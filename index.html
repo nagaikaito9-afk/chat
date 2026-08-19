@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberChat - リアルタイム自由チャット (画質・お絵かき・画面共有進化版)</title>
+  <title>CyberChat - リアルタイム自由チャット (Googleログイン対応版)</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,20 +24,25 @@
   <div class="bg-glow bg-glow-1"></div>
   <div class="bg-glow bg-glow-2"></div>
 
-  <!-- リモート音声・画面共有用格納要素 -->
+  <!-- リモート音声格納要素 -->
   <div id="remote-audio-container" class="hidden"></div>
 
-  <!-- 全員共通：左下画面共有ライブ表示ビューポート -->
+  <!-- 画面共有ライブ表示ビューポート -->
   <div id="screen-share-overlay" class="screen-share-box glass-panel hidden">
     <div class="screen-share-header">
-      <span><i class="fa-solid fa-desktop text-success pulse"></i> <strong id="screen-sharer-name">誰か</strong> の画面配信中</span>
+      <span id="screen-share-title-clickable" style="cursor:pointer;" title="クリックで大画面/小画面切り替え">
+        <i class="fa-solid fa-desktop text-success pulse"></i> <strong id="screen-sharer-name">誰か</strong> の画面配信中
+      </span>
       <div class="screen-share-actions">
+        <button id="btn-expand-screen" class="btn-secondary btn-sm" title="大画面切り替え (シアターモード)"><i class="fa-solid fa-expand"></i></button>
         <button id="btn-snap-screen" class="btn-secondary btn-sm" title="スナップショット投稿"><i class="fa-solid fa-camera"></i></button>
         <button id="btn-stop-screen" class="btn-secondary btn-sm danger" title="共有停止"><i class="fa-solid fa-xmark"></i></button>
       </div>
     </div>
-    <video id="screen-share-video" autoplay playsinline muted></video>
-    <img id="screen-share-remote-img" class="hidden" alt="リモート画面配信">
+    <div class="screen-share-video-wrapper">
+      <video id="screen-share-video" autoplay playsinline muted title="クリックで大画面切り替え"></video>
+      <img id="screen-share-remote-img" class="hidden" alt="リモート画面配信" title="クリックで大画面切り替え">
+    </div>
   </div>
 
   <!-- 入室・初期設定モーダル (全画面オーバーレイ) -->
@@ -49,6 +54,16 @@
           <h2>CyberChat</h2>
         </div>
         <p class="join-subtitle">名前、アイコン、気分を設定して自由に話そう</p>
+      </div>
+
+      <!-- Google ログインボタン -->
+      <button type="button" id="btn-google-login" class="btn-google">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="google-icon">
+        <span>Google アカウントでかんたんログイン</span>
+      </button>
+
+      <div class="google-auth-divider">
+        <span>または名前を入力して参加</span>
       </div>
 
       <form id="join-form" onsubmit="return false;">

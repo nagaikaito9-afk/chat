@@ -4,6 +4,9 @@ import {
   getDatabase, ref, set, push, onValue, onChildAdded, onChildChanged, onChildRemoved,
   remove, get, update, serverTimestamp, onDisconnect, query, limitToLast 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -19,6 +22,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
 
 // Global State
 let myUserId = localStorage.getItem('cyberchat_user_id') || 'usr_' + Math.random().toString(36).substring(2, 10);
@@ -283,6 +287,7 @@ function initApp() {
   setupAvatarPickers();
   setupTripInputListeners();
   setupJoinForm();
+  setupGoogleAuth();
   setupChatControls();
   setupRoomTabs();
   setupStampsAndMinigames();
@@ -303,6 +308,64 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
   initApp();
+}
+
+// Google Auth Handler
+function setupGoogleAuth() {
+  const btnGoogle = document.getElementById('btn-google-login');
+  if (!btnGoogle) return;
+
+  btnGoogle.addEventListener('click', async () => {
+    const provider = new GoogleAuthProvider();
+    btnGoogle.disabled = true;
+    btnGoogle.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Google認証中...';
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const displayName = user.displayName || 'Googleユーザー';
+      
+      const isDuplicate = await checkDuplicateName(displayName, myUserId);
+      if (isDuplicate) {
+        showToast(`「${displayName}」は現在他ユーザーが使用中です。`, 'error');
+        btnGoogle.disabled = false;
+        btnGoogle.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="google-icon"> <span>Google アカウントでかんたんログイン</span>';
+        return;
+      }
+
+      myName = displayName;
+      myTrip = '◆' + user.uid.substring(0, 10);
+      myAvatar = '🔑';
+
+      await registerOnlineUser();
+
+      const joinModal = document.getElementById('join-modal');
+      if (joinModal) {
+        joinModal.classList.remove('active');
+        joinModal.classList.add('hidden');
+        joinModal.style.display = 'none';
+      }
+      document.getElementById('app-container').classList.remove('hidden');
+
+      updateMyProfileUI();
+      sendSystemMessage(`${myAvatar} ${myName} (${myTrip}) がGoogleログインで入室しました！`);
+      initFirebaseRealtimeSync();
+      showToast(`Googleアカウント「${displayName}」でログイン成功！`, 'success');
+
+    } catch (err) {
+      console.error("Google Login error:", err);
+      if (err.code === 'auth/unauthorized-domain') {
+        showToast('Firebase Consoleの承認済みドメイン設定が必要です（設定手順をご確認ください）', 'error');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        showToast('Googleログイン画面がキャンセルされました');
+      } else {
+        showToast(`Googleログイン失敗: ${err.message || 'Firebase設定を確認してください'}`, 'error');
+      }
+    } finally {
+      btnGoogle.disabled = false;
+      btnGoogle.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="google-icon"> <span>Google アカウントでかんたんログイン</span>';
+    }
+  });
 }
 
 // Avatar Grid Selector
@@ -581,7 +644,7 @@ function initFirebaseRealtimeSync() {
     }
   });
 
-  // 5. 左下画面共有（全員への配信・フレーム表示）
+  // 5. 画面共有状態（全員へリアルタイム配信）
   unsubscribeScreen = onValue(roomRef('screen_share'), (snapshot) => {
     const box = document.getElementById('screen-share-overlay');
     const sharerNameEl = document.getElementById('screen-sharer-name');
@@ -602,7 +665,10 @@ function initFirebaseRealtimeSync() {
         videoEl.classList.remove('hidden');
       }
     } else {
-      if (!isScreenSharing) box.classList.add('hidden');
+      if (!isScreenSharing) {
+        box.classList.add('hidden');
+        document.getElementById('app-container').classList.remove('screen-share-expanded');
+      }
     }
   });
 }
@@ -1149,13 +1215,43 @@ async function sendSpecialMessageWithMedia(msgType, text, fileUrl) {
   }
 }
 
-// Screen Sharing Logic (左下に固定・全員リアルタイム同期)
+// Screen Sharing Logic (クリックで大画面シアターモード切り替え)
 function setupScreenShare() {
   const btnToggle = document.getElementById('btn-toggle-screen');
   const box = document.getElementById('screen-share-overlay');
   const videoEl = document.getElementById('screen-share-video');
+  const remoteImgEl = document.getElementById('screen-share-remote-img');
   const btnSnap = document.getElementById('btn-snap-screen');
   const btnStop = document.getElementById('btn-stop-screen');
+  const btnExpand = document.getElementById('btn-expand-screen');
+  const titleClickable = document.getElementById('screen-share-title-clickable');
+  const appContainer = document.getElementById('app-container');
+
+  let isExpanded = false;
+
+  function toggleTheaterMode(e) {
+    if (e && (e.target.closest('#btn-snap-screen') || e.target.closest('#btn-stop-screen'))) {
+      return;
+    }
+
+    isExpanded = !isExpanded;
+    if (isExpanded) {
+      appContainer.classList.add('screen-share-expanded');
+      btnExpand.innerHTML = '<i class="fa-solid fa-compress"></i>';
+      btnExpand.title = '小画面に戻す';
+      showToast('大画面（シアターモード）に切り替えました。右側でチャットができます！');
+    } else {
+      appContainer.classList.remove('screen-share-expanded');
+      btnExpand.innerHTML = '<i class="fa-solid fa-expand"></i>';
+      btnExpand.title = '大画面切り替え';
+      showToast('小画面（左下）に戻しました');
+    }
+  }
+
+  if (btnExpand) btnExpand.addEventListener('click', toggleTheaterMode);
+  if (titleClickable) titleClickable.addEventListener('click', toggleTheaterMode);
+  if (videoEl) videoEl.addEventListener('click', toggleTheaterMode);
+  if (remoteImgEl) remoteImgEl.addEventListener('click', toggleTheaterMode);
 
   btnToggle.addEventListener('click', async () => {
     if (!isScreenSharing) {
@@ -1180,12 +1276,11 @@ function setupScreenShare() {
           timestamp: Date.now()
         });
 
-        // 1.5秒ごとに全ユーザーの左下プレイヤーに画面フレームを同期送信
         screenFrameInterval = setInterval(() => {
           if (!isScreenSharing || !videoEl || videoEl.videoWidth === 0) return;
           const canvas = document.createElement('canvas');
-          canvas.width = 320;
-          canvas.height = Math.round((videoEl.videoHeight * 320) / videoEl.videoWidth);
+          canvas.width = 480;
+          canvas.height = Math.round((videoEl.videoHeight * 480) / videoEl.videoWidth);
           const ctx = canvas.getContext('2d');
           ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
           const frameDataUrl = canvas.toDataURL('image/jpeg', 0.4);
@@ -1194,10 +1289,10 @@ function setupScreenShare() {
             frameData: frameDataUrl,
             timestamp: Date.now()
           });
-        }, 1500);
+        }, 1200);
 
         sendSystemMessage(`🖥️ ${myName} が画面共有を開始しました`);
-        showToast('画面共有を開始しました！(全員の左下に配信されます)', 'success');
+        showToast('画面共有を開始しました！(クリックで大画面化できます)', 'success');
 
         screenStream.getVideoTracks()[0].onended = () => {
           stopScreenShare();
@@ -1230,6 +1325,8 @@ function setupScreenShare() {
 
   function stopScreenShare() {
     isScreenSharing = false;
+    isExpanded = false;
+    appContainer.classList.remove('screen-share-expanded');
     if (screenFrameInterval) clearInterval(screenFrameInterval);
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());

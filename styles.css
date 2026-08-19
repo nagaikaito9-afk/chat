@@ -100,7 +100,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Background Ambient Glows (Optimized for speed) */
+/* Background Ambient Glows */
 .bg-glow {
   position: fixed;
   border-radius: 50%;
@@ -258,7 +258,7 @@ html, body {
   color: #ffffff;
 }
 
-/* 全員共通：画面共有ライブ表示 (画面左下に固定配置) */
+/* 通常時：画面共有プレイヤー (左下に浮遊固定) */
 .screen-share-box {
   position: fixed;
   bottom: 24px;
@@ -270,12 +270,13 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: rgba(10, 13, 20, 0.9);
+  background: rgba(10, 13, 20, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--accent-primary);
   box-shadow: var(--shadow-md), 0 0 20px var(--accent-glow);
-  animation: slideUpMsg 0.3s ease-out;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
 }
 
 .screen-share-header {
@@ -291,16 +292,115 @@ html, body {
   gap: 6px;
 }
 
+.screen-share-video-wrapper {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #000;
+}
+
 #screen-share-video, #screen-share-remote-img {
   width: 100%;
   max-height: 180px;
   border-radius: var(--radius-sm);
   background: #000;
   object-fit: contain;
+  display: block;
+}
+
+/* 大画面シアターモード（クリックで発動：左側が大画面共有、右側がチャット） */
+.app-container.screen-share-expanded {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  grid-template-rows: 100vh;
+}
+
+.app-container.screen-share-expanded .sidebar {
+  display: none !important;
+}
+
+.app-container.screen-share-expanded .screen-share-box {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  width: 100%;
+  height: 100vh;
+  z-index: 100;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--glass-border);
+  background: #000;
+  box-shadow: none;
+  padding: 16px;
+  cursor: default;
+}
+
+.app-container.screen-share-expanded .screen-share-video-wrapper {
+  height: calc(100vh - 60px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-container.screen-share-expanded #screen-share-video,
+.app-container.screen-share-expanded #screen-share-remote-img {
+  max-height: 100%;
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
 }
 
 .btn-block {
   width: 100%;
+}
+
+.btn-google {
+  width: 100%;
+  padding: 12px;
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: var(--transition-normal);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  margin-bottom: 14px;
+}
+
+.btn-google:hover {
+  background: #f9fafb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.google-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.google-auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 16px 0 18px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.google-auth-divider::before, .google-auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.google-auth-divider span {
+  padding: 0 10px;
 }
 
 .btn-sm {
@@ -978,7 +1078,7 @@ html, body {
   border-bottom-left-radius: 4px;
 }
 
-/* コンパクト画像プレビュー (大きい画像は小さく表示) */
+/* サムネイル画像サイズ */
 .msg-image {
   max-width: 220px;
   max-height: 180px;
@@ -995,7 +1095,7 @@ html, body {
   transform: scale(1.03);
 }
 
-/* YouTube Iframe Embed Card */
+/* YouTube Iframe */
 .msg-youtube-iframe {
   width: 100%;
   max-width: 320px;
@@ -1099,7 +1199,7 @@ html, body {
   transform: scale(1.2);
 }
 
-/* Dropdown Menu for Edit/Delete */
+/* Dropdown Menu */
 .msg-actions-menu-btn {
   position: absolute;
   top: 4px;
@@ -1676,6 +1776,20 @@ html, body {
   .screen-share-box {
     left: 12px;
     bottom: 12px;
-    width: 260px;
+    width: 240px;
+  }
+
+  .app-container.screen-share-expanded {
+    grid-template-columns: 1fr;
+    grid-template-rows: 45vh 1fr;
+  }
+
+  .app-container.screen-share-expanded .screen-share-box {
+    height: 45vh;
+  }
+
+  .app-container.screen-share-expanded .chat-main {
+    width: 100%;
+    height: 55vh;
   }
 }
