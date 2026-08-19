@@ -89,18 +89,41 @@
         </div>
 
         <div class="input-group">
-          <label><i class="fa-solid fa-face-smile"></i> アイコンを選択</label>
-          <div id="join-avatar-picker" class="avatar-picker-grid">
-            <span class="avatar-opt active" data-avatar="🤖">🤖</span>
-            <span class="avatar-opt" data-avatar="🐱">🐱</span>
-            <span class="avatar-opt" data-avatar="🦊">🦊</span>
-            <span class="avatar-opt" data-avatar="👑">👑</span>
-            <span class="avatar-opt" data-avatar="🚀">🚀</span>
-            <span class="avatar-opt" data-avatar="💎">💎</span>
-            <span class="avatar-opt" data-avatar="🐲">🐲</span>
-            <span class="avatar-opt" data-avatar="⚡">⚡</span>
-            <span class="avatar-opt" data-avatar="🌸">🌸</span>
-            <span class="avatar-opt" data-avatar="🎮">🎮</span>
+          <label><i class="fa-solid fa-face-smile"></i> アイコンを選択 (全50種 & 画像対応)</label>
+          <div class="avatar-picker-tabs">
+            <button type="button" class="avatar-tab-btn active" data-target="join-tab-preset">アイコン50種</button>
+            <button type="button" class="avatar-tab-btn" data-target="join-tab-custom">📷 画像アイコン</button>
+          </div>
+
+          <div id="join-tab-preset" class="avatar-tab-content active">
+            <div class="avatar-category-pills">
+              <button type="button" class="cat-pill active" data-cat="all" data-picker="join">すべて</button>
+              <button type="button" class="cat-pill" data-cat="cyber" data-picker="join">SF</button>
+              <button type="button" class="cat-pill" data-cat="werewolf" data-picker="join">人狼</button>
+              <button type="button" class="cat-pill" data-cat="animal" data-picker="join">動物</button>
+              <button type="button" class="cat-pill" data-cat="face" data-picker="join">表情</button>
+              <button type="button" class="cat-pill" data-cat="hobby" data-picker="join">趣味</button>
+            </div>
+            <div id="join-avatar-picker" class="avatar-picker-grid-50">
+              <!-- 50種類アイコンはJSで動的/プリセット挿入 -->
+            </div>
+          </div>
+
+          <div id="join-tab-custom" class="avatar-tab-content hidden">
+            <div class="custom-avatar-uploader">
+              <label class="btn-secondary btn-sm file-upload-btn">
+                <i class="fa-solid fa-upload"></i> 画像ファイルをアップロード
+                <input type="file" id="join-avatar-file-input" accept="image/*" class="hidden-file-input">
+              </label>
+              <div class="url-input-row" style="margin-top:8px; display:flex; gap:6px;">
+                <input type="url" id="join-avatar-url-input" placeholder="画像URL (https://...)" class="input-sm" style="flex:1;">
+                <button type="button" id="btn-join-apply-url" class="btn-primary btn-sm">適用</button>
+              </div>
+              <div class="custom-preview-wrapper" style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+                <span class="preview-lbl" style="font-size:0.85rem; color:var(--text-secondary);">現在のアイコン:</span>
+                <div id="join-avatar-preview" class="avatar-preview-box">🤖</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -356,6 +379,7 @@
 
       <!-- Quick Snippets ショートカットバー -->
       <div class="snippets-bar">
+        <span class="snippet-tag snippet-werewolf" onclick="window.openWerewolfModal()">🐺 人狼ゲーム</span>
         <span class="snippet-tag" onclick="window.insertSnippet('🤖 @bot ')">🤖 AI Botに質問</span>
         <span class="snippet-tag" onclick="window.startMathQuizGame()">🧠 数学クイズ</span>
         <span class="snippet-tag" onclick="window.startRpsBattle()">✌️ じゃんけん勝負</span>
@@ -407,6 +431,11 @@
 
         <div class="chat-input-row">
           <div class="tool-buttons">
+            <!-- 🐺 人狼ゲーム ボタン -->
+            <button type="button" onclick="window.openWerewolfModal()" class="btn-icon-tool" title="人狼ゲームを開始 (CPU/オンライン)">
+              <i class="fa-solid fa-moon text-warning"></i>
+            </button>
+
             <!-- 🤖 AI CyberBot ボタン -->
             <button type="button" id="btn-call-ai-bot" class="btn-icon-tool" title="AI CyberBotを呼ぶ (@bot)">
               <i class="fa-solid fa-robot text-primary"></i>
@@ -697,18 +726,41 @@
         </div>
 
         <div class="input-group">
-          <label><i class="fa-solid fa-face-smile"></i> アイコンを変更</label>
-          <div id="edit-avatar-picker" class="avatar-picker-grid">
-            <span class="avatar-opt" data-avatar="🤖">🤖</span>
-            <span class="avatar-opt" data-avatar="🐱">🐱</span>
-            <span class="avatar-opt" data-avatar="🦊">🦊</span>
-            <span class="avatar-opt" data-avatar="👑">👑</span>
-            <span class="avatar-opt" data-avatar="🚀">🚀</span>
-            <span class="avatar-opt" data-avatar="💎">💎</span>
-            <span class="avatar-opt" data-avatar="🐲">🐲</span>
-            <span class="avatar-opt" data-avatar="⚡">⚡</span>
-            <span class="avatar-opt" data-avatar="🌸">🌸</span>
-            <span class="avatar-opt" data-avatar="🎮">🎮</span>
+          <label><i class="fa-solid fa-face-smile"></i> アイコンを変更 (全50種 & 画像対応)</label>
+          <div class="avatar-picker-tabs">
+            <button type="button" class="avatar-tab-btn active" data-target="edit-tab-preset">アイコン50種</button>
+            <button type="button" class="avatar-tab-btn" data-target="edit-tab-custom">📷 画像アイコン</button>
+          </div>
+
+          <div id="edit-tab-preset" class="avatar-tab-content active">
+            <div class="avatar-category-pills">
+              <button type="button" class="cat-pill active" data-cat="all" data-picker="edit">すべて</button>
+              <button type="button" class="cat-pill" data-cat="cyber" data-picker="edit">SF</button>
+              <button type="button" class="cat-pill" data-cat="werewolf" data-picker="edit">人狼</button>
+              <button type="button" class="cat-pill" data-cat="animal" data-picker="edit">動物</button>
+              <button type="button" class="cat-pill" data-cat="face" data-picker="edit">表情</button>
+              <button type="button" class="cat-pill" data-cat="hobby" data-picker="edit">趣味</button>
+            </div>
+            <div id="edit-avatar-picker" class="avatar-picker-grid-50">
+              <!-- 50種類アイコンはJSで動的/プリセット挿入 -->
+            </div>
+          </div>
+
+          <div id="edit-tab-custom" class="avatar-tab-content hidden">
+            <div class="custom-avatar-uploader">
+              <label class="btn-secondary btn-sm file-upload-btn">
+                <i class="fa-solid fa-upload"></i> 画像ファイルをアップロード
+                <input type="file" id="edit-avatar-file-input" accept="image/*" class="hidden-file-input">
+              </label>
+              <div class="url-input-row" style="margin-top:8px; display:flex; gap:6px;">
+                <input type="url" id="edit-avatar-url-input" placeholder="画像URL (https://...)" class="input-sm" style="flex:1;">
+                <button type="button" id="btn-edit-apply-url" class="btn-primary btn-sm">適用</button>
+              </div>
+              <div class="custom-preview-wrapper" style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+                <span class="preview-lbl" style="font-size:0.85rem; color:var(--text-secondary);">現在のアイコン:</span>
+                <div id="edit-avatar-preview" class="avatar-preview-box">🤖</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -758,6 +810,176 @@
     <div class="image-modal-content">
       <button class="btn-icon image-modal-close"><i class="fa-solid fa-xmark"></i></button>
       <img id="full-image-display" src="" alt="拡大画像">
+    </div>
+  </div>
+
+  <!-- 🐺 サイバー人狼ゲーム モーダル -->
+  <div id="werewolf-game-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel werewolf-modal-card animate-scale-up">
+      <div class="modal-header werewolf-header">
+        <div class="werewolf-title">
+          <i class="fa-solid fa-moon text-warning pulse"></i>
+          <h3>サイバー人狼 (Cyber Werewolf)</h3>
+          <span id="werewolf-phase-badge" class="werewolf-phase-badge">ロビー</span>
+        </div>
+        <div class="werewolf-header-actions">
+          <span id="werewolf-timer-display" class="werewolf-timer hidden">⏳ <strong id="werewolf-timer-sec">45</strong>s</span>
+          <button type="button" id="btn-close-werewolf" class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div class="modal-body werewolf-modal-body">
+        <!-- 1. ロビー (設定画面) -->
+        <div id="werewolf-screen-lobby" class="werewolf-screen active">
+          <div class="werewolf-lobby-box">
+            <div class="lobby-banner">
+              <span class="lobby-icon">🐺</span>
+              <h4>村に潜む人狼を暴き出せ！</h4>
+              <p>オンラインメンバーやAI Botと対戦できる本格人狼ゲーム。役職を駆使してチームを勝利に導こう！</p>
+            </div>
+
+            <div class="lobby-settings-grid">
+              <div class="setting-item">
+                <label><i class="fa-solid fa-users"></i> プレイ人数</label>
+                <select id="werewolf-player-count" class="status-select">
+                  <option value="4">4人 (人狼1 / 占い1 / 市民2)</option>
+                  <option value="5" selected>5人 (人狼1 / 占い1 / 騎士1 / 市民2)</option>
+                  <option value="6">6人 (人狼1 / 狂人1 / 占い1 / 騎士1 / 市民2)</option>
+                  <option value="7">7人 (人狼2 / 占い1 / 騎士1 / 霊媒1 / 市民2)</option>
+                  <option value="8">8人 (人狼2 / 狂人1 / 占い1 / 騎士1 / 霊媒1 / 市民2)</option>
+                </select>
+              </div>
+
+              <div class="setting-item">
+                <label><i class="fa-solid fa-robot"></i> プレイヤー補充</label>
+                <div class="mode-toggle-group">
+                  <button type="button" class="device-btn active" style="cursor:default;">🤖 人数不足分をAI Botで自動補正</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="lobby-roles-preview">
+              <h5><i class="fa-solid fa-shield-halved"></i> 登場役職一覧</h5>
+              <div class="role-tags-wrapper">
+                <span class="role-chip wolf"><i class="fa-solid fa-wolf-pack-white"></i> 人狼</span>
+                <span class="role-chip seer"><i class="fa-solid fa-crystal-ball"></i> 占い師</span>
+                <span class="role-chip knight"><i class="fa-solid fa-shield-halved"></i> 騎士</span>
+                <span class="role-chip madman"><i class="fa-solid fa-masks-theater"></i> 狂人</span>
+                <span class="role-chip medium"><i class="fa-solid fa-ghost"></i> 霊媒師</span>
+                <span class="role-chip villager"><i class="fa-solid fa-user"></i> 市民</span>
+              </div>
+            </div>
+
+            <div class="lobby-start-action" style="margin-top:16px;">
+              <button type="button" id="btn-start-werewolf-game" class="btn-primary btn-block danger" style="padding:12px; font-size:1.1rem;">
+                <i class="fa-solid fa-play"></i> ゲームを開始する
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 役職配布・確認画面 -->
+        <div id="werewolf-screen-role" class="werewolf-screen hidden">
+          <div class="role-reveal-box">
+            <div class="role-card-inner">
+              <div class="role-icon-large" id="wf-my-role-icon">🔮</div>
+              <h3 id="wf-my-role-title">占い師</h3>
+              <span id="wf-my-role-team" class="role-team-tag">市民陣営</span>
+              <p id="wf-my-role-desc" class="role-desc-text">毎晩、指定した人物が「市民」か「人狼」かを占うことができます。</p>
+            </div>
+            <button type="button" id="btn-confirm-role" class="btn-primary" style="margin-top:16px;">役職を確認した (夜へ進む)</button>
+          </div>
+        </div>
+
+        <!-- 3. 夜の行動画面 -->
+        <div id="werewolf-screen-night" class="werewolf-screen hidden">
+          <div class="night-action-box">
+            <div class="night-header">
+              <i class="fa-solid fa-moon text-warning pulse"></i>
+              <h4 id="wf-night-prompt-title">夜の行動フェーズ</h4>
+              <p id="wf-night-prompt-desc">能力を行使する対象を選択してください。</p>
+            </div>
+
+            <div id="wf-night-target-list" class="werewolf-player-grid">
+              <!-- 動的生成 -->
+            </div>
+
+            <div class="night-footer" style="margin-top:16px; text-align:center;">
+              <button type="button" id="btn-submit-night-action" class="btn-primary danger" disabled>決定する</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 昼の議論画面 -->
+        <div id="werewolf-screen-day" class="werewolf-screen hidden">
+          <div class="day-main-layout">
+            <div id="wf-day-announce-banner" class="day-announce-banner">
+              <i class="fa-solid fa-sun text-warning"></i>
+              <span id="wf-day-announce-text">朝が来ました。昨夜の犠牲者は居ませんでした。</span>
+            </div>
+
+            <div id="wf-day-player-grid" class="werewolf-player-grid">
+              <!-- 動的生成 -->
+            </div>
+
+            <div class="werewolf-chat-section">
+              <div class="wf-chat-header">
+                <span><i class="fa-solid fa-comments"></i> 議論チャット</span>
+                <button type="button" id="btn-wf-skip-discussion" class="btn-secondary btn-sm"><i class="fa-solid fa-forward"></i> 議論を終了して投票へ</button>
+              </div>
+              <div id="wf-chat-messages" class="wf-chat-messages">
+                <!-- 発言ログ -->
+              </div>
+              <div id="wf-chat-input-row" class="wf-chat-input-row">
+                <input type="text" id="wf-chat-input" placeholder="意見や怪しい人物を発言... (Enterで送信)" maxlength="100">
+                <button type="button" id="btn-wf-send-chat" class="btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 投票選択画面 -->
+        <div id="werewolf-screen-vote" class="werewolf-screen hidden">
+          <div class="vote-action-box">
+            <div class="vote-header">
+              <i class="fa-solid fa-check-to-slot text-danger pulse"></i>
+              <h4>追放投票フェーズ</h4>
+              <p>人狼だと思われる人物に1票を投じてください。</p>
+            </div>
+
+            <div id="wf-vote-target-grid" class="werewolf-player-grid">
+              <!-- 動的生成 -->
+            </div>
+
+            <div class="vote-footer" style="margin-top:16px; text-align:center;">
+              <button type="button" id="btn-submit-vote" class="btn-primary danger" disabled>投票を完了する</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. 結果発表画面 -->
+        <div id="werewolf-screen-result" class="werewolf-screen hidden">
+          <div class="result-display-box">
+            <div class="result-banner" id="wf-result-banner">
+              <h2 id="wf-result-title">🎉 市民陣営の勝利！</h2>
+              <p id="wf-result-subtitle">人狼は全員追放されました！</p>
+            </div>
+
+            <div class="result-roles-summary">
+              <h5><i class="fa-solid fa-users-viewfinder"></i> 全プレイヤーの役職公開</h5>
+              <div id="wf-result-player-list" class="result-player-list">
+                <!-- 動的生成 -->
+              </div>
+            </div>
+
+            <div class="result-actions" style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+              <button type="button" id="btn-wf-play-again" class="btn-primary"><i class="fa-solid fa-rotate-right"></i> もう一度プレイ</button>
+              <button type="button" id="btn-wf-share-chat" class="btn-secondary"><i class="fa-solid fa-share-nodes"></i> 結果をチャットに共有</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 

@@ -255,6 +255,47 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// 50 Icon Choices Array (Categorized)
+const AVATAR_PRESETS_50 = [
+  // SF & Cyber (10)
+  { icon: '🤖', cat: 'cyber' }, { icon: '💻', cat: 'cyber' }, { icon: '🛸', cat: 'cyber' },
+  { icon: '🚀', cat: 'cyber' }, { icon: '⚡', cat: 'cyber' }, { icon: '🛰️', cat: 'cyber' },
+  { icon: '👾', cat: 'cyber' }, { icon: '🕹️', cat: 'cyber' }, { icon: '🦾', cat: 'cyber' },
+  { icon: '🔮', cat: 'cyber' },
+
+  // Werewolf & Fantasy (10)
+  { icon: '🐺', cat: 'werewolf' }, { icon: '🧙‍♂️', cat: 'werewolf' }, { icon: '🛡️', cat: 'werewolf' },
+  { icon: '⚔️', cat: 'werewolf' }, { icon: '🌙', cat: 'werewolf' }, { icon: '📜', cat: 'werewolf' },
+  { icon: '🏹', cat: 'werewolf' }, { icon: '👑', cat: 'werewolf' }, { icon: '🏰', cat: 'werewolf' },
+  { icon: '🕯️', cat: 'werewolf' },
+
+  // Animals & Monsters (10)
+  { icon: '🐱', cat: 'animal' }, { icon: '🦊', cat: 'animal' }, { icon: '🦁', cat: 'animal' },
+  { icon: '🐯', cat: 'animal' }, { icon: '🐲', cat: 'animal' }, { icon: '🐻', cat: 'animal' },
+  { icon: '🦉', cat: 'animal' }, { icon: '🦅', cat: 'animal' }, { icon: '🦄', cat: 'animal' },
+  { icon: '🐼', cat: 'animal' },
+
+  // Faces & Emotes (10)
+  { icon: '😎', cat: 'face' }, { icon: '🤠', cat: 'face' }, { icon: '🥷', cat: 'face' },
+  { icon: '🤡', cat: 'face' }, { icon: '👻', cat: 'face' }, { icon: '💀', cat: 'face' },
+  { icon: '🎃', cat: 'face' }, { icon: '👽', cat: 'face' }, { icon: '👺', cat: 'face' },
+  { icon: '🌸', cat: 'face' },
+
+  // Hobbies & Items (10)
+  { icon: '🎮', cat: 'hobby' }, { icon: '🎨', cat: 'hobby' }, { icon: '🎵', cat: 'hobby' },
+  { icon: '💎', cat: 'hobby' }, { icon: '⚽', cat: 'hobby' }, { icon: '🍕', cat: 'hobby' },
+  { icon: '☕', cat: 'hobby' }, { icon: '🌟', cat: 'hobby' }, { icon: '🔥', cat: 'hobby' },
+  { icon: '🌈', cat: 'hobby' }
+];
+
+function renderAvatarHTML(avatar, customClass = '') {
+  if (!avatar) return `<span class="${customClass}">🤖</span>`;
+  if (avatar.startsWith('data:image/') || avatar.startsWith('http://') || avatar.startsWith('https://')) {
+    return `<img src="${escapeHtml(avatar)}" class="avatar-img-obj ${customClass}" alt="avatar">`;
+  }
+  return `<span class="${customClass}">${escapeHtml(avatar)}</span>`;
+}
+
 function formatTime(timestamp) {
   if (!timestamp) return '';
   const date = new Date(timestamp);
@@ -405,6 +446,7 @@ function initApp() {
   setupReplyBanner();
   setupAdminSystem();
   setupAiBotControls();
+  setupWerewolfGameControls();
   renderIgnoredUsersUI();
   initBanCheckListener();
   setupPresenceConnectionHeartbeat();
@@ -561,7 +603,7 @@ function renderAdminUsersTable() {
   activeUsersMap.forEach((uData, uid) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${escapeHtml(uData.avatar || '')} ${escapeHtml(uData.name || '')} ${uid === myUserId ? '<strong>(あなた)</strong>' : ''}</td>
+      <td>${renderAvatarHTML(uData.avatar || '🤖')} ${escapeHtml(uData.name || '')} ${uid === myUserId ? '<strong>(あなた)</strong>' : ''}</td>
       <td><span class="trip-badge">${escapeHtml(uData.trip || '')}</span></td>
       <td><code>${uid.substring(0, 8)}...</code></td>
       <td>
@@ -714,22 +756,140 @@ function setupGoogleAuth() {
   });
 }
 
-// Avatar Grid Selector
+// Avatar Grid Selector & Custom Image Uploader
 function setupAvatarPickers() {
-  document.querySelectorAll('#join-avatar-picker .avatar-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-      document.querySelectorAll('#join-avatar-picker .avatar-opt').forEach(o => o.classList.remove('active'));
-      opt.classList.add('active');
-      myAvatar = opt.dataset.avatar;
+  const joinGrid = document.getElementById('join-avatar-picker');
+  const editGrid = document.getElementById('edit-avatar-picker');
+
+  // Populate 50 icons in grids
+  const populateGrid = (gridEl, pickerType) => {
+    if (!gridEl) return;
+    gridEl.innerHTML = '';
+    AVATAR_PRESETS_50.forEach((item, idx) => {
+      const opt = document.createElement('span');
+      opt.className = `avatar-opt ${idx === 0 ? 'active' : ''}`;
+      opt.dataset.avatar = item.icon;
+      opt.dataset.cat = item.cat;
+      opt.textContent = item.icon;
+
+      opt.addEventListener('click', () => {
+        gridEl.querySelectorAll('.avatar-opt').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        myAvatar = item.icon;
+        updateMyProfileUI();
+      });
+      gridEl.appendChild(opt);
+    });
+  };
+
+  populateGrid(joinGrid, 'join');
+  populateGrid(editGrid, 'edit');
+
+  // Tab Switching (Presets vs Custom Image)
+  document.querySelectorAll('.avatar-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const parentGroup = btn.closest('.input-group');
+      if (!parentGroup) return;
+      parentGroup.querySelectorAll('.avatar-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const targetId = btn.dataset.target;
+      parentGroup.querySelectorAll('.avatar-tab-content').forEach(c => c.classList.add('hidden'));
+      const targetContent = document.getElementById(targetId);
+      if (targetContent) targetContent.classList.remove('hidden');
     });
   });
 
-  document.querySelectorAll('#edit-avatar-picker .avatar-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-      document.querySelectorAll('#edit-avatar-picker .avatar-opt').forEach(o => o.classList.remove('active'));
-      opt.classList.add('active');
+  // Category Filtering
+  document.querySelectorAll('.cat-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const cat = pill.dataset.cat;
+      const parentTab = pill.closest('.avatar-tab-content');
+      if (!parentTab) return;
+
+      parentTab.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+
+      const grid = parentTab.querySelector('.avatar-picker-grid-50');
+      if (!grid) return;
+      grid.querySelectorAll('.avatar-opt').forEach(opt => {
+        if (cat === 'all' || opt.dataset.cat === cat) {
+          opt.style.display = 'flex';
+        } else {
+          opt.style.display = 'none';
+        }
+      });
     });
   });
+
+  // Custom Image Upload Listeners
+  const bindImageFileUploader = (inputId, previewId) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      processCustomAvatarFile(file, previewId);
+    });
+  };
+
+  const bindImageUrlApplier = (btnId, inputId, previewId) => {
+    const btn = document.getElementById(btnId);
+    const input = document.getElementById(inputId);
+    if (!btn || !input) return;
+    btn.addEventListener('click', () => {
+      processCustomAvatarUrl(input.value, previewId);
+    });
+  };
+
+  bindImageFileUploader('join-avatar-file-input', 'join-avatar-preview');
+  bindImageFileUploader('edit-avatar-file-input', 'edit-avatar-preview');
+  bindImageUrlApplier('btn-join-apply-url', 'join-avatar-url-input', 'join-avatar-preview');
+  bindImageUrlApplier('btn-edit-apply-url', 'edit-avatar-url-input', 'edit-avatar-preview');
+}
+
+function processCustomAvatarFile(file, previewElemId) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const maxSize = 128;
+      let w = img.width;
+      let h = img.height;
+      if (w > h) {
+        if (w > maxSize) {
+          h = Math.round((h * maxSize) / w);
+          w = maxSize;
+        }
+      } else {
+        if (h > maxSize) {
+          w = Math.round((w * maxSize) / h);
+          h = maxSize;
+        }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/png', 0.85);
+      myAvatar = dataUrl;
+      updateMyProfileUI();
+      showToast('画像アイコンを設定しました！', 'success');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function processCustomAvatarUrl(urlStr, previewElemId) {
+  if (!urlStr || (!urlStr.startsWith('http://') && !urlStr.startsWith('https://') && !urlStr.startsWith('data:image/'))) {
+    showToast('有効な画像URLを入力してください (http/https/data:image)', 'error');
+    return;
+  }
+  myAvatar = urlStr.trim();
+  updateMyProfileUI();
+  showToast('画像URLアイコンを設定しました！', 'success');
 }
 
 function setupTripInputListeners() {
@@ -838,8 +998,13 @@ async function registerOnlineUser() {
 function updateMyProfileUI() {
   document.getElementById('my-name-display').textContent = myName;
   document.getElementById('my-trip-display').textContent = myTrip;
-  document.getElementById('my-avatar').textContent = myAvatar;
+  document.getElementById('my-avatar').innerHTML = renderAvatarHTML(myAvatar);
   document.getElementById('my-status-display').textContent = myStatus;
+
+  const joinPrev = document.getElementById('join-avatar-preview');
+  if (joinPrev) joinPrev.innerHTML = renderAvatarHTML(myAvatar);
+  const editPrev = document.getElementById('edit-avatar-preview');
+  if (editPrev) editPrev.innerHTML = renderAvatarHTML(myAvatar);
 }
 
 // Room Switching Logic
@@ -904,7 +1069,7 @@ function initFirebaseRealtimeSync() {
         const li = document.createElement('li');
         li.className = 'user-item';
         li.innerHTML = `
-          <div class="avatar-sm">${escapeHtml(uData.avatar || '🤖')}</div>
+          <div class="avatar-sm">${renderAvatarHTML(uData.avatar || '🤖')}</div>
           <div class="user-item-info">
             <div class="user-item-name">${escapeHtml(uData.name)} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
             <div class="user-item-status">${escapeHtml(uData.status || '💬 雑談歓迎')}</div>
@@ -1284,7 +1449,7 @@ function renderSingleMessage(msgId, msg) {
 
     const metaHtml = `
       <div class="msg-meta">
-        <span class="msg-avatar-icon">${escapeHtml(msg.avatar || '🤖')}</span>
+        <span class="msg-avatar-icon">${renderAvatarHTML(msg.avatar || '🤖')}</span>
         <span class="msg-sender-name">${starBadge}${whisperHeader} ${escapeHtml(msg.name)} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
         <span class="msg-time">${formatTime(msg.timestamp)} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
@@ -2785,4 +2950,545 @@ function setupImageModal() {
       }
     });
   });
+}
+
+/* ==========================================================================
+   🐺 Werewolf (人狼) Game Engine
+   ========================================================================== */
+class WerewolfGameEngine {
+  constructor() {
+    this.players = [];
+    this.phase = 'lobby'; // lobby, role, night, day_chat, vote, result
+    this.dayNum = 1;
+    this.myRole = null;
+    this.myPlayerId = null;
+    this.selectedTargetId = null;
+    this.discussionTimer = null;
+    this.timerSeconds = 45;
+    this.nightResultMsg = '';
+  }
+
+  initLobby() {
+    this.phase = 'lobby';
+    document.getElementById('werewolf-phase-badge').textContent = 'ロビー';
+    document.getElementById('werewolf-timer-display').classList.add('hidden');
+    this.showScreen('werewolf-screen-lobby');
+  }
+
+  showScreen(screenId) {
+    document.querySelectorAll('.werewolf-screen').forEach(s => s.classList.add('hidden'));
+    const target = document.getElementById(screenId);
+    if (target) target.classList.remove('hidden');
+  }
+
+  startNewGame() {
+    const totalCount = parseInt(document.getElementById('werewolf-player-count').value, 10) || 5;
+
+    let rolePool = [];
+    if (totalCount === 4) {
+      rolePool = ['wolf', 'seer', 'villager', 'villager'];
+    } else if (totalCount === 5) {
+      rolePool = ['wolf', 'seer', 'knight', 'villager', 'villager'];
+    } else if (totalCount === 6) {
+      rolePool = ['wolf', 'madman', 'seer', 'knight', 'villager', 'villager'];
+    } else if (totalCount === 7) {
+      rolePool = ['wolf', 'wolf', 'seer', 'knight', 'medium', 'villager', 'villager'];
+    } else {
+      rolePool = ['wolf', 'wolf', 'madman', 'seer', 'knight', 'medium', 'villager', 'villager'];
+    }
+
+    rolePool.sort(() => Math.random() - 0.5);
+
+    const botPresets = [
+      { name: 'AIたくや', avatar: '🤖' },
+      { name: 'AIねこ丸', avatar: '🐱' },
+      { name: 'AIきつね先生', avatar: '🦊' },
+      { name: 'AIウルフ', avatar: '🐺' },
+      { name: 'AIオラクル', avatar: '🔮' },
+      { name: 'AIマスター', avatar: '🧙‍♂️' },
+      { name: 'AIアーサー', avatar: '🛡️' },
+      { name: 'AIキング', avatar: '👑' }
+    ];
+
+    this.players = [];
+    this.myPlayerId = 'p_me';
+
+    this.players.push({
+      id: 'p_me',
+      name: myName || 'あなた',
+      avatar: myAvatar || '🤖',
+      role: rolePool[0],
+      isAlive: true,
+      isCpu: false
+    });
+
+    for (let i = 1; i < totalCount; i++) {
+      const preset = botPresets[(i - 1) % botPresets.length];
+      this.players.push({
+        id: `p_bot_${i}`,
+        name: preset.name,
+        avatar: preset.avatar,
+        role: rolePool[i],
+        isAlive: true,
+        isCpu: true
+      });
+    }
+
+    this.dayNum = 1;
+    this.myRole = this.players[0].role;
+    document.getElementById('wf-chat-messages').innerHTML = '';
+
+    this.showRoleRevealScreen();
+  }
+
+  showRoleRevealScreen() {
+    this.phase = 'role';
+    document.getElementById('werewolf-phase-badge').textContent = '役職確認';
+
+    const roleInfo = this.getRoleInfo(this.myRole);
+    document.getElementById('wf-my-role-icon').textContent = roleInfo.icon;
+    document.getElementById('wf-my-role-title').textContent = roleInfo.name;
+    document.getElementById('wf-my-role-team').textContent = roleInfo.team;
+    document.getElementById('wf-my-role-team').style.background = roleInfo.teamColor;
+    document.getElementById('wf-my-role-desc').textContent = roleInfo.desc;
+
+    this.showScreen('werewolf-screen-role');
+  }
+
+  getRoleInfo(role) {
+    const rolesMap = {
+      wolf: { icon: '🐺', name: '人狼', team: '人狼陣営', teamColor: 'rgba(255,51,102,0.4)', desc: '毎晩1人の人間を襲撃します。仲間の人狼と協力し、村人を人狼と同数以下まで減らせば勝利です。' },
+      seer: { icon: '🔮', name: '占い師', team: '市民陣営', teamColor: 'rgba(0,240,255,0.4)', desc: '毎晩1人を占い、その人が「市民(白)」か「人狼(黒)」かを判別できます。人狼をあばこう！' },
+      knight: { icon: '🛡️', name: '騎士', team: '市民陣営', teamColor: 'rgba(0,255,136,0.4)', desc: '毎晩1人を人狼の襲撃から護衛します。自分自身を守ることはできません。' },
+      madman: { icon: '🃏', name: '狂人', team: '人狼陣営', teamColor: 'rgba(167,139,250,0.4)', desc: '人間ですが心は人狼に売った狂信者。能力はありませんが人狼陣営が勝利すれば勝ちとなります。' },
+      medium: { icon: '👻', name: '霊媒師', team: '市民陣営', teamColor: 'rgba(255,184,0,0.4)', desc: '昼の投票で追放された人物が「市民」か「人狼」だったかを夜に知ることができます。' },
+      villager: { icon: '👱', name: '市民', team: '市民陣営', teamColor: 'rgba(255,255,255,0.2)', desc: '特殊能力を持たない一般市民。昼の議論と投票で人狼を追放しよう！' }
+    };
+    return rolesMap[role] || rolesMap.villager;
+  }
+
+  startNightPhase() {
+    this.phase = 'night';
+    this.selectedTargetId = null;
+    document.getElementById('werewolf-phase-badge').textContent = `夜 (${this.dayNum}日目)`;
+    playSound('receive');
+
+    const promptTitle = document.getElementById('wf-night-prompt-title');
+    const promptDesc = document.getElementById('wf-night-prompt-desc');
+    const btnSubmit = document.getElementById('btn-submit-night-action');
+
+    const me = this.players.find(p => p.id === 'p_me');
+
+    if (!me.isAlive) {
+      promptTitle.textContent = '👻 観戦中 (死亡)';
+      promptDesc.textContent = '夜の行動が行われています...';
+      btnSubmit.disabled = true;
+      this.renderNightTargets([]);
+      setTimeout(() => this.resolveNightActions(), 2500);
+      this.showScreen('werewolf-screen-night');
+      return;
+    }
+
+    if (this.myRole === 'wolf') {
+      promptTitle.textContent = '🐺 人狼の襲撃対象を選択';
+      promptDesc.textContent = '今夜命を奪うプレイヤーを選んでください。';
+      btnSubmit.disabled = true;
+      this.renderNightTargets(this.players.filter(p => p.isAlive && p.role !== 'wolf'));
+    } else if (this.myRole === 'seer') {
+      promptTitle.textContent = '🔮 占うプレイヤーを選択';
+      promptDesc.textContent = '正体を明かしたいプレイヤーを選んでください。';
+      btnSubmit.disabled = true;
+      this.renderNightTargets(this.players.filter(p => p.isAlive && p.id !== 'p_me'));
+    } else if (this.myRole === 'knight') {
+      promptTitle.textContent = '🛡️ 守るプレイヤーを選択';
+      promptDesc.textContent = '人狼の襲撃から庇いたいプレイヤーを選んでください。';
+      btnSubmit.disabled = true;
+      this.renderNightTargets(this.players.filter(p => p.isAlive && p.id !== 'p_me'));
+    } else {
+      promptTitle.textContent = '🌙 夜が更けていきます';
+      promptDesc.textContent = '恐ろしい夜が明けるのを待ちましょう...';
+      btnSubmit.disabled = false;
+      btnSubmit.textContent = '朝を迎える';
+      this.renderNightTargets([]);
+    }
+
+    this.showScreen('werewolf-screen-night');
+  }
+
+  renderNightTargets(targetablePlayers) {
+    const grid = document.getElementById('wf-night-target-list');
+    grid.innerHTML = '';
+
+    if (targetablePlayers.length === 0) {
+      grid.innerHTML = '<div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">今夜行える行動はありません</div>';
+      return;
+    }
+
+    targetablePlayers.forEach(p => {
+      const card = document.createElement('div');
+      card.className = `wf-player-card ${this.selectedTargetId === p.id ? 'selected' : ''}`;
+      card.onclick = () => {
+        this.selectedTargetId = p.id;
+        document.querySelectorAll('#wf-night-target-list .wf-player-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        const btn = document.getElementById('btn-submit-night-action');
+        btn.disabled = false;
+        btn.textContent = '決定する';
+      };
+
+      card.innerHTML = `
+        <div class="wf-player-avatar">${renderAvatarHTML(p.avatar)}</div>
+        <div class="wf-player-name">${escapeHtml(p.name)}</div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  submitNightAction() {
+    this.resolveNightActions();
+  }
+
+  resolveNightActions() {
+    let wolfTarget = null;
+    let guardTarget = null;
+    let seerTarget = null;
+
+    const me = this.players.find(p => p.id === 'p_me');
+    if (me.isAlive && this.selectedTargetId) {
+      if (this.myRole === 'wolf') wolfTarget = this.selectedTargetId;
+      if (this.myRole === 'knight') guardTarget = this.selectedTargetId;
+      if (this.myRole === 'seer') seerTarget = this.selectedTargetId;
+    }
+
+    this.players.filter(p => p.isAlive && p.isCpu).forEach(cpu => {
+      const livingOthers = this.players.filter(p => p.isAlive && p.id !== cpu.id);
+      if (cpu.role === 'wolf' && !wolfTarget) {
+        const nonWolves = livingOthers.filter(p => p.role !== 'wolf');
+        if (nonWolves.length > 0) wolfTarget = nonWolves[Math.floor(Math.random() * nonWolves.length)].id;
+      }
+      if (cpu.role === 'knight' && !guardTarget) {
+        if (livingOthers.length > 0) guardTarget = livingOthers[Math.floor(Math.random() * livingOthers.length)].id;
+      }
+      if (cpu.role === 'seer' && !seerTarget) {
+        if (livingOthers.length > 0) seerTarget = livingOthers[Math.floor(Math.random() * livingOthers.length)].id;
+      }
+    });
+
+    if (this.myRole === 'seer' && seerTarget) {
+      const targetP = this.players.find(p => p.id === seerTarget);
+      const isWolf = targetP.role === 'wolf';
+      showToast(`🔮 【占い結果】 ${targetP.name} は 『${isWolf ? '人狼 🐺 (黒)' : '市民 👱 (白)'}』 でした！`, isWolf ? 'error' : 'success');
+    }
+
+    let victim = null;
+    if (wolfTarget && wolfTarget !== guardTarget) {
+      victim = this.players.find(p => p.id === wolfTarget);
+      if (victim) {
+        victim.isAlive = false;
+        this.nightResultMsg = `昨夜、${victim.name} さんが無惨な姿で発見されました... 💀`;
+      }
+    } else {
+      this.nightResultMsg = `昨夜は恐ろしい遠吠えが響き渡りましたが、犠牲者は誰も居ませんでした！ ✨`;
+    }
+
+    this.startDayPhase();
+  }
+
+  startDayPhase() {
+    this.phase = 'day_chat';
+    document.getElementById('werewolf-phase-badge').textContent = `昼 議論 (${this.dayNum}日目)`;
+    playSound('send');
+
+    document.getElementById('wf-day-announce-text').textContent = this.nightResultMsg;
+
+    if (this.checkWinCondition()) return;
+
+    this.renderDayPlayerGrid();
+
+    this.timerSeconds = 45;
+    document.getElementById('werewolf-timer-display').classList.remove('hidden');
+    document.getElementById('werewolf-timer-sec').textContent = this.timerSeconds;
+
+    if (this.discussionTimer) clearInterval(this.discussionTimer);
+    this.discussionTimer = setInterval(() => {
+      this.timerSeconds--;
+      document.getElementById('werewolf-timer-sec').textContent = this.timerSeconds;
+      if (this.timerSeconds <= 0) {
+        clearInterval(this.discussionTimer);
+        this.startVotePhase();
+      }
+    }, 1000);
+
+    this.addWfChatMessage('システム', `昼の議論を開始します (${this.timerSeconds}秒)。人狼と思われる人物について話し合ってください！`);
+    this.simulateAiDiscussion();
+
+    this.showScreen('werewolf-screen-day');
+  }
+
+  renderDayPlayerGrid() {
+    const grid = document.getElementById('wf-day-player-grid');
+    grid.innerHTML = '';
+
+    this.players.forEach(p => {
+      const card = document.createElement('div');
+      card.className = `wf-player-card ${!p.isAlive ? 'dead' : ''}`;
+      card.innerHTML = `
+        <div class="wf-player-avatar">${renderAvatarHTML(p.avatar)}</div>
+        <div class="wf-player-name">${escapeHtml(p.name)}</div>
+        <div class="wf-player-status">${p.isAlive ? '🟢 生存' : '💀 死亡'}</div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  addWfChatMessage(speakerName, text) {
+    const box = document.getElementById('wf-chat-messages');
+    if (!box) return;
+
+    const line = document.createElement('div');
+    line.className = 'wf-chat-line';
+    line.innerHTML = `<span class="wf-speaker">${escapeHtml(speakerName)}:</span> <span>${escapeHtml(text)}</span>`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  simulateAiDiscussion() {
+    const livingBots = this.players.filter(p => p.isAlive && p.isCpu);
+    if (livingBots.length === 0) return;
+
+    const speechTemplates = [
+      "私市民です！みなさん誰が怪しいと思いますか？",
+      "前日の発言から考えると、静かな人が怪しい気がします...",
+      "私は白です！変な投票はやめましょう！",
+      "人狼を探すために占い師の方はCO(宣言)してください！",
+      "直感を信じて慎重に投票しましょう！"
+    ];
+
+    setTimeout(() => {
+      if (this.phase !== 'day_chat') return;
+      const bot = livingBots[Math.floor(Math.random() * livingBots.length)];
+      const line = speechTemplates[Math.floor(Math.random() * speechTemplates.length)];
+      this.addWfChatMessage(bot.name, line);
+    }, 4000);
+
+    setTimeout(() => {
+      if (this.phase !== 'day_chat') return;
+      const bot2 = livingBots[Math.floor(Math.random() * livingBots.length)];
+      const targetP = this.players.filter(p => p.isAlive && p.id !== bot2.id)[0];
+      if (targetP) {
+        this.addWfChatMessage(bot2.name, `${targetP.name} さん、どう思われますか？`);
+      }
+    }, 12000);
+  }
+
+  sendUserWfChat() {
+    const input = document.getElementById('wf-chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    this.addWfChatMessage(myName || 'あなた', text);
+    input.value = '';
+  }
+
+  skipDiscussionToVote() {
+    if (this.discussionTimer) clearInterval(this.discussionTimer);
+    this.startVotePhase();
+  }
+
+  startVotePhase() {
+    this.phase = 'vote';
+    this.selectedTargetId = null;
+    document.getElementById('werewolf-phase-badge').textContent = '追放投票';
+    document.getElementById('werewolf-timer-display').classList.add('hidden');
+    playSound('receive');
+
+    const me = this.players.find(p => p.id === 'p_me');
+    const btnSubmit = document.getElementById('btn-submit-vote');
+
+    if (!me.isAlive) {
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = '観戦中 (自動開票)';
+      this.renderVoteTargets([]);
+      setTimeout(() => this.resolveVotes(), 3000);
+      this.showScreen('werewolf-screen-vote');
+      return;
+    }
+
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = '投票を完了する';
+    this.renderVoteTargets(this.players.filter(p => p.isAlive && p.id !== 'p_me'));
+    this.showScreen('werewolf-screen-vote');
+  }
+
+  renderVoteTargets(targetablePlayers) {
+    const grid = document.getElementById('wf-vote-target-grid');
+    grid.innerHTML = '';
+
+    targetablePlayers.forEach(p => {
+      const card = document.createElement('div');
+      card.className = `wf-player-card ${this.selectedTargetId === p.id ? 'selected' : ''}`;
+      card.onclick = () => {
+        this.selectedTargetId = p.id;
+        document.querySelectorAll('#wf-vote-target-grid .wf-player-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        const btn = document.getElementById('btn-submit-vote');
+        btn.disabled = false;
+      };
+
+      card.innerHTML = `
+        <div class="wf-player-avatar">${renderAvatarHTML(p.avatar)}</div>
+        <div class="wf-player-name">${escapeHtml(p.name)}</div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  resolveVotes() {
+    const voteCounts = {};
+    this.players.forEach(p => voteCounts[p.id] = 0);
+
+    if (this.selectedTargetId) {
+      voteCounts[this.selectedTargetId]++;
+    }
+
+    this.players.filter(p => p.isAlive && p.isCpu).forEach(cpu => {
+      const candidates = this.players.filter(p => p.isAlive && p.id !== cpu.id);
+      if (candidates.length > 0) {
+        const target = candidates[Math.floor(Math.random() * candidates.length)];
+        voteCounts[target.id]++;
+      }
+    });
+
+    let maxVotes = -1;
+    let executedPlayer = null;
+
+    Object.entries(voteCounts).forEach(([pid, count]) => {
+      if (count > maxVotes) {
+        maxVotes = count;
+        executedPlayer = this.players.find(p => p.id === pid);
+      }
+    });
+
+    if (executedPlayer) {
+      executedPlayer.isAlive = false;
+      showToast(`投票の結果、${executedPlayer.name} さんが追放されました (${maxVotes}票) 💀`, 'error');
+    }
+
+    if (!this.checkWinCondition()) {
+      this.dayNum++;
+      setTimeout(() => this.startNightPhase(), 2500);
+    }
+  }
+
+  checkWinCondition() {
+    const livingPlayers = this.players.filter(p => p.isAlive);
+    const livingWolves = livingPlayers.filter(p => p.role === 'wolf');
+    const livingHumans = livingPlayers.filter(p => p.role !== 'wolf');
+
+    if (livingWolves.length === 0) {
+      this.showResultScreen('villager');
+      return true;
+    } else if (livingWolves.length >= livingHumans.length) {
+      this.showResultScreen('wolf');
+      return true;
+    }
+    return false;
+  }
+
+  showResultScreen(winnerTeam) {
+    this.phase = 'result';
+    document.getElementById('werewolf-phase-badge').textContent = '決着！';
+    document.getElementById('werewolf-timer-display').classList.add('hidden');
+    playSound('fanfare');
+
+    const banner = document.getElementById('wf-result-banner');
+    const title = document.getElementById('wf-result-title');
+    const subtitle = document.getElementById('wf-result-subtitle');
+
+    if (winnerTeam === 'villager') {
+      banner.className = 'result-banner';
+      title.textContent = '🎉 市民陣営の完全勝利！';
+      subtitle.textContent = '村に平和が戻りました！人狼を全員追放することに成功！';
+    } else {
+      banner.className = 'result-banner wolf-win';
+      title.textContent = '🐺 人狼陣営の完全勝利！';
+      subtitle.textContent = '村は人狼の支配下に落ちました... 闇が包み込みます。';
+    }
+
+    const list = document.getElementById('wf-result-player-list');
+    list.innerHTML = '';
+
+    this.players.forEach(p => {
+      const rInfo = this.getRoleInfo(p.role);
+      const row = document.createElement('div');
+      row.className = 'result-player-row';
+      row.innerHTML = `
+        <div class="wf-player-avatar" style="width:36px; height:36px; font-size:1.2rem;">${renderAvatarHTML(p.avatar)}</div>
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:0.85rem;">${escapeHtml(p.name)} ${p.isAlive ? '🟢' : '💀'}</div>
+          <div style="font-size:0.75rem; color:var(--text-secondary);">${rInfo.icon} ${rInfo.name} (${rInfo.team})</div>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+
+    this.showScreen('werewolf-screen-result');
+  }
+
+  shareResultToMainChat() {
+    const winnerText = this.phase === 'result' ? document.getElementById('wf-result-title').textContent : '人狼ゲーム';
+    const summary = `🐺 <strong>【サイバー人狼 ゲーム結果発表】</strong><br>${winnerText}<br>参加プレイヤー数: ${this.players.length}名 (${this.dayNum}日目で決着！)`;
+    sendSpecialMessage('game', summary);
+    showToast('結果をメインチャットに共有しました！', 'success');
+  }
+}
+
+const werewolfEngine = new WerewolfGameEngine();
+
+window.openWerewolfModal = () => {
+  const modal = document.getElementById('werewolf-game-modal');
+  if (modal) {
+    werewolfEngine.initLobby();
+    modal.classList.remove('hidden');
+  }
+};
+
+function setupWerewolfGameControls() {
+  const btnStart = document.getElementById('btn-start-werewolf-game');
+  if (btnStart) btnStart.addEventListener('click', () => werewolfEngine.startNewGame());
+
+  const btnConfirmRole = document.getElementById('btn-confirm-role');
+  if (btnConfirmRole) btnConfirmRole.addEventListener('click', () => werewolfEngine.startNightPhase());
+
+  const btnNightSubmit = document.getElementById('btn-submit-night-action');
+  if (btnNightSubmit) btnNightSubmit.addEventListener('click', () => werewolfEngine.submitNightAction());
+
+  const btnWfSendChat = document.getElementById('btn-wf-send-chat');
+  if (btnWfSendChat) btnWfSendChat.addEventListener('click', () => werewolfEngine.sendUserWfChat());
+
+  const wfChatInput = document.getElementById('wf-chat-input');
+  if (wfChatInput) {
+    wfChatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') werewolfEngine.sendUserWfChat();
+    });
+  }
+
+  const btnSkipDisc = document.getElementById('btn-wf-skip-discussion');
+  if (btnSkipDisc) btnSkipDisc.addEventListener('click', () => werewolfEngine.skipDiscussionToVote());
+
+  const btnSubmitVote = document.getElementById('btn-submit-vote');
+  if (btnSubmitVote) btnSubmitVote.addEventListener('click', () => werewolfEngine.resolveVotes());
+
+  const btnPlayAgain = document.getElementById('btn-wf-play-again');
+  if (btnPlayAgain) btnPlayAgain.addEventListener('click', () => werewolfEngine.initLobby());
+
+  const btnShareChat = document.getElementById('btn-wf-share-chat');
+  if (btnShareChat) btnShareChat.addEventListener('click', () => werewolfEngine.shareResultToMainChat());
+
+  const btnCloseWf = document.getElementById('btn-close-werewolf');
+  if (btnCloseWf) {
+    btnCloseWf.addEventListener('click', () => {
+      document.getElementById('werewolf-game-modal').classList.add('hidden');
+    });
+  }
 }
