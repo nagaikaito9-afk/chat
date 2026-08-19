@@ -158,6 +158,7 @@ html, body {
 
 .text-success { color: var(--success-color); }
 .text-warning { color: var(--warning-color); }
+.text-danger { color: var(--danger-color); }
 .text-primary { color: var(--accent-primary); }
 .pulse { animation: pulseAnim 2s infinite; }
 
@@ -165,6 +166,166 @@ html, body {
   0% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.9); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+/* 運営（Admin）ボタン */
+.btn-admin {
+  background: rgba(255, 51, 102, 0.15);
+  border: 1px solid rgba(255, 51, 102, 0.4);
+  color: #ff4d79;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition-fast);
+}
+
+.btn-admin:hover {
+  background: rgba(255, 51, 102, 0.28);
+  box-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-primary.danger {
+  background: linear-gradient(135deg, #ff3366 0%, #d91b5c 100%);
+}
+
+.btn-primary.danger:hover {
+  background: linear-gradient(135deg, #ff4d79 0%, #e6004c 100%);
+}
+
+/* 運営コントロールパネルの要素 */
+.admin-section-box {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.admin-section-box h4 {
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.btn-admin-act {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-admin-act:hover {
+  transform: translateY(-2px);
+}
+
+.btn-admin-act.danger {
+  border-color: rgba(255, 51, 102, 0.4);
+  color: #ff6b8b;
+}
+
+.btn-admin-act.danger:hover {
+  background: rgba(255, 51, 102, 0.2);
+}
+
+.btn-admin-act.warning {
+  border-color: rgba(255, 184, 0, 0.4);
+  color: var(--warning-color);
+}
+
+.btn-admin-act.warning:hover {
+  background: rgba(255, 184, 0, 0.2);
+}
+
+.btn-admin-act.primary {
+  border-color: rgba(0, 240, 255, 0.4);
+  color: var(--accent-primary);
+}
+
+.btn-admin-act.primary:hover {
+  background: rgba(0, 240, 255, 0.2);
+}
+
+.admin-announce-form {
+  display: flex;
+  gap: 10px;
+}
+
+.admin-announce-form input {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.admin-user-table-wrapper {
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.admin-user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.admin-user-table th, .admin-user-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.admin-user-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.admin-banned-ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.admin-banned-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
 }
 
 /* Device Mode Selector (PC / Mobile) */
@@ -1886,12 +2047,14 @@ body.device-mobile .chat-room-info h1 {
 }
 
 body.device-mobile .btn-screen span,
-body.device-mobile .btn-vc span {
+body.device-mobile .btn-vc span,
+body.device-mobile .btn-admin span {
   display: none;
 }
 
 body.device-mobile .btn-screen,
-body.device-mobile .btn-vc {
+body.device-mobile .btn-vc,
+body.device-mobile .btn-admin {
   padding: 8px 10px;
 }
 

@@ -35,6 +35,8 @@ let myStatus = '💬 雑談歓迎';
 let currentRoomId = 'public_main';
 
 let deviceMode = localStorage.getItem('cyberchat_device_mode') || 'pc';
+let isAdminMode = false;
+const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371";
 
 let soundEnabled = true;
 let isScrolledToBottom = true;
@@ -44,6 +46,7 @@ let currentFilter = 'all';
 let searchKeyword = '';
 let allMessages = new Map();
 let activeUsersMap = new Map();
+let bannedUsersMap = new Map();
 let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored_users') || '[]'));
 let starredMsgSet = new Set(JSON.parse(localStorage.getItem('cyberchat_starred_msgs') || '[]'));
 
@@ -63,6 +66,7 @@ let unsubscribeTyping = null;
 let unsubscribeTopic = null;
 let unsubscribeSignals = null;
 let unsubscribeScreen = null;
+let unsubscribeBannedUsers = null;
 
 // Whisper (DM) State
 let whisperTargetId = null;
@@ -98,6 +102,10 @@ let isPainting = false;
 // Database Path Helper
 function roomRef(subPath) {
   return ref(db, `rooms/${currentRoomId}/${subPath}`);
+}
+
+function globalRef(subPath) {
+  return ref(db, subPath);
 }
 
 // Web Audio API Synthesizer (SE & Soundboard)
@@ -350,7 +358,9 @@ function initApp() {
   setupScreenShare();
   setupPaintModal();
   setupReplyBanner();
+  setupAdminSystem();
   renderIgnoredUsersUI();
+  initBanCheckListener();
 }
 
 if (document.readyState === 'loading') {
@@ -358,6 +368,196 @@ if (document.readyState === 'loading') {
 } else {
   initApp();
 }
+
+// 🚫 リアルタイムBAN判定リスナー
+function initBanCheckListener() {
+  onValue(globalRef(`banned_users/${myUserId}`), (snapshot) => {
+    if (snapshot.exists()) {
+      alert("⚠️ あなたのアカウントは運営によってBAN（アクセス禁止）されました。");
+      location.reload();
+    }
+  });
+
+  // 全体BANリスト同期（運営用）
+  onValue(globalRef('banned_users'), (snapshot) => {
+    bannedUsersMap.clear();
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      Object.entries(data).forEach(([uid, val]) => bannedUsersMap.set(uid, val));
+    }
+    renderAdminBannedUsersUI();
+  });
+}
+
+// 👑 運営専用管理システム Setup
+function setupAdminSystem() {
+  const openAuthBtn = document.getElementById('btn-open-admin-auth');
+  const authModal = document.getElementById('admin-auth-modal');
+  const passInput = document.getElementById('admin-password-input');
+  const authSubmitBtn = document.getElementById('btn-submit-admin-auth');
+  const authError = document.getElementById('admin-auth-error');
+  const togglePassVis = document.getElementById('toggle-admin-pass-vis');
+
+  const panelModal = document.getElementById('admin-panel-modal');
+
+  openAuthBtn.addEventListener('click', () => {
+    if (isAdminMode) {
+      openAdminPanel();
+    } else {
+      passInput.value = '';
+      authError.classList.add('hidden');
+      authModal.classList.remove('hidden');
+      passInput.focus();
+    }
+  });
+
+  document.querySelectorAll('#admin-auth-modal .modal-close').forEach(b => {
+    b.addEventListener('click', () => authModal.classList.add('hidden'));
+  });
+
+  document.querySelectorAll('#admin-panel-modal .modal-close').forEach(b => {
+    b.addEventListener('click', () => panelModal.classList.add('hidden'));
+  });
+
+  if (togglePassVis) {
+    togglePassVis.addEventListener('click', () => {
+      passInput.type = passInput.type === 'password' ? 'text' : 'password';
+    });
+  }
+
+  const handleAuthSubmit = () => {
+    authError.classList.add('hidden');
+    const inputPass = passInput.value.trim();
+
+    if (inputPass === ADMIN_PASSWORD) {
+      isAdminMode = true;
+      authModal.classList.add('hidden');
+      openAuthBtn.classList.add('active');
+      openAuthBtn.innerHTML = '<i class="fa-solid fa-crown text-warning"></i> <span>運営（認証済み）</span>';
+      showToast('👑 運営認証に成功しました！管理コントロールパネルを開きます。', 'success');
+      openAdminPanel();
+    } else {
+      authError.textContent = 'パスワードが正しくありません。';
+      authError.classList.remove('hidden');
+    }
+  };
+
+  authSubmitBtn.addEventListener('click', handleAuthSubmit);
+  passInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleAuthSubmit();
+  });
+
+  // 運営コントロールパネルの各種一括ボタン
+  document.getElementById('btn-admin-clear-messages').addEventListener('click', async () => {
+    if (!confirm('【警告】このルームの全メッセージを消去します。よろしいですか？')) return;
+    try {
+      await remove(roomRef('messages'));
+      sendSystemMessage('⚠️ 運営によって部屋のすべてのメッセージが消去されました');
+      showToast('発言を全消去しました', 'success');
+    } catch (e) {
+      showToast('消去に失敗しました', 'error');
+    }
+  });
+
+  document.getElementById('btn-admin-clear-topic').addEventListener('click', async () => {
+    try {
+      await remove(roomRef('topic'));
+      showToast('お題をリセットしました', 'success');
+    } catch (e) {
+      showToast('リセット失敗', 'error');
+    }
+  });
+
+  document.getElementById('btn-admin-toggle-crown').addEventListener('click', async () => {
+    myAvatar = myAvatar.includes('👑') ? '🤖' : '👑 運営';
+    await registerOnlineUser();
+    updateMyProfileUI();
+    showToast(`アバターマークを変更しました (${myAvatar})`);
+  });
+
+  document.getElementById('btn-admin-send-announce').addEventListener('click', async () => {
+    const input = document.getElementById('admin-announce-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    await sendSpecialMessage('game', `📢 【運営公式アナウンス】\n${text}`);
+    input.value = '';
+    showToast('全体アナウンスを放送しました！', 'success');
+  });
+}
+
+function openAdminPanel() {
+  renderAdminUsersTable();
+  renderAdminBannedUsersUI();
+  document.getElementById('admin-panel-modal').classList.remove('hidden');
+}
+
+function renderAdminUsersTable() {
+  const tbody = document.getElementById('admin-user-tbody');
+  tbody.innerHTML = '';
+
+  activeUsersMap.forEach((uData, uid) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(uData.avatar || '')} ${escapeHtml(uData.name || '')} ${uid === myUserId ? '<strong>(あなた)</strong>' : ''}</td>
+      <td><span class="trip-badge">${escapeHtml(uData.trip || '')}</span></td>
+      <td><code>${uid.substring(0, 8)}...</code></td>
+      <td>
+        ${uid !== myUserId ? `
+          <button class="btn-secondary btn-sm danger" onclick="window.adminBanUser('${uid}', '${escapeHtml(uData.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>
+        ` : '<span style="opacity:0.5;">-</span>'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderAdminBannedUsersUI() {
+  const ul = document.getElementById('admin-banned-list');
+  if (!ul) return;
+  ul.innerHTML = '';
+
+  if (bannedUsersMap.size === 0) {
+    ul.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem;">現在BANされたユーザーはいません</li>';
+    return;
+  }
+
+  bannedUsersMap.forEach((bData, uid) => {
+    const li = document.createElement('li');
+    li.className = 'admin-banned-item';
+    li.innerHTML = `
+      <span>🚫 <strong>${escapeHtml(bData.name || '不明')}</strong> (ID: ${uid.substring(0, 10)}) - ${formatTime(bData.timestamp)}</span>
+      <button class="btn-secondary btn-sm" onclick="window.adminUnbanUser('${uid}', '${escapeHtml(bData.name)}')">BAN解除</button>
+    `;
+    ul.appendChild(li);
+  });
+}
+
+window.adminBanUser = async (uid, name) => {
+  if (!confirm(`【確認】「${name}」をBAN（アクセス禁止）にしますか？`)) return;
+  try {
+    await set(globalRef(`banned_users/${uid}`), {
+      name: name,
+      timestamp: Date.now()
+    });
+    await remove(roomRef(`active_users/${uid}`));
+    sendSystemMessage(`🚫 運営によって ${name} がBAN（アクセス禁止）処理されました`);
+    showToast(`「${name}」をBANしました`, 'success');
+    renderAdminUsersTable();
+  } catch (e) {
+    showToast('BAN処理に失敗しました', 'error');
+  }
+};
+
+window.adminUnbanUser = async (uid, name) => {
+  try {
+    await remove(globalRef(`banned_users/${uid}`));
+    showToast(`「${name}」のBANを解除しました`, 'success');
+    renderAdminBannedUsersUI();
+  } catch (e) {
+    showToast('解除失敗', 'error');
+  }
+};
 
 // Google Auth Redirect Result Handling (ページ復帰時の判定)
 async function checkGoogleRedirectResult() {
@@ -830,10 +1030,11 @@ function renderSingleMessage(msgId, msg) {
       <div id="msg-menu-${msgId}" class="msg-dropdown-menu hidden animate-scale-up">
         <button onclick="window.replyToMsg('${msgId}')"><i class="fa-solid fa-reply text-primary"></i> 返信</button>
         <button onclick="window.toggleStarMsg('${msgId}')"><i class="fa-solid fa-star ${isStarred ? 'text-warning' : ''}"></i> ${isStarred ? 'しおり解除' : 'しおり保存'}</button>
-        ${isSelf && !msg.deleted ? `<button onclick="window.openEditMsgModal('${msgId}')"><i class="fa-solid fa-pen"></i> 編集</button>` : ''}
-        ${isSelf && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
+        ${(isSelf || isAdminMode) && !msg.deleted ? `<button onclick="window.openEditMsgModal('${msgId}')"><i class="fa-solid fa-pen"></i> 編集</button>` : ''}
+        ${(isSelf || isAdminMode) && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
+        ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
       </div>
     `;
 

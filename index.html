@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberChat - リアルタイム自由チャット (スマホ/PC切替 & メッセージ返信対応)</title>
+  <title>CyberChat - リアルタイム自由チャット (運営管理機能付き)</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -224,6 +224,12 @@
         </div>
 
         <div class="header-actions">
+          <!-- 運営管理ボタン -->
+          <button id="btn-open-admin-auth" class="btn-admin" title="運営専用管理画面">
+            <i class="fa-solid fa-user-shield"></i>
+            <span>運営</span>
+          </button>
+
           <!-- 表示モード（スマホ/PC）即時切替ボタン -->
           <button id="btn-toggle-device-mode" class="btn-icon" title="スマホ/PC 表示モード切り替え">
             <i class="fa-solid fa-desktop"></i>
@@ -434,6 +440,102 @@
         </div>
       </footer>
     </main>
+  </div>
+
+  <!-- 🔑 運営パスワード入力モーダル -->
+  <div id="admin-auth-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3 class="text-danger"><i class="fa-solid fa-user-shield"></i> 運営専用認証</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="admin-password-input">パスワードを入力 <span class="required">*</span></label>
+          <div class="trip-input-wrapper">
+            <input type="password" id="admin-password-input" placeholder="運営パスワードを入力" required autocomplete="off">
+            <button type="button" id="toggle-admin-pass-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
+          </div>
+        </div>
+        <div id="admin-auth-error" class="error-banner hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">キャンセル</button>
+        <button id="btn-submit-admin-auth" class="btn-primary danger"><i class="fa-solid fa-lock-open"></i> 認証して管理画面を開く</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👑 運営管理画面（コントロールパネル）モーダル -->
+  <div id="admin-panel-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 650px;">
+      <div class="modal-header" style="background: rgba(255, 51, 102, 0.15);">
+        <h3 class="text-danger"><i class="fa-solid fa-user-gear"></i> CyberChat 運営専用コントロールパネル</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+        
+        <!-- 一括操作エリア -->
+        <div class="admin-section-box">
+          <h4><i class="fa-solid fa-bolt text-danger"></i> ルーム一括操作</h4>
+          <div class="admin-action-grid">
+            <button id="btn-admin-clear-messages" class="btn-admin-act danger">
+              <i class="fa-solid fa-trash-can"></i>
+              <span>発言を全消去</span>
+            </button>
+            <button id="btn-admin-clear-topic" class="btn-admin-act warning">
+              <i class="fa-solid fa-eraser"></i>
+              <span>お題リセット</span>
+            </button>
+            <button id="btn-admin-toggle-crown" class="btn-admin-act primary">
+              <i class="fa-solid fa-crown"></i>
+              <span>👑 運営マーク切替</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 📢 運営公式アナウンス送信 -->
+        <div class="admin-section-box">
+          <h4><i class="fa-solid fa-bullhorn text-warning"></i> 運営公式アナウンス放送</h4>
+          <div class="admin-announce-form">
+            <input type="text" id="admin-announce-input" placeholder="全体に送る公式アナウンスメッセージを入力..." maxlength="120">
+            <button id="btn-admin-send-announce" class="btn-primary"><i class="fa-solid fa-paper-plane"></i> 放送</button>
+          </div>
+        </div>
+
+        <!-- 👥 オンラインユーザー管理 & BAN操作 -->
+        <div class="admin-section-box">
+          <h4><i class="fa-solid fa-users-slash text-danger"></i> 参加中メンバーのBAN（アクセス禁止）/ 追放</h4>
+          <div class="admin-user-table-wrapper">
+            <table class="admin-user-table">
+              <thead>
+                <tr>
+                  <th>ユーザー名</th>
+                  <th>トリップ</th>
+                  <th>ID</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="admin-user-tbody">
+                <!-- JSで動的生成 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 🚫 BANリスト解除管理 -->
+        <div class="admin-section-box">
+          <h4><i class="fa-solid fa-ban text-muted"></i> 現在BANされているユーザー一覧</h4>
+          <ul id="admin-banned-list" class="admin-banned-ul">
+            <!-- JSで動的生成 -->
+          </ul>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">管理画面を閉じる</button>
+      </div>
+    </div>
   </div>
 
   <!-- お絵かきキャンバスモーダル -->
