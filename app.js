@@ -1474,17 +1474,6 @@ async function fetchAiBotResponse(prompt, senderName) {
 
   return generateLocalAiResponse(prompt, senderName);
 }
-        if (text && text.trim()) {
-          return text.trim();
-        }
-      }
-    } catch (e) {
-      console.warn(`Gemini API fetch error (${model}):`, e);
-    }
-  }
-
-  return generateLocalAiResponse(prompt, senderName);
-}
 
 function checkAiBotTrigger(msgData) {
   if (!msgData.text || msgData.userId === 'cyberbot_ai' || msgData.type === 'system') return;
