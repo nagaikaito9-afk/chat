@@ -1545,8 +1545,6 @@ function generateLocalAiResponse(prompt, senderName) {
   return `「${prompt}」についてのお問い合わせですね！${senderName}さん、AIとしてお答えします！何か他にお手伝いできることはありますか？🤖`;
 }
 
-}
-
 // 🧠 数学スピードクイズ機能
 window.startMathQuizGame = async () => {
   const num1 = Math.floor(Math.random() * 20) + 5;
