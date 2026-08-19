@@ -1007,6 +1007,21 @@ html, body {
   flex-shrink: 0;
   z-index: 10;
   transition: var(--transition-normal);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#friends-sidebar-ul {
+  max-height: 150px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 4px;
+}
+
+#online-user-list {
+  max-height: 200px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sidebar-header {
@@ -1109,6 +1124,14 @@ html, body {
   padding: 4px 16px 12px;
   border-bottom: 1px solid var(--glass-border);
   overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.filter-pills::-webkit-scrollbar {
+  display: none;
 }
 
 .pill-btn {
@@ -2895,7 +2918,7 @@ body.device-pc .sidebar-close-btn {
 .friend-online-dot.offline { background: var(--text-muted); }
 
 /* ==========================================================================
-   📱 Mobile Navigation Drawer & Touch Optimizations
+   📱 Mobile Smartphone (Portrait & Touch) Complete Adaptation
    ========================================================================== */
 .sidebar-overlay {
   position: fixed;
@@ -2916,13 +2939,20 @@ body.device-pc .sidebar-close-btn {
   pointer-events: auto;
 }
 
-@media (max-width: 768px) {
-  body {
+@media (max-width: 768px), (orientation: portrait) {
+  html, body {
     overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
   }
 
   .app-container {
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100vw;
     height: 100vh;
     height: 100dvh;
@@ -2931,17 +2961,18 @@ body.device-pc .sidebar-close-btn {
     overflow: hidden;
   }
 
+  /* Drawer Sidebar for Mobile Portrait */
   .sidebar {
     position: fixed !important;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 290px !important;
-    max-width: 85vw;
+    width: 280px !important;
+    max-width: 82vw;
     z-index: 999 !important;
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
     background: rgba(10, 13, 20, 0.98) !important;
     backdrop-filter: blur(25px);
   }
@@ -2963,8 +2994,18 @@ body.device-pc .sidebar-close-btn {
     overflow: hidden;
   }
 
+  /* Header in Mobile Portrait */
   .chat-header {
-    padding: 8px 12px;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .room-info h2 {
+    font-size: 0.95rem;
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .header-actions {
@@ -2972,37 +3013,166 @@ body.device-pc .sidebar-close-btn {
   }
 
   .header-actions button span {
-    display: none;
+    display: none !important;
   }
 
-  .snippets-bar {
-    padding: 6px 10px;
-    gap: 6px;
+  .header-actions button {
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+
+  /* Room Tabs Bar in Portrait */
+  .room-tabs-container {
+    padding: 4px 8px;
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .room-tab {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+  }
+
+  /* Snippets & Tools in Portrait */
+  .snippets-bar {
+    padding: 4px 8px;
+    gap: 4px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .snippet-tag {
+    font-size: 0.75rem;
+    padding: 3px 8px;
   }
 
   .tool-buttons {
+    padding: 2px 8px;
+    gap: 4px;
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-    gap: 4px;
   }
 
+  .tool-btn {
+    padding: 4px 8px;
+    font-size: 0.78rem;
+  }
+
+  /* Messages Container & Bubbles in Portrait */
+  .messages-container {
+    padding: 8px 6px;
+    gap: 8px;
+  }
+
+  .msg-bubble {
+    max-width: 88% !important;
+    padding: 8px 11px;
+    font-size: 0.9rem;
+  }
+
+  .msg-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.95rem;
+  }
+
+  /* Chat Footer Input in Portrait */
   .chat-footer {
-    padding: 8px 12px;
+    padding: 6px 8px;
+  }
+
+  .input-wrapper {
+    gap: 6px;
   }
 
   textarea#message-text-input {
-    font-size: 16px !important;
+    font-size: 16px !important; /* Prevents iOS auto-zoom */
+    padding: 8px 12px;
+    border-radius: 18px;
+    min-height: 36px;
+    max-height: 90px;
+  }
+
+  .btn-send {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 50%;
+    padding: 0;
+  }
+
+  .btn-send span {
+    display: none;
+  }
+
+  /* Modals in Mobile Portrait */
+  .overlay-screen {
+    padding: 8px;
+  }
+
+  .auth-card {
+    max-width: 96vw !important;
+    width: 96vw !important;
+    max-height: 90vh !important;
+    padding: 14px !important;
   }
 
   .modal-card {
     max-width: 95vw !important;
-    max-height: 90vh !important;
+    width: 95vw !important;
+    max-height: 88vh !important;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 14px !important;
+    border-radius: 16px !important;
+  }
+
+  /* Avatar 50 Presets Grid on Mobile Portrait */
+  .avatar-picker-grid-50 {
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 4px !important;
+    max-height: 160px !important;
+  }
+
+  .avatar-category-pills {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+
+  .cat-pill {
+    padding: 3px 8px;
+    font-size: 0.75rem;
+  }
+
+  /* Werewolf Game in Mobile Portrait */
+  .werewolf-modal-card {
+    max-width: 96vw !important;
+    max-height: 90vh !important;
+    padding: 12px !important;
+  }
+
+  .werewolf-player-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .wf-player-card {
+    padding: 6px 4px !important;
+  }
+
+  .wf-player-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.1rem !important;
+  }
+
+  .wf-player-name {
+    font-size: 0.75rem !important;
   }
 }

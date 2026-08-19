@@ -1476,7 +1476,7 @@ async function fetchAiBotResponse(prompt, senderName) {
 }
 
 function checkAiBotTrigger(msgData) {
-  if (!msgData.text || msgData.userId === 'cyberbot_ai' || msgData.type === 'system') return;
+  if (!msgData.text || msgData.userId === 'cyberbot_ai' || msgData.type === 'system' || msgData.whisperTo) return;
 
   const text = msgData.text.trim();
   if (text.startsWith('@bot') || text.startsWith('@CyberBot') || text.includes('@bot')) {
@@ -1893,6 +1893,14 @@ function renderReactionsHtml(msgId, reactionsData) {
 }
 
 function updateMessageUI(msgId, msgData) {
+  if (msgData.whisperTo) {
+    if (msgData.userId !== myUserId && msgData.whisperTo !== myUserId) {
+      const node = document.getElementById(`msg-${msgId}`);
+      if (node) node.remove();
+      return;
+    }
+  }
+
   const reactionsContainer = document.getElementById(`reactions-${msgId}`);
   if (reactionsContainer) {
     reactionsContainer.innerHTML = renderReactionsHtml(msgId, msgData.reactions);
@@ -2105,6 +2113,13 @@ window.toggleQuickReactionMenu = (msgId) => {
 };
 
 function applyFilterAndSearchToNode(node, msg) {
+  if (msg.whisperTo) {
+    if (msg.userId !== myUserId && msg.whisperTo !== myUserId) {
+      node.classList.add('hidden');
+      return;
+    }
+  }
+
   let visible = true;
   if (currentFilter === 'star' && !starredMsgSet.has(msg.id)) visible = false;
   if (currentFilter === 'image' && (msg.type !== 'image' && msg.type !== 'video')) visible = false;
