@@ -4,9 +4,6 @@ import {
   getDatabase, ref, set, push, onValue, onChildAdded, onChildChanged, onChildRemoved,
   remove, get, update, serverTimestamp, onDisconnect, query, limitToLast 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -33,6 +30,11 @@ let myTrip = '◆(なし)';
 let myAvatar = '🤖';
 let myStatus = '💬 雑談歓迎';
 let currentRoomId = 'public_main';
+
+let friendsMap = new Map();
+let friendRequestsMap = new Map();
+let unsubscribeFriendRequests = null;
+let unsubscribeFriends = null;
 
 let deviceMode = localStorage.getItem('cyberchat_device_mode') || 'pc';
 let currentTheme = localStorage.getItem('cyberchat_theme') || 'cyber';
@@ -427,9 +429,7 @@ function initApp() {
   setupThemePicker();
   setupAvatarPickers();
   setupTripInputListeners();
-  setupJoinForm();
-  setupGoogleAuth();
-  checkGoogleRedirectResult();
+  setupAuthForms();
   setupChatControls();
   setupRoomTabs();
   setupStampsAndMinigames();
@@ -447,6 +447,8 @@ function initApp() {
   setupAdminSystem();
   setupAiBotControls();
   setupWerewolfGameControls();
+  setupFriendModalControls();
+  setupMobileNavigation();
   renderIgnoredUsersUI();
   initBanCheckListener();
   setupPresenceConnectionHeartbeat();
@@ -663,97 +665,250 @@ window.adminUnbanUser = async (uid, name) => {
   }
 };
 
-// Google Auth Redirect Result Handling
-async function checkGoogleRedirectResult() {
-  try {
-    const result = await getRedirectResult(auth);
-    if (result && result.user) {
-      const user = result.user;
-      const displayName = user.displayName || 'Googleユーザー';
-      myName = displayName;
-      myTrip = '◆' + user.uid.substring(0, 10);
-      myAvatar = '🔑';
-
-      await registerOnlineUser();
-
-      const joinModal = document.getElementById('join-modal');
-      if (joinModal) {
-        joinModal.classList.remove('active');
-        joinModal.classList.add('hidden');
-        joinModal.style.display = 'none';
-      }
-      document.getElementById('app-container').classList.remove('hidden');
-
-      updateMyProfileUI();
-      sendSystemMessage(`${myAvatar} ${myName} (${myTrip}) がGoogle認証で入室しました！`);
-      initFirebaseRealtimeSync();
-      showToast(`Googleアカウント「${displayName}」でログイン成功！`, 'success');
-    }
-  } catch (err) {
-    console.warn("Redirect result check:", err);
-  }
+// Password Hashing and Key Sanitization
+async function hashPassword(passStr) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(passStr);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Google Auth Handler
-function setupGoogleAuth() {
-  const btnGoogle = document.getElementById('btn-google-login');
-  if (!btnGoogle) return;
+function sanitizeAccountKey(name) {
+  if (!name) return '';
+  return name.trim().toLowerCase().replace(/[^a-z0-9_a-zA-Z0-9ぁ-んァ-ン一-龥]/g, '_');
+}
 
-  btnGoogle.addEventListener('click', async () => {
-    const provider = new GoogleAuthProvider();
-    btnGoogle.disabled = true;
+// 🔑 Account Authentication System (Login & Signup)
+function setupAuthForms() {
+  const tabLogin = document.getElementById('tab-auth-login');
+  const tabRegister = document.getElementById('tab-auth-register');
+  const loginForm = document.getElementById('login-form');
+  const regForm = document.getElementById('register-form');
+
+  if (tabLogin && tabRegister) {
+    tabLogin.addEventListener('click', () => {
+      tabLogin.classList.add('active');
+      tabRegister.classList.remove('active');
+      loginForm.classList.add('active');
+      loginForm.classList.remove('hidden');
+      regForm.classList.remove('active');
+      regForm.classList.add('hidden');
+    });
+
+    tabRegister.addEventListener('click', () => {
+      tabRegister.classList.add('active');
+      tabLogin.classList.remove('active');
+      regForm.classList.add('active');
+      regForm.classList.remove('hidden');
+      loginForm.classList.remove('active');
+      loginForm.classList.add('hidden');
+    });
+  }
+
+  const toggleVis = (btnId, inputId) => {
+    const btn = document.getElementById(btnId);
+    const input = document.getElementById(inputId);
+    if (btn && input) {
+      btn.addEventListener('click', () => {
+        input.type = input.type === 'password' ? 'text' : 'password';
+      });
+    }
+  };
+  toggleVis('toggle-login-pass-vis', 'login-password');
+  toggleVis('toggle-reg-pass-vis', 'reg-password');
+
+  // Handle Login Submission
+  const handleLoginSubmit = async (e) => {
+    if (e) e.preventDefault();
+    const errorMsg = document.getElementById('login-error-msg');
+    errorMsg.classList.add('hidden');
+
+    const accName = document.getElementById('login-account-name').value.trim();
+    const pass = document.getElementById('login-password').value;
+    const btn = document.getElementById('btn-submit-login');
+
+    if (!accName || !pass) {
+      errorMsg.textContent = 'アカウント名とパスワードを入力してください。';
+      errorMsg.classList.remove('hidden');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ログイン中...';
 
     try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      const displayName = user.displayName || 'Googleユーザー';
-      
-      const isDuplicate = await checkDuplicateName(displayName, myUserId);
-      if (isDuplicate) {
-        showToast(`「${displayName}」は現在他ユーザーが使用中です。`, 'error');
-        btnGoogle.disabled = false;
+      const key = sanitizeAccountKey(accName);
+      const passHash = await hashPassword(pass);
+
+      const snap = await get(globalRef(`accounts/${key}`));
+      if (!snap.exists()) {
+        errorMsg.textContent = 'アカウントが見つかりません。アカウント名を確認するか、新規登録を行ってください。';
+        errorMsg.classList.remove('hidden');
         return;
       }
 
-      myName = displayName;
-      myTrip = '◆' + user.uid.substring(0, 10);
-      myAvatar = '🔑';
-
-      await registerOnlineUser();
-
-      const joinModal = document.getElementById('join-modal');
-      if (joinModal) {
-        joinModal.classList.remove('active');
-        joinModal.classList.add('hidden');
-        joinModal.style.display = 'none';
+      const accData = snap.val();
+      if (accData.passwordHash !== passHash) {
+        errorMsg.textContent = 'パスワードが正しくありません。';
+        errorMsg.classList.remove('hidden');
+        return;
       }
-      document.getElementById('app-container').classList.remove('hidden');
 
-      updateMyProfileUI();
-      sendSystemMessage(`${myAvatar} ${myName} (${myTrip}) がGoogleログインで入室しました！`);
-      initFirebaseRealtimeSync();
-      showToast(`Googleアカウント「${displayName}」でログイン成功！`, 'success');
+      myUserId = accData.userId || ('usr_' + Math.random().toString(36).substring(2, 10));
+      myName = accData.username || accName;
+      myAvatar = accData.avatar || '🤖';
+      myStatus = accData.status || '💬 雑談歓迎';
+      myTrip = await generateTrip(accName);
+
+      localStorage.setItem('cyberchat_user_id', myUserId);
+      localStorage.setItem('cyberchat_account_key', key);
+      localStorage.setItem('cyberchat_account_name', myName);
+
+      await completeUserLogin();
+      showToast(`ログイン成功！おかえりなさい、${myName} さん！`, 'success');
 
     } catch (err) {
-      console.error("Google Login error:", err);
-      if (err.code === 'auth/popup-blocked') {
-        showToast('ポップアップがブロックされたため、リダイレクト方式でログインします...', 'info');
-        try {
-          await signInWithRedirect(auth, provider);
-        } catch (redirectErr) {
-          console.error("Redirect auth error:", redirectErr);
-        }
-      } else if (err.code === 'auth/unauthorized-domain') {
-        showToast('Firebase Consoleの承認済みドメイン設定（localhost等）が必要です', 'error');
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        showToast('Googleログイン画面がキャンセルされました');
-      } else {
-        showToast(`Googleログイン失敗: ${err.message || 'Firebase設定を確認してください'}`, 'error');
-      }
+      console.error("Login error:", err);
+      errorMsg.textContent = `ログイン処理エラー: ${err.message}`;
+      errorMsg.classList.remove('hidden');
     } finally {
-      btnGoogle.disabled = false;
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> ログインする';
     }
-  });
+  };
+
+  if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
+
+  // Handle Registration Submission
+  const handleRegSubmit = async (e) => {
+    if (e) e.preventDefault();
+    const errorMsg = document.getElementById('reg-error-msg');
+    errorMsg.classList.add('hidden');
+
+    const accName = document.getElementById('reg-account-name').value.trim();
+    const pass = document.getElementById('reg-password').value;
+    const passConf = document.getElementById('reg-password-confirm').value;
+    const status = document.getElementById('reg-status').value;
+    const btn = document.getElementById('btn-submit-register');
+
+    if (!accName || accName.length < 3) {
+      errorMsg.textContent = 'アカウント名は3文字以上で入力してください。';
+      errorMsg.classList.remove('hidden');
+      return;
+    }
+
+    if (!pass || pass.length < 4) {
+      errorMsg.textContent = 'パスワードは4文字以上で入力してください。';
+      errorMsg.classList.remove('hidden');
+      return;
+    }
+
+    if (pass !== passConf) {
+      errorMsg.textContent = 'パスワードと確認用パスワードが一致しません。';
+      errorMsg.classList.remove('hidden');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 登録処理中...';
+
+    try {
+      const key = sanitizeAccountKey(accName);
+      const snap = await get(globalRef(`accounts/${key}`));
+      if (snap.exists()) {
+        errorMsg.textContent = `「${accName}」は既に登録されています。別の名前を指定するかログインしてください。`;
+        errorMsg.classList.remove('hidden');
+        return;
+      }
+
+      const passHash = await hashPassword(pass);
+      myUserId = 'usr_' + Math.random().toString(36).substring(2, 10);
+      myName = accName;
+      myStatus = status;
+      myTrip = await generateTrip(accName);
+
+      await set(globalRef(`accounts/${key}`), {
+        userId: myUserId,
+        username: myName,
+        accountKey: key,
+        passwordHash: passHash,
+        avatar: myAvatar,
+        status: myStatus,
+        createdAt: Date.now()
+      });
+
+      localStorage.setItem('cyberchat_user_id', myUserId);
+      localStorage.setItem('cyberchat_account_key', key);
+      localStorage.setItem('cyberchat_account_name', myName);
+
+      await completeUserLogin();
+      showToast(`新規会員登録完了！ようこそ ${myName} さん！`, 'success');
+
+    } catch (err) {
+      console.error("Register error:", err);
+      errorMsg.textContent = `登録処理エラー: ${err.message}`;
+      errorMsg.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-user-check"></i> 新規登録して始める';
+    }
+  };
+
+  if (regForm) regForm.addEventListener('submit', handleRegSubmit);
+
+  const logoutBtn = document.getElementById('btn-logout-account');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      if (!confirm('ログアウトしますか？')) return;
+      localStorage.removeItem('cyberchat_account_key');
+      localStorage.removeItem('cyberchat_account_name');
+      await remove(roomRef(`active_users/${myUserId}`));
+      location.reload();
+    });
+  }
+
+  checkSavedSession();
+}
+
+async function checkSavedSession() {
+  const savedKey = localStorage.getItem('cyberchat_account_key');
+  if (savedKey) {
+    try {
+      const snap = await get(globalRef(`accounts/${savedKey}`));
+      if (snap.exists()) {
+        const accData = snap.val();
+        myUserId = accData.userId || localStorage.getItem('cyberchat_user_id');
+        myName = accData.username;
+        myAvatar = accData.avatar || '🤖';
+        myStatus = accData.status || '💬 雑談歓迎';
+        myTrip = await generateTrip(myName);
+
+        await completeUserLogin();
+        return;
+      }
+    } catch (e) {
+      console.warn("Session restore error:", e);
+    }
+  }
+
+  const authModal = document.getElementById('auth-modal');
+  if (authModal) authModal.classList.add('active');
+}
+
+async function completeUserLogin() {
+  await registerOnlineUser();
+
+  const authModal = document.getElementById('auth-modal');
+  if (authModal) {
+    authModal.classList.remove('active');
+    authModal.classList.add('hidden');
+  }
+
+  document.getElementById('app-container').classList.remove('hidden');
+  updateMyProfileUI();
+  initFirebaseRealtimeSync();
+  initFriendListeners();
 }
 
 // Avatar Grid Selector & Custom Image Uploader
@@ -1075,6 +1230,7 @@ function initFirebaseRealtimeSync() {
             <div class="user-item-status">${escapeHtml(uData.status || '💬 雑談歓迎')}</div>
           </div>
           <button class="btn-secondary btn-sm" onclick="window.startWhisper('${uid}', '${escapeHtml(uData.name)}')" title="内緒話（DM）"><i class="fa-solid fa-lock"></i></button>
+          ${uid !== myUserId ? `<button class="btn-secondary btn-sm" onclick="window.sendFriendRequest('${uid}', '${escapeHtml(uData.name)}')" title="フレンド申請"><i class="fa-solid fa-user-plus text-primary"></i></button>` : ''}
           ${uid !== myUserId ? `<button class="btn-mute-user" onclick="window.ignoreUser('${uid}', '${escapeHtml(uData.name)}')" title="無視（ブロック）"><i class="fa-solid fa-user-slash"></i></button>` : ''}
         `;
         userListEl.appendChild(li);
@@ -1439,6 +1595,7 @@ function renderSingleMessage(msgId, msg) {
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button onclick="window.openEditMsgModal('${msgId}')"><i class="fa-solid fa-pen"></i> 編集</button>` : ''}
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
+        ${!isSelf ? `<button onclick="window.sendFriendRequest('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
         ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
       </div>
@@ -3491,4 +3648,254 @@ function setupWerewolfGameControls() {
       document.getElementById('werewolf-game-modal').classList.add('hidden');
     });
   }
+}
+
+/* ==========================================================================
+   🤝 Friend System Logic & Controls
+   ========================================================================== */
+function initFriendListeners() {
+  if (unsubscribeFriendRequests) unsubscribeFriendRequests();
+  if (unsubscribeFriends) unsubscribeFriends();
+
+  if (!myUserId) return;
+
+  unsubscribeFriendRequests = onValue(globalRef(`friend_requests/${myUserId}`), (snapshot) => {
+    friendRequestsMap.clear();
+    if (snapshot.exists()) {
+      const reqs = snapshot.val();
+      Object.entries(reqs).forEach(([reqUid, reqData]) => {
+        friendRequestsMap.set(reqUid, reqData);
+      });
+    }
+    renderFriendRequestsUI();
+  });
+
+  unsubscribeFriends = onValue(globalRef(`friends/${myUserId}`), (snapshot) => {
+    friendsMap.clear();
+    if (snapshot.exists()) {
+      const fList = snapshot.val();
+      Object.entries(fList).forEach(([fUid, fData]) => {
+        friendsMap.set(fUid, fData);
+      });
+    }
+    renderFriendsListUI();
+  });
+}
+
+function renderFriendRequestsUI() {
+  const badge = document.getElementById('friend-req-notify-badge');
+  const cntSpan = document.getElementById('friend-req-cnt');
+  const reqUl = document.getElementById('friend-req-ul');
+
+  const count = friendRequestsMap.size;
+  if (badge) {
+    if (count > 0) {
+      badge.textContent = count;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+  if (cntSpan) cntSpan.textContent = count;
+
+  if (!reqUl) return;
+  reqUl.innerHTML = '';
+
+  if (count === 0) {
+    reqUl.innerHTML = '<li style="color:var(--text-muted); font-size:0.85rem; padding:12px; text-align:center;">届いているフレンド申請はありません</li>';
+    return;
+  }
+
+  friendRequestsMap.forEach((reqData, fromUid) => {
+    const li = document.createElement('li');
+    li.className = 'friend-item-card';
+    li.innerHTML = `
+      <div class="avatar-sm">${renderAvatarHTML(reqData.fromAvatar)}</div>
+      <div class="friend-item-info">
+        <div class="friend-item-name">${escapeHtml(reqData.fromName)}</div>
+        <div class="friend-item-status">フレンド申請が届いています</div>
+      </div>
+      <button class="btn-primary btn-sm" onclick="window.acceptFriendRequest('${fromUid}', '${escapeHtml(reqData.fromName)}', '${escapeHtml(reqData.fromAvatar)}')">承認</button>
+      <button class="btn-secondary btn-sm danger" onclick="window.declineFriendRequest('${fromUid}')">拒否</button>
+    `;
+    reqUl.appendChild(li);
+  });
+}
+
+function renderFriendsListUI() {
+  const sidebarUl = document.getElementById('friends-sidebar-ul');
+  const modalUl = document.getElementById('friend-modal-ul');
+  const cntBadge = document.getElementById('friends-count-badge');
+  const listCntSpan = document.getElementById('friend-list-cnt');
+
+  const count = friendsMap.size;
+  if (cntBadge) cntBadge.textContent = `${count}人`;
+  if (listCntSpan) listCntSpan.textContent = count;
+
+  if (sidebarUl) sidebarUl.innerHTML = '';
+  if (modalUl) modalUl.innerHTML = '';
+
+  if (count === 0) {
+    if (sidebarUl) sidebarUl.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem; padding:6px 10px;">フレンドはいません</li>';
+    if (modalUl) modalUl.innerHTML = '<li style="color:var(--text-muted); font-size:0.85rem; padding:16px; text-align:center;">まだフレンドはいません。「探す / 申請」タブから登録しましょう！</li>';
+    return;
+  }
+
+  friendsMap.forEach((fData, fUid) => {
+    const isOnline = activeUsersMap.has(fUid);
+
+    if (sidebarUl) {
+      const li = document.createElement('li');
+      li.className = 'user-item';
+      li.innerHTML = `
+        <div class="avatar-sm">${renderAvatarHTML(fData.friendAvatar)}</div>
+        <div class="user-item-info">
+          <div class="user-item-name"><span class="friend-online-dot ${isOnline ? 'online' : 'offline'}"></span>${escapeHtml(fData.friendName)}</div>
+          <div class="user-item-status">${isOnline ? '🟢 オンライン' : '⚪ オフライン'}</div>
+        </div>
+        <button class="btn-secondary btn-sm" onclick="window.startWhisper('${fUid}', '${escapeHtml(fData.friendName)}')" title="会話する"><i class="fa-solid fa-comments text-primary"></i></button>
+      `;
+      sidebarUl.appendChild(li);
+    }
+
+    if (modalUl) {
+      const mLi = document.createElement('li');
+      mLi.className = 'friend-item-card';
+      mLi.innerHTML = `
+        <div class="avatar-sm">${renderAvatarHTML(fData.friendAvatar)}</div>
+        <div class="friend-item-info">
+          <div class="friend-item-name"><span class="friend-online-dot ${isOnline ? 'online' : 'offline'}"></span>${escapeHtml(fData.friendName)}</div>
+          <div class="friend-item-status">${isOnline ? '🟢 オンライン' : '⚪ オフライン'}</div>
+        </div>
+        <button class="btn-primary btn-sm" onclick="window.startWhisper('${fUid}', '${escapeHtml(fData.friendName)}'); document.getElementById('friend-modal').classList.add('hidden');"><i class="fa-solid fa-comments"></i> 会話する</button>
+      `;
+      modalUl.appendChild(mLi);
+    }
+  });
+}
+
+window.sendFriendRequest = async (targetUid, targetName) => {
+  if (targetUid === myUserId) {
+    showToast('自分自身にフレンド申請は送れません', 'error');
+    return;
+  }
+  if (friendsMap.has(targetUid)) {
+    showToast(`「${targetName}」さんは既にフレンドです！`, 'info');
+    return;
+  }
+
+  try {
+    await set(globalRef(`friend_requests/${targetUid}/${myUserId}`), {
+      fromUserId: myUserId,
+      fromName: myName,
+      fromAvatar: myAvatar,
+      timestamp: Date.now()
+    });
+    showToast(`「${targetName}」さんにフレンド申請を送信しました！`, 'success');
+  } catch (e) {
+    showToast('フレンド申請の送信に失敗しました', 'error');
+  }
+};
+
+window.acceptFriendRequest = async (fromUid, fromName, fromAvatar) => {
+  try {
+    await set(globalRef(`friends/${myUserId}/${fromUid}`), {
+      friendUserId: fromUid,
+      friendName: fromName,
+      friendAvatar: fromAvatar,
+      addedAt: Date.now()
+    });
+
+    await set(globalRef(`friends/${fromUid}/${myUserId}`), {
+      friendUserId: myUserId,
+      friendName: myName,
+      friendAvatar: myAvatar,
+      addedAt: Date.now()
+    });
+
+    await remove(globalRef(`friend_requests/${myUserId}/${fromUid}`));
+
+    playSound('fanfare');
+    showToast(`🎉 「${fromName}」さんとフレンドになりました！`, 'success');
+  } catch (e) {
+    showToast('承認処理に失敗しました', 'error');
+  }
+};
+
+window.declineFriendRequest = async (fromUid) => {
+  try {
+    await remove(globalRef(`friend_requests/${myUserId}/${fromUid}`));
+    showToast('フレンド申請を辞退しました', 'info');
+  } catch (e) {
+    showToast('処理に失敗しました', 'error');
+  }
+};
+
+function setupFriendModalControls() {
+  const btnOpen = document.getElementById('btn-open-friend-modal');
+  const modal = document.getElementById('friend-modal');
+
+  if (btnOpen && modal) {
+    btnOpen.addEventListener('click', () => modal.classList.remove('hidden'));
+  }
+
+  document.querySelectorAll('.friend-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.friend-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const targetId = btn.dataset.target;
+      document.querySelectorAll('#friend-modal .friend-tab-content').forEach(c => c.classList.add('hidden'));
+      const target = document.getElementById(targetId);
+      if (target) target.classList.remove('hidden');
+    });
+  });
+
+  const btnSendByName = document.getElementById('btn-send-friend-req-by-name');
+  const searchInput = document.getElementById('friend-search-input');
+  if (btnSendByName && searchInput) {
+    btnSendByName.addEventListener('click', async () => {
+      const targetName = searchInput.value.trim();
+      if (!targetName) return;
+
+      const key = sanitizeAccountKey(targetName);
+      try {
+        const snap = await get(globalRef(`accounts/${key}`));
+        if (!snap.exists()) {
+          showToast(`「${targetName}」というアカウントは見つかりませんでした`, 'error');
+          return;
+        }
+
+        const accData = snap.val();
+        await window.sendFriendRequest(accData.userId, accData.username);
+        searchInput.value = '';
+      } catch (e) {
+        showToast('検索エラーが発生しました', 'error');
+      }
+    });
+  }
+}
+
+/* ==========================================================================
+   📱 Mobile Navigation Drawer Controls
+   ========================================================================== */
+function setupMobileNavigation() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const toggleBtn = document.getElementById('btn-toggle-sidebar');
+  const closeBtn = document.getElementById('btn-close-sidebar');
+
+  const openDrawer = () => {
+    if (sidebar) sidebar.classList.add('open');
+    if (overlay) overlay.classList.add('active');
+  };
+
+  const closeDrawer = () => {
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
+  };
+
+  if (toggleBtn) toggleBtn.addEventListener('click', openDrawer);
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+  if (overlay) overlay.addEventListener('click', closeDrawer);
 }

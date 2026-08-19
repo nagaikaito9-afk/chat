@@ -45,91 +45,108 @@
     </div>
   </div>
 
-  <!-- 入室・初期設定モーダル (全画面オーバーレイ) -->
-  <div id="join-modal" class="overlay-screen active">
-    <div class="join-card glass-panel animate-fade-in">
+  <!-- 🔑 ログイン・新規会員登録 モーダル (全画面オーバーレイ) -->
+  <div id="auth-modal" class="overlay-screen active">
+    <div class="join-card glass-panel animate-fade-in auth-card">
       <div class="join-header">
         <div class="app-brand">
           <i class="fa-solid fa-comments brand-icon"></i>
           <h2>CyberChat</h2>
         </div>
-        <p class="join-subtitle">端末モード、名前、アイコンを設定してチャットに参加</p>
+        <p class="join-subtitle">アカウント登録・ログインしてチャットを開始</p>
       </div>
 
-      <!-- 画面表示モード切り替え（スマホ / PC） -->
-      <div class="input-group">
-        <label><i class="fa-solid fa-display"></i> 表示モードを選択 <span class="required">*</span></label>
-        <div class="device-mode-selector">
-          <button type="button" class="device-btn active" data-mode="pc">
-            <i class="fa-solid fa-desktop"></i>
-            <span>💻 PC表示</span>
-          </button>
-          <button type="button" class="device-btn" data-mode="mobile">
-            <i class="fa-solid fa-mobile-screen-button"></i>
-            <span>📱 スマホ表示</span>
-          </button>
-        </div>
+      <!-- Auth Mode Switch Tabs -->
+      <div class="auth-tabs">
+        <button type="button" id="tab-auth-login" class="auth-tab-btn active">🔑 ログイン</button>
+        <button type="button" id="tab-auth-register" class="auth-tab-btn">✨ 新規会員登録</button>
       </div>
 
-      <!-- Google ログインボタン -->
-      <button type="button" id="btn-google-login" class="btn-google">
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="google-icon">
-        <span>Google アカウントでかんたんログイン</span>
-      </button>
-
-      <div class="google-auth-divider">
-        <span>または名前を入力して参加</span>
-      </div>
-
-      <form id="join-form" onsubmit="return false;">
+      <!-- 1. ログインフォーム -->
+      <form id="login-form" class="auth-form-content active" onsubmit="return false;">
         <div class="input-group">
-          <label for="join-username"><i class="fa-solid fa-user"></i> ユーザー名 <span class="required">*</span></label>
-          <input type="text" id="join-username" placeholder="例: たなか" maxlength="20" required autocomplete="off">
-          <span class="input-hint">※既に他の人が使用している名前は使えません</span>
+          <label for="login-account-name"><i class="fa-solid fa-user"></i> アカウント名 <span class="required">*</span></label>
+          <input type="text" id="login-account-name" placeholder="アカウント名を入力" maxlength="30" required autocomplete="username">
+        </div>
+
+        <div class="input-group">
+          <label for="login-password"><i class="fa-solid fa-key"></i> パスワード <span class="required">*</span></label>
+          <div class="trip-input-wrapper">
+            <input type="password" id="login-password" placeholder="パスワードを入力" required autocomplete="current-password">
+            <button type="button" id="toggle-login-pass-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
+          </div>
+        </div>
+
+        <div id="login-error-msg" class="error-banner hidden"></div>
+
+        <button type="submit" id="btn-submit-login" class="btn-primary btn-block btn-lg" style="margin-top:12px;">
+          <i class="fa-solid fa-right-to-bracket"></i> ログインする
+        </button>
+      </form>
+
+      <!-- 2. 新規登録フォーム -->
+      <form id="register-form" class="auth-form-content hidden" onsubmit="return false;">
+        <div class="input-group">
+          <label for="reg-account-name"><i class="fa-solid fa-user-plus"></i> アカウント名 <span class="required">*</span></label>
+          <input type="text" id="reg-account-name" placeholder="例: cyber_user" maxlength="20" required autocomplete="username">
+          <span class="input-hint">※半角英数字や日本語（3〜20文字）</span>
+        </div>
+
+        <div class="input-group">
+          <label for="reg-password"><i class="fa-solid fa-lock"></i> パスワード <span class="required">*</span></label>
+          <div class="trip-input-wrapper">
+            <input type="password" id="reg-password" placeholder="4文字以上のパスワード" minlength="4" required autocomplete="new-password">
+            <button type="button" id="toggle-reg-pass-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="reg-password-confirm"><i class="fa-solid fa-shield-halved"></i> パスワード (確認) <span class="required">*</span></label>
+          <input type="password" id="reg-password-confirm" placeholder="パスワードを再入力" minlength="4" required autocomplete="new-password">
         </div>
 
         <div class="input-group">
           <label><i class="fa-solid fa-face-smile"></i> アイコンを選択 (全50種 & 画像対応)</label>
           <div class="avatar-picker-tabs">
-            <button type="button" class="avatar-tab-btn active" data-target="join-tab-preset">アイコン50種</button>
-            <button type="button" class="avatar-tab-btn" data-target="join-tab-custom">📷 画像アイコン</button>
+            <button type="button" class="avatar-tab-btn active" data-target="reg-tab-preset">アイコン50種</button>
+            <button type="button" class="avatar-tab-btn" data-target="reg-tab-custom">📷 画像アイコン</button>
           </div>
 
-          <div id="join-tab-preset" class="avatar-tab-content active">
+          <div id="reg-tab-preset" class="avatar-tab-content active">
             <div class="avatar-category-pills">
-              <button type="button" class="cat-pill active" data-cat="all" data-picker="join">すべて</button>
-              <button type="button" class="cat-pill" data-cat="cyber" data-picker="join">SF</button>
-              <button type="button" class="cat-pill" data-cat="werewolf" data-picker="join">人狼</button>
-              <button type="button" class="cat-pill" data-cat="animal" data-picker="join">動物</button>
-              <button type="button" class="cat-pill" data-cat="face" data-picker="join">表情</button>
-              <button type="button" class="cat-pill" data-cat="hobby" data-picker="join">趣味</button>
+              <button type="button" class="cat-pill active" data-cat="all" data-picker="reg">すべて</button>
+              <button type="button" class="cat-pill" data-cat="cyber" data-picker="reg">SF</button>
+              <button type="button" class="cat-pill" data-cat="werewolf" data-picker="reg">人狼</button>
+              <button type="button" class="cat-pill" data-cat="animal" data-picker="reg">動物</button>
+              <button type="button" class="cat-pill" data-cat="face" data-picker="reg">表情</button>
+              <button type="button" class="cat-pill" data-cat="hobby" data-picker="reg">趣味</button>
             </div>
-            <div id="join-avatar-picker" class="avatar-picker-grid-50">
-              <!-- 50種類アイコンはJSで動的/プリセット挿入 -->
+            <div id="reg-avatar-picker" class="avatar-picker-grid-50">
+              <!-- 50種類アイコン -->
             </div>
           </div>
 
-          <div id="join-tab-custom" class="avatar-tab-content hidden">
+          <div id="reg-tab-custom" class="avatar-tab-content hidden">
             <div class="custom-avatar-uploader">
               <label class="btn-secondary btn-sm file-upload-btn">
                 <i class="fa-solid fa-upload"></i> 画像ファイルをアップロード
-                <input type="file" id="join-avatar-file-input" accept="image/*" class="hidden-file-input">
+                <input type="file" id="reg-avatar-file-input" accept="image/*" class="hidden-file-input">
               </label>
               <div class="url-input-row" style="margin-top:8px; display:flex; gap:6px;">
-                <input type="url" id="join-avatar-url-input" placeholder="画像URL (https://...)" class="input-sm" style="flex:1;">
-                <button type="button" id="btn-join-apply-url" class="btn-primary btn-sm">適用</button>
+                <input type="url" id="reg-avatar-url-input" placeholder="画像URL (https://...)" class="input-sm" style="flex:1;">
+                <button type="button" id="btn-reg-apply-url" class="btn-primary btn-sm">適用</button>
               </div>
               <div class="custom-preview-wrapper" style="margin-top:10px; display:flex; align-items:center; gap:10px;">
                 <span class="preview-lbl" style="font-size:0.85rem; color:var(--text-secondary);">現在のアイコン:</span>
-                <div id="join-avatar-preview" class="avatar-preview-box">🤖</div>
+                <div id="reg-avatar-preview" class="avatar-preview-box">🤖</div>
               </div>
             </div>
           </div>
         </div>
 
         <div class="input-group">
-          <label for="join-status"><i class="fa-solid fa-heart-pulse"></i> 一言ステータス / 気分</label>
-          <select id="join-status" class="status-select">
+          <label for="reg-status"><i class="fa-solid fa-heart-pulse"></i> 一言ステータス</label>
+          <select id="reg-status" class="status-select">
             <option value="💬 雑談歓迎">💬 雑談歓迎</option>
             <option value="🎮 ゲーム中">🎮 ゲーム中</option>
             <option value="☕ 作業中...">☕ 作業中...</option>
@@ -139,21 +156,10 @@
           </select>
         </div>
 
-        <div class="input-group">
-          <label for="join-tripkey"><i class="fa-solid fa-key"></i> トリップキー (任意)</label>
-          <div class="trip-input-wrapper">
-            <input type="password" id="join-tripkey" placeholder="例: mysecret123" maxlength="30" autocomplete="off">
-            <button type="button" id="toggle-trip-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
-          </div>
-          <div class="trip-preview">
-            生成トリップ: <span id="trip-preview-code" class="trip-badge">◆(なし)</span>
-          </div>
-        </div>
+        <div id="reg-error-msg" class="error-banner hidden"></div>
 
-        <div id="join-error-msg" class="error-banner hidden"></div>
-
-        <button type="submit" id="btn-start-chat" class="btn-primary btn-block">
-          <i class="fa-solid fa-right-to-bracket"></i> チャットを開始する
+        <button type="submit" id="btn-submit-register" class="btn-primary btn-block btn-lg" style="margin-top:12px;">
+          <i class="fa-solid fa-user-check"></i> 新規登録して始める
         </button>
       </form>
     </div>
@@ -179,9 +185,30 @@
           <div class="profile-status-badge" id="my-status-display">💬 雑談歓迎</div>
           <div class="profile-trip" id="my-trip-display">◆------</div>
         </div>
-        <button id="btn-open-edit-profile" class="btn-icon" title="名前・アイコン・ステータスを変更">
-          <i class="fa-solid fa-pen-to-square"></i>
-        </button>
+        <div class="profile-card-actions">
+          <button id="btn-open-edit-profile" class="btn-icon" title="プロフィール変更">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button id="btn-logout-account" class="btn-icon danger" title="ログアウト">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 🤝 フレンド管理セクション -->
+      <div class="friends-sidebar-section">
+        <div class="section-title">
+          <span><i class="fa-solid fa-user-group text-primary"></i> フレンド</span>
+          <span class="user-count-badge" id="friends-count-badge">0人</span>
+        </div>
+        <div class="friends-action-row" style="margin-bottom:8px; display:flex; gap:6px;">
+          <button type="button" id="btn-open-friend-modal" class="btn-secondary btn-sm" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <i class="fa-solid fa-user-plus"></i> フレンド管理 <span id="friend-req-notify-badge" class="req-notify-badge hidden">0</span>
+          </button>
+        </div>
+        <ul id="friends-sidebar-ul" class="online-user-list">
+          <!-- JS動的生成 -->
+        </ul>
       </div>
 
       <!-- フィルター・検索 -->
@@ -231,6 +258,9 @@
         </ul>
       </div>
     </aside>
+
+    <!-- スマホDrawerオーバーレイ背景 -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
     <!-- メインチャットエリア -->
     <main class="chat-main">
@@ -979,6 +1009,55 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- 🤝 フレンド管理モーダル -->
+  <div id="friend-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-group text-primary"></i> フレンド管理</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="friend-modal-tabs">
+          <button type="button" class="friend-tab-btn active" data-target="tab-friend-list">フレンド一覧 (<span id="friend-list-cnt">0</span>)</button>
+          <button type="button" class="friend-tab-btn" data-target="tab-friend-req">申請 (<span id="friend-req-cnt">0</span>)</button>
+          <button type="button" class="friend-tab-btn" data-target="tab-friend-add">🔍 探す / 申請</button>
+        </div>
+
+        <!-- 1. フレンド一覧 -->
+        <div id="tab-friend-list" class="friend-tab-content active">
+          <ul id="friend-modal-ul" class="friend-modal-ul">
+            <!-- JS動的生成 -->
+          </ul>
+        </div>
+
+        <!-- 2. 届いた申請 -->
+        <div id="tab-friend-req" class="friend-tab-content hidden">
+          <ul id="friend-req-ul" class="friend-modal-ul">
+            <!-- JS動的生成 -->
+          </ul>
+        </div>
+
+        <!-- 3. フレンドを探す / 申請送信 -->
+        <div id="tab-friend-add" class="friend-tab-content hidden">
+          <div class="input-group">
+            <label for="friend-search-input">相手のアカウント名 <span class="required">*</span></label>
+            <div class="search-input-wrapper" style="display:flex; gap:6px;">
+              <input type="text" id="friend-search-input" placeholder="アカウント名を入力" style="flex:1;">
+              <button type="button" id="btn-send-friend-req-by-name" class="btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i> 申請送信</button>
+            </div>
+            <span class="input-hint">相手のアカウント名を入力して「申請送信」を押してください</span>
+          </div>
+          <div id="friend-search-result" class="friend-search-result" style="margin-top:10px;"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">閉じる</button>
       </div>
     </div>
   </div>
