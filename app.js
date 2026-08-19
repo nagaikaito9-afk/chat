@@ -2512,8 +2512,34 @@ function setupStampsAndMinigames() {
   });
 }
 
+// 🛡️ Anti-Spam Rate Limiter & Flood Prevention
+let lastMessageTime = 0;
+const MESSAGE_COOLDOWN_MS = 1200;
+
+function checkAntiSpam(text) {
+  const now = Date.now();
+  if (now - lastMessageTime < MESSAGE_COOLDOWN_MS) {
+    showToast('⚠️ 連投防止：少し時間をおいてから送信してください', 'error');
+    return false;
+  }
+
+  if (text && text.length > 1000) {
+    showToast('⚠️ メッセージが長すぎます（最大1000文字まで）', 'error');
+    return false;
+  }
+
+  if (text && /(.)\1{35,}/.test(text)) {
+    showToast('⚠️ 意味のない長文連投パターンは送信できません', 'error');
+    return false;
+  }
+
+  lastMessageTime = now;
+  return true;
+}
+
 async function sendSpecialMessage(msgType, text) {
   if (isSendingSpecial) return;
+  if (!checkAntiSpam(text)) return;
   isSendingSpecial = true;
   try {
     const newMsgRef = push(roomRef('messages'));
@@ -2647,6 +2673,8 @@ function setupChatControls() {
     if (isSending) return;
     const text = textInput.value.trim();
     if (!text && !selectedFileObject) return;
+
+    if (!checkAntiSpam(text)) return;
 
     isSending = true;
     try {
