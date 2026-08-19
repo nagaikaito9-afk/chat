@@ -492,11 +492,12 @@ function setupPresenceConnectionHeartbeat() {
   });
 }
 
-// 🚫 リアルタイムBAN判定リスナー
+// 🚫 リアルタイムBAN判定リスナー（IDおよびアカウント名チェック）
 function initBanCheckListener() {
   onValue(globalRef(`banned_users/${myUserId}`), (snapshot) => {
     if (snapshot.exists()) {
       alert("⚠️ あなたのアカウントは運営によってBAN（アクセス禁止）されました。");
+      localStorage.clear();
       location.reload();
     }
   });
@@ -505,7 +506,14 @@ function initBanCheckListener() {
     bannedUsersMap.clear();
     if (snapshot.exists()) {
       const data = snapshot.val();
-      Object.entries(data).forEach(([uid, val]) => bannedUsersMap.set(uid, val));
+      Object.entries(data).forEach(([key, val]) => {
+        bannedUsersMap.set(key, val);
+        if (val && val.name && myName && val.name.trim().toLowerCase() === myName.trim().toLowerCase()) {
+          alert("⚠️ お使いのユーザー名・アカウントは運営によって永久BANされました。");
+          localStorage.clear();
+          location.reload();
+        }
+      });
     }
     renderAdminBannedUsersUI();
   });
@@ -645,6 +653,23 @@ function setupAdminSystem() {
       showToast('💾 AI APIキーを保存しました！', 'success');
     });
   }
+
+  // 🎯 手動ユーザー名指定BAN
+  const btnManualBan = document.getElementById('btn-admin-manual-ban');
+  const manualBanInput = document.getElementById('admin-manual-ban-name-input');
+  if (btnManualBan && manualBanInput) {
+    btnManualBan.addEventListener('click', async () => {
+      const targetName = manualBanInput.value.trim();
+      if (!targetName) {
+        showToast('BAN対象のユーザー名を入力してください', 'error');
+        return;
+      }
+      if (!confirm(`【警告】ユーザー名「${targetName}」を永久BAN（アクセス拒否）しますか？`)) return;
+
+      await window.adminBanByName(targetName);
+      manualBanInput.value = '';
+    });
+  }
 }
 
 function openAdminPanel() {
@@ -701,6 +726,14 @@ window.adminBanUser = async (uid, name) => {
       name: name,
       timestamp: Date.now()
     });
+    const key = sanitizeAccountKey(name);
+    if (key) {
+      await set(globalRef(`banned_users/name_${key}`), {
+        name: name,
+        timestamp: Date.now()
+      });
+    }
+
     await remove(roomRef(`active_users/${uid}`));
     sendSystemMessage(`🚫 運営によって ${name} がBAN（アクセス禁止）処理されました`);
     showToast(`「${name}」をBANしました`, 'success');
@@ -710,9 +743,47 @@ window.adminBanUser = async (uid, name) => {
   }
 };
 
+window.adminBanByName = async (name) => {
+  try {
+    const key = sanitizeAccountKey(name);
+    let targetUid = null;
+
+    activeUsersMap.forEach((uData, uid) => {
+      if (uData.name && uData.name.trim().toLowerCase() === name.trim().toLowerCase()) {
+        targetUid = uid;
+      }
+    });
+
+    if (targetUid) {
+      await set(globalRef(`banned_users/${targetUid}`), {
+        name: name,
+        timestamp: Date.now()
+      });
+      await remove(roomRef(`active_users/${targetUid}`));
+    }
+
+    await set(globalRef(`banned_users/name_${key}`), {
+      name: name,
+      timestamp: Date.now()
+    });
+
+    sendSystemMessage(`🚫 運営によって ユーザー名「${name}」が永久BAN（アクセス禁止）処理されました`);
+    showToast(`「${name}」を永久BANリストに追加しました！`, 'success');
+    renderAdminUsersTable();
+    renderAdminBannedUsersUI();
+  } catch (e) {
+    console.error("Manual BAN error:", e);
+    showToast('BAN処理に失敗しました', 'error');
+  }
+};
+
 window.adminUnbanUser = async (uid, name) => {
   try {
     await remove(globalRef(`banned_users/${uid}`));
+    const key = sanitizeAccountKey(name);
+    if (key) {
+      await remove(globalRef(`banned_users/name_${key}`));
+    }
     showToast(`「${name}」のBANを解除しました`, 'success');
     renderAdminBannedUsersUI();
   } catch (e) {
@@ -794,6 +865,13 @@ function setupAuthForms() {
 
     try {
       const key = sanitizeAccountKey(accName);
+      const nameBanSnap = await get(globalRef(`banned_users/name_${key}`));
+      if (nameBanSnap.exists()) {
+        errorMsg.textContent = '⚠️ このアカウント・ユーザー名は運営によって永久BANされています。アクセスできません。';
+        errorMsg.classList.remove('hidden');
+        return;
+      }
+
       const passHash = await hashPassword(pass);
 
       const snap = await get(globalRef(`accounts/${key}`));
@@ -870,6 +948,13 @@ function setupAuthForms() {
 
     try {
       const key = sanitizeAccountKey(accName);
+      const nameBanSnap = await get(globalRef(`banned_users/name_${key}`));
+      if (nameBanSnap.exists()) {
+        errorMsg.textContent = '⚠️ このユーザー名は運営によって禁止されています。別の名前を指定してください。';
+        errorMsg.classList.remove('hidden');
+        return;
+      }
+
       const snap = await get(globalRef(`accounts/${key}`));
       if (snap.exists()) {
         errorMsg.textContent = `「${accName}」は既に登録されています。別の名前を指定するかログインしてください。`;

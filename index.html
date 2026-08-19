@@ -623,6 +623,19 @@
         <!-- 👥 オンラインユーザー管理 & BAN操作 -->
         <div class="admin-section-box">
           <h4><i class="fa-solid fa-users-slash text-danger"></i> 参加中メンバーのBAN（アクセス禁止）/ 追放</h4>
+          
+          <!-- 🎯 ユーザー名直接指定BANフォーム -->
+          <div style="margin-bottom: 12px; background: rgba(255, 51, 102, 0.08); padding: 10px; border-radius: var(--radius-md); border: 1px solid rgba(255, 51, 102, 0.3);">
+            <label style="font-size:0.82rem; font-weight:700; color:#ff6b8b; display:block; margin-bottom:6px;">
+              <i class="fa-solid fa-user-ninja"></i> ユーザー名・アカウント名で直接永久BAN指定
+            </label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="admin-manual-ban-name-input" placeholder="例: 野獣先輩" class="input-sm" style="flex:1;">
+              <button type="button" id="btn-admin-manual-ban" class="btn-primary btn-sm danger"><i class="fa-solid fa-gavel"></i> 永久BAN実行</button>
+            </div>
+            <span class="input-hint">※指定した名前での新規ログイン・アクセス・発言を即座かつ永久に遮断します。</span>
+          </div>
+
           <div class="admin-user-table-wrapper">
             <table class="admin-user-table">
               <thead>
