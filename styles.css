@@ -100,7 +100,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Background Ambient Glows */
+/* Background Ambient Glows (Optimized for speed) */
 .bg-glow {
   position: fixed;
   border-radius: 50%;
@@ -157,6 +157,7 @@ html, body {
 }
 
 .text-success { color: var(--success-color); }
+.text-warning { color: var(--warning-color); }
 .pulse { animation: pulseAnim 2s infinite; }
 
 @keyframes pulseAnim {
@@ -257,35 +258,42 @@ html, body {
   color: #ffffff;
 }
 
-/* Screen Share Viewport Container */
+/* 全員共通：画面共有ライブ表示 (画面左下に固定配置) */
 .screen-share-box {
-  margin: 12px 20px 0;
-  padding: 12px;
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  width: 320px;
+  z-index: 900;
+  padding: 10px;
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: rgba(0, 0, 0, 0.4);
+  gap: 8px;
+  background: rgba(10, 13, 20, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--accent-primary);
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+  box-shadow: var(--shadow-md), 0 0 20px var(--accent-glow);
+  animation: slideUpMsg 0.3s ease-out;
 }
 
 .screen-share-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .screen-share-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-#screen-share-video {
+#screen-share-video, #screen-share-remote-img {
   width: 100%;
-  max-height: 420px;
+  max-height: 180px;
   border-radius: var(--radius-sm);
   background: #000;
   object-fit: contain;
@@ -970,6 +978,33 @@ html, body {
   border-bottom-left-radius: 4px;
 }
 
+/* コンパクト画像プレビュー (大きい画像は小さく表示) */
+.msg-image {
+  max-width: 220px;
+  max-height: 180px;
+  border-radius: var(--radius-md);
+  margin-top: 6px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  object-fit: cover;
+  border: 1px solid var(--glass-border);
+  display: block;
+}
+
+.msg-image:hover {
+  transform: scale(1.03);
+}
+
+/* YouTube Iframe Embed Card */
+.msg-youtube-iframe {
+  width: 100%;
+  max-width: 320px;
+  height: 180px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  margin-top: 6px;
+}
+
 /* Whisper Message Bubble */
 .msg-bubble.whisper {
   background: var(--msg-whisper-bg) !important;
@@ -1007,7 +1042,7 @@ html, body {
 /* Video & Audio Players */
 .msg-video {
   max-width: 100%;
-  max-height: 280px;
+  max-height: 220px;
   border-radius: var(--radius-md);
   margin-top: 6px;
   outline: none;
@@ -1124,6 +1159,32 @@ html, body {
 .msg-dropdown-menu button.danger:hover {
   background: rgba(255, 51, 102, 0.2);
   color: var(--danger-color);
+}
+
+/* Quick Snippets Bar */
+.snippets-bar {
+  display: flex;
+  gap: 6px;
+  padding: 4px 20px;
+  overflow-x: auto;
+}
+
+.snippet-tag {
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.snippet-tag:hover {
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
 }
 
 /* Typing & Whisper Indicators */
@@ -1610,5 +1671,11 @@ html, body {
 
   .chat-footer {
     padding: 12px 16px;
+  }
+
+  .screen-share-box {
+    left: 12px;
+    bottom: 12px;
+    width: 260px;
   }
 }

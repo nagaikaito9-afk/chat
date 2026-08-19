@@ -44,6 +44,7 @@ let starredMsgSet = new Set(JSON.parse(localStorage.getItem('cyberchat_starred_m
 // Screen Sharing State
 let isScreenSharing = false;
 let screenStream = null;
+let screenFrameInterval = null;
 
 // Sending Locks (二重送信防止)
 let isSending = false;
@@ -79,6 +80,9 @@ let bgmAudioCtx = null;
 let bgmOsc = null;
 let bgmGain = null;
 let isBgmPlaying = false;
+
+// Paint Board Canvas State
+let isPainting = false;
 
 // Database Path Helper
 function roomRef(subPath) {
@@ -245,6 +249,15 @@ function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+// Insert Snippet Shortcut
+window.insertSnippet = (text) => {
+  const textInput = document.getElementById('message-text-input');
+  if (textInput) {
+    textInput.value += (textInput.value ? ' ' : '') + text;
+    textInput.focus();
+  }
+};
+
 // Duplicate Name Check
 async function checkDuplicateName(nameToCheck, excludeUserId = null) {
   try {
@@ -282,6 +295,7 @@ function initApp() {
   setupVoiceChatAndRec();
   setupBgmPlayer();
   setupScreenShare();
+  setupPaintModal();
   renderIgnoredUsersUI();
 }
 
@@ -567,15 +581,25 @@ function initFirebaseRealtimeSync() {
     }
   });
 
-  // 5. 画面共有状態の同期
+  // 5. 左下画面共有（全員への配信・フレーム表示）
   unsubscribeScreen = onValue(roomRef('screen_share'), (snapshot) => {
     const box = document.getElementById('screen-share-overlay');
     const sharerNameEl = document.getElementById('screen-sharer-name');
+    const videoEl = document.getElementById('screen-share-video');
+    const remoteImgEl = document.getElementById('screen-share-remote-img');
+
     if (snapshot.exists() && snapshot.val().active) {
       const data = snapshot.val();
       sharerNameEl.textContent = data.userId === myUserId ? 'あなた' : data.name;
-      if (data.userId !== myUserId) {
-        showToast(`🖥️ 「${data.name}」が画面共有を開始しました`);
+      box.classList.remove('hidden');
+
+      if (data.userId !== myUserId && data.frameData) {
+        videoEl.classList.add('hidden');
+        remoteImgEl.src = data.frameData;
+        remoteImgEl.classList.remove('hidden');
+      } else if (data.userId === myUserId) {
+        remoteImgEl.classList.add('hidden');
+        videoEl.classList.remove('hidden');
       }
     } else {
       if (!isScreenSharing) box.classList.add('hidden');
@@ -678,7 +702,8 @@ function renderSingleMessage(msgId, msg) {
     } else if (msg.type === 'poll') {
       contentHtml = renderPollCardHtml(msgId, msg.poll);
     } else {
-      contentHtml = `<div class="${bubbleClass}">${formatMessageText(msg.text)}</div>`;
+      const ytEmbedHtml = getYouTubeEmbedHtml(msg.text);
+      contentHtml = `<div class="${bubbleClass}">${formatMessageText(msg.text)}${ytEmbedHtml}</div>`;
     }
 
     const reactionsHtml = `<div class="msg-reactions" id="reactions-${msgId}">${renderReactionsHtml(msgId, msg.reactions)}</div>`;
@@ -696,6 +721,17 @@ function renderSingleMessage(msgId, msg) {
     unreadMessagesCount++;
     updateScrollBottomButton();
   }
+}
+
+// YouTube Video URL Detector
+function getYouTubeEmbedHtml(text) {
+  if (!text) return '';
+  const match = text.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (match && match[1]) {
+    const videoId = match[1];
+    return `<br><iframe class="msg-youtube-iframe" src="https://www.youtube.com/embed/${videoId}" allowfullscreen></iframe>`;
+  }
+  return '';
 }
 
 // Markdown Formatting
@@ -776,7 +812,6 @@ function renderReactionsHtml(msgId, reactionsData) {
   return html;
 }
 
-// 修正済み: リアクションクリック時にノードを追加せずインナーHTMLのみ部分更新
 function updateMessageUI(msgId, msgData) {
   const reactionsContainer = document.getElementById(`reactions-${msgId}`);
   if (reactionsContainer) {
@@ -1014,7 +1049,107 @@ function filterAllMessages() {
   });
 }
 
-// Screen Sharing Logic
+// Canvas Paint Board Popup Setup
+function setupPaintModal() {
+  const modal = document.getElementById('paint-modal');
+  const openBtn = document.getElementById('btn-open-paint');
+  const canvas = document.getElementById('paint-canvas');
+  const ctx = canvas.getContext('2d');
+  const colorPicker = document.getElementById('paint-color');
+  const sizePicker = document.getElementById('paint-size');
+  const clearBtn = document.getElementById('btn-clear-paint');
+  const submitBtn = document.getElementById('btn-submit-paint');
+
+  openBtn.addEventListener('click', () => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    modal.classList.remove('hidden');
+  });
+
+  document.querySelectorAll('#paint-modal .modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  clearBtn.addEventListener('click', () => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  });
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  const startDraw = (e) => {
+    isPainting = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  };
+
+  const draw = (e) => {
+    if (!isPainting) return;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = colorPicker.value;
+    ctx.lineWidth = sizePicker.value;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  };
+
+  const stopDraw = () => { isPainting = false; };
+
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDraw);
+  canvas.addEventListener('mouseleave', stopDraw);
+
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(e); });
+  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
+  canvas.addEventListener('touchend', stopDraw);
+
+  submitBtn.addEventListener('click', () => {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+    modal.classList.add('hidden');
+    
+    sendSpecialMessageWithMedia('image', '🎨 手書きイラスト', dataUrl);
+    showToast('イラストを投稿しました！', 'success');
+  });
+}
+
+async function sendSpecialMessageWithMedia(msgType, text, fileUrl) {
+  if (isSendingSpecial) return;
+  isSendingSpecial = true;
+  try {
+    const newMsgRef = push(roomRef('messages'));
+    const msgObj = {
+      userId: myUserId,
+      name: myName,
+      trip: myTrip,
+      avatar: myAvatar,
+      type: msgType,
+      text: text,
+      fileUrl: fileUrl,
+      timestamp: Date.now()
+    };
+    if (whisperTargetId) msgObj.whisperTo = whisperTargetId;
+
+    await set(newMsgRef, msgObj);
+    playSound('send');
+  } catch (err) {
+    showToast('送信に失敗しました', 'error');
+  } finally {
+    isSendingSpecial = false;
+  }
+}
+
+// Screen Sharing Logic (左下に固定・全員リアルタイム同期)
 function setupScreenShare() {
   const btnToggle = document.getElementById('btn-toggle-screen');
   const box = document.getElementById('screen-share-overlay');
@@ -1035,6 +1170,7 @@ function setupScreenShare() {
         btnToggle.innerHTML = '<i class="fa-solid fa-desktop text-danger"></i> <span>共有停止</span>';
 
         videoEl.srcObject = screenStream;
+        videoEl.classList.remove('hidden');
         box.classList.remove('hidden');
 
         await set(roomRef('screen_share'), {
@@ -1044,8 +1180,24 @@ function setupScreenShare() {
           timestamp: Date.now()
         });
 
+        // 1.5秒ごとに全ユーザーの左下プレイヤーに画面フレームを同期送信
+        screenFrameInterval = setInterval(() => {
+          if (!isScreenSharing || !videoEl || videoEl.videoWidth === 0) return;
+          const canvas = document.createElement('canvas');
+          canvas.width = 320;
+          canvas.height = Math.round((videoEl.videoHeight * 320) / videoEl.videoWidth);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          const frameDataUrl = canvas.toDataURL('image/jpeg', 0.4);
+
+          update(roomRef('screen_share'), {
+            frameData: frameDataUrl,
+            timestamp: Date.now()
+          });
+        }, 1500);
+
         sendSystemMessage(`🖥️ ${myName} が画面共有を開始しました`);
-        showToast('画面共有を開始しました！', 'success');
+        showToast('画面共有を開始しました！(全員の左下に配信されます)', 'success');
 
         screenStream.getVideoTracks()[0].onended = () => {
           stopScreenShare();
@@ -1072,24 +1224,13 @@ function setupScreenShare() {
     ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
 
     const snapDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-    const newMsgRef = push(roomRef('messages'));
-    set(newMsgRef, {
-      userId: myUserId,
-      name: myName,
-      trip: myTrip,
-      avatar: myAvatar,
-      type: 'image',
-      text: '📸 共有画面のスナップショット',
-      fileUrl: snapDataUrl,
-      timestamp: Date.now()
-    });
-
-    playSound('send');
+    sendSpecialMessageWithMedia('image', '📸 共有画面のスナップショット', snapDataUrl);
     showToast('共有画面のスナップショットを投稿しました！', 'success');
   });
 
   function stopScreenShare() {
     isScreenSharing = false;
+    if (screenFrameInterval) clearInterval(screenFrameInterval);
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());
       screenStream = null;

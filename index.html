@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberChat - リアルタイム自由チャット (画面共有対応版)</title>
+  <title>CyberChat - リアルタイム自由チャット (画質・お絵かき・画面共有進化版)</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,6 +26,19 @@
 
   <!-- リモート音声・画面共有用格納要素 -->
   <div id="remote-audio-container" class="hidden"></div>
+
+  <!-- 全員共通：左下画面共有ライブ表示ビューポート -->
+  <div id="screen-share-overlay" class="screen-share-box glass-panel hidden">
+    <div class="screen-share-header">
+      <span><i class="fa-solid fa-desktop text-success pulse"></i> <strong id="screen-sharer-name">誰か</strong> の画面配信中</span>
+      <div class="screen-share-actions">
+        <button id="btn-snap-screen" class="btn-secondary btn-sm" title="スナップショット投稿"><i class="fa-solid fa-camera"></i></button>
+        <button id="btn-stop-screen" class="btn-secondary btn-sm danger" title="共有停止"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+    <video id="screen-share-video" autoplay playsinline muted></video>
+    <img id="screen-share-remote-img" class="hidden" alt="リモート画面配信">
+  </div>
 
   <!-- 入室・初期設定モーダル (全画面オーバーレイ) -->
   <div id="join-modal" class="overlay-screen active">
@@ -227,18 +240,6 @@
         <button id="btn-edit-topic" class="btn-edit-topic-icon" title="お題を変更"><i class="fa-solid fa-pen"></i></button>
       </div>
 
-      <!-- 画面共有ライブ表示ビューポート -->
-      <div id="screen-share-overlay" class="screen-share-box glass-panel hidden">
-        <div class="screen-share-header">
-          <span><i class="fa-solid fa-desktop text-success pulse"></i> <strong id="screen-sharer-name">あなた</strong> の画面を配信中</span>
-          <div class="screen-share-actions">
-            <button id="btn-snap-screen" class="btn-secondary btn-sm"><i class="fa-solid fa-camera"></i> スナップショット投稿</button>
-            <button id="btn-stop-screen" class="btn-secondary btn-sm danger"><i class="fa-solid fa-xmark"></i> 共有停止</button>
-          </div>
-        </div>
-        <video id="screen-share-video" autoplay playsinline muted></video>
-      </div>
-
       <!-- メッセージ表示エリア -->
       <div id="chat-messages" class="chat-messages">
         <div id="messages-loading" class="loading-state">
@@ -286,6 +287,15 @@
         </div>
         <button id="btn-cancel-voice" class="btn-secondary btn-sm"><i class="fa-solid fa-trash"></i> キャンセル</button>
         <button id="btn-send-voice" class="btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i> 録音を送信</button>
+      </div>
+
+      <!-- Quick Snippets ショートカットバー -->
+      <div class="snippets-bar">
+        <span class="snippet-tag" onclick="window.insertSnippet('草ww')">草ww</span>
+        <span class="snippet-tag" onclick="window.insertSnippet('88888👏')">88888👏</span>
+        <span class="snippet-tag" onclick="window.insertSnippet('なるほど！')">なるほど！</span>
+        <span class="snippet-tag" onclick="window.insertSnippet('わこつ！')">わこつ！</span>
+        <span class="snippet-tag" onclick="window.insertSnippet('おつあり！')">おつあり！</span>
       </div>
 
       <!-- 入力フッター -->
@@ -338,6 +348,10 @@
               <i class="fa-solid fa-icons"></i>
             </button>
 
+            <button type="button" id="btn-open-paint" class="btn-icon-tool" title="お絵かき・手書きイラスト">
+              <i class="fa-solid fa-paintbrush"></i>
+            </button>
+
             <button type="button" id="btn-soundboard-toggle" class="btn-icon-tool" title="効果音ポン出し">
               <i class="fa-solid fa-bullhorn"></i>
             </button>
@@ -375,6 +389,30 @@
         </div>
       </footer>
     </main>
+  </div>
+
+  <!-- お絵かきキャンバスモーダル -->
+  <div id="paint-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-paintbrush"></i> お絵かき・手書き投稿</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <canvas id="paint-canvas" width="360" height="260" style="background:#fff; border-radius:12px; border:2px solid var(--glass-border); cursor:crosshair; touch-action:none;"></canvas>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="color" id="paint-color" value="#00f0ff" style="border:none; width:32px; height:32px; cursor:pointer; background:transparent;">
+            <input type="range" id="paint-size" min="2" max="20" value="5" style="width:90px;">
+          </div>
+          <button id="btn-clear-paint" class="btn-secondary btn-sm"><i class="fa-solid fa-eraser"></i> 消去</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">キャンセル</button>
+        <button id="btn-submit-paint" class="btn-primary"><i class="fa-solid fa-paper-plane"></i> イラストを投稿</button>
+      </div>
+    </div>
   </div>
 
   <!-- カスタムルーム作成/入室モーダル -->
