@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyberChat - リアルタイム自由チャット</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- SVG Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- 背景グローエフェクト -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <!-- 入室・初期設定モーダル (全画面オーバーレイ) -->
+  <div id="join-modal" class="overlay-screen active">
+    <div class="join-card glass-panel animate-fade-in">
+      <div class="join-header">
+        <div class="app-brand">
+          <i class="fa-solid fa-comments brand-icon"></i>
+          <h2>CyberChat</h2>
+        </div>
+        <p class="join-subtitle">名前とトリップキーを入力してチャットに参加しよう</p>
+      </div>
+
+      <form id="join-form" onsubmit="return false;">
+        <div class="input-group">
+          <label for="join-username"><i class="fa-solid fa-user"></i> ユーザー名 <span class="required">*</span></label>
+          <input type="text" id="join-username" placeholder="例: たなか" maxlength="20" required autocomplete="off">
+          <span class="input-hint">※既に他の人が使用している名前は使えません</span>
+        </div>
+
+        <div class="input-group">
+          <label for="join-tripkey"><i class="fa-solid fa-key"></i> トリップキー (任意)</label>
+          <div class="trip-input-wrapper">
+            <input type="password" id="join-tripkey" placeholder="例: mysecret123" maxlength="30" autocomplete="off">
+            <button type="button" id="toggle-trip-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
+          </div>
+          <div class="trip-preview">
+            生成トリップ: <span id="trip-preview-code" class="trip-badge">◆(なし)</span>
+          </div>
+        </div>
+
+        <div id="join-error-msg" class="error-banner hidden"></div>
+
+        <button type="submit" id="btn-start-chat" class="btn-primary btn-block">
+          <i class="fa-solid fa-right-to-bracket"></i> チャットを開始する
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- メインチャット画面 -->
+  <div id="app-container" class="app-container hidden">
+    <!-- サイドバー -->
+    <aside id="sidebar" class="sidebar glass-panel">
+      <div class="sidebar-header">
+        <div class="app-brand-sm">
+          <i class="fa-solid fa-comments brand-icon"></i>
+          <span>CyberChat</span>
+        </div>
+        <button id="btn-close-sidebar" class="btn-icon mobile-only"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- 自分のプロフィールカード -->
+      <div class="my-profile-card">
+        <div class="avatar-circle" id="my-avatar">?</div>
+        <div class="profile-info">
+          <div class="profile-name" id="my-name-display">ゲスト</div>
+          <div class="profile-trip" id="my-trip-display">◆------</div>
+        </div>
+        <button id="btn-open-edit-profile" class="btn-icon" title="名前・トリップを変更">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </button>
+      </div>
+
+      <!-- フィルター・検索 -->
+      <div class="sidebar-search">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="search-input" placeholder="メッセージを検索...">
+      </div>
+
+      <div class="filter-pills">
+        <button class="pill-btn active" data-filter="all">すべて</button>
+        <button class="pill-btn" data-filter="image"><i class="fa-regular fa-image"></i> 画像</button>
+        <button class="pill-btn" data-filter="poll"><i class="fa-solid fa-chart-simple"></i> アンケート</button>
+      </div>
+
+      <!-- オンラインユーザーリスト -->
+      <div class="online-section">
+        <div class="section-title">
+          <span><i class="fa-solid fa-circle text-success pulse"></i> 参加中メンバー</span>
+          <span class="user-count-badge" id="online-count">0人</span>
+        </div>
+        <ul id="online-user-list" class="online-user-list">
+          <!-- JSで動的生成 -->
+        </ul>
+      </div>
+    </aside>
+
+    <!-- メインチャットエリア -->
+    <main class="chat-main">
+      <!-- ヘッダー -->
+      <header class="chat-header glass-panel">
+        <div class="header-left">
+          <button id="btn-toggle-sidebar" class="btn-icon mobile-only">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div class="chat-room-info">
+            <h1><i class="fa-solid fa-globe"></i> パブリックルーム</h1>
+            <span class="room-status"><i class="fa-solid fa-bolt"></i> リアルタイム同期中</span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button id="btn-toggle-sound" class="btn-icon active" title="通知音 ON/OFF">
+            <i class="fa-solid fa-volume-high"></i>
+          </button>
+          <button id="btn-toggle-theme" class="btn-icon" title="テーマ切り替え">
+            <i class="fa-solid fa-moon"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- メッセージ表示エリア -->
+      <div id="chat-messages" class="chat-messages">
+        <div id="messages-loading" class="loading-state">
+          <i class="fa-solid fa-circle-notch fa-spin"></i> メッセージを読み込み中...
+        </div>
+        <div id="messages-container" class="messages-container"></div>
+      </div>
+
+      <!-- スクロールダウンボタン -->
+      <button id="btn-scroll-bottom" class="scroll-bottom-btn hidden">
+        <i class="fa-solid fa-arrow-down"></i>
+        <span id="unread-count" class="unread-badge hidden">0</span>
+      </button>
+
+      <!-- 画像添付プレビューバー -->
+      <div id="attachment-preview" class="attachment-preview-bar hidden">
+        <div class="preview-thumb-wrapper">
+          <img id="preview-img" src="" alt="添付画像">
+          <button id="btn-remove-attachment" class="btn-remove-thumb"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="preview-info">
+          <span class="preview-title">画像が選択されました</span>
+          <span class="preview-hint">送信ボタンを押すと投稿されます</span>
+        </div>
+      </div>
+
+      <!-- 入力フッター -->
+      <footer class="chat-footer glass-panel">
+        <!-- 絵文字ピッカー -->
+        <div id="emoji-picker" class="emoji-picker-popup hidden">
+          <div class="emoji-grid">
+            <span>😀</span><span>😂</span><span>🤣</span><span>😍</span><span>🥰</span><span>😎</span>
+            <span>😊</span><span>🙌</span><span>👍</span><span>❤️</span><span>🔥</span><span>✨</span>
+            <span>🎉</span><span>🤔</span><span>😅</span><span>😭</span><span>👀</span><span>💯</span>
+            <span>🚀</span><span>💪</span><span>🙏</span><span>👏</span><span>⚡</span><span>💩</span>
+          </div>
+        </div>
+
+        <div class="chat-input-row">
+          <div class="tool-buttons">
+            <button type="button" id="btn-emoji-toggle" class="btn-icon-tool" title="絵文字">
+              <i class="fa-regular fa-face-smile"></i>
+            </button>
+
+            <label for="image-file-input" class="btn-icon-tool" title="画像を共有">
+              <i class="fa-regular fa-image"></i>
+              <input type="file" id="image-file-input" accept="image/*" class="hidden-file-input">
+            </label>
+
+            <button type="button" id="btn-open-create-poll" class="btn-icon-tool" title="アンケートを作成">
+              <i class="fa-solid fa-chart-simple"></i>
+            </button>
+          </div>
+
+          <textarea id="message-text-input" placeholder="メッセージを入力... (Shift+Enterで改行)" rows="1"></textarea>
+
+          <button id="btn-send-message" class="btn-send">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- アンケート作成モーダル -->
+  <div id="poll-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-chart-simple"></i> アンケートを作成</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="poll-question">アンケートの質問 <span class="required">*</span></label>
+          <input type="text" id="poll-question" placeholder="例: 次のイベントはどこに行きたい？" maxlength="80">
+        </div>
+
+        <div class="input-group">
+          <label>選択肢 <span class="required">*</span> (最小2つ、最大6つ)</label>
+          <div id="poll-options-container" class="poll-options-inputs">
+            <div class="poll-opt-row">
+              <input type="text" class="poll-opt-input" placeholder="選択肢 1" maxlength="30">
+            </div>
+            <div class="poll-opt-row">
+              <input type="text" class="poll-opt-input" placeholder="選択肢 2" maxlength="30">
+            </div>
+          </div>
+          <button type="button" id="btn-add-poll-opt" class="btn-secondary btn-sm">
+            <i class="fa-solid fa-plus"></i> 選択肢を追加
+          </button>
+        </div>
+
+        <div id="poll-error-msg" class="error-banner hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">キャンセル</button>
+        <button id="btn-submit-poll" class="btn-primary"><i class="fa-solid fa-paper-plane"></i> アンケートを投稿</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- プロフィール変更モーダル -->
+  <div id="profile-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-pen"></i> 名前とトリップを変更</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="edit-username">新しいユーザー名 <span class="required">*</span></label>
+          <input type="text" id="edit-username" placeholder="新しい名前を入力" maxlength="20">
+          <span class="input-hint">※他の参加者と重複する名前は指定できません</span>
+        </div>
+
+        <div class="input-group">
+          <label for="edit-tripkey">新しいトリップキー (任意)</label>
+          <div class="trip-input-wrapper">
+            <input type="password" id="edit-tripkey" placeholder="新しいトリップキー" maxlength="30">
+            <button type="button" id="toggle-edit-trip-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
+          </div>
+          <div class="trip-preview">
+            プレビュー: <span id="edit-trip-preview-code" class="trip-badge">◆(なし)</span>
+          </div>
+        </div>
+
+        <div id="edit-profile-error" class="error-banner hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">キャンセル</button>
+        <button id="btn-save-profile" class="btn-primary"><i class="fa-solid fa-check"></i> 変更を保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 画像拡大モーダル -->
+  <div id="image-modal" class="modal-overlay hidden">
+    <div class="image-modal-content">
+      <button class="btn-icon image-modal-close"><i class="fa-solid fa-xmark"></i></button>
+      <img id="full-image-display" src="" alt="拡大画像">
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Application Logic Script -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
