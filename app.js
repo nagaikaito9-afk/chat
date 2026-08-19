@@ -40,6 +40,16 @@ let allMessages = new Map();
 let activeUsersMap = new Map();
 let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored_users') || '[]'));
 
+// Sending Locks (連打・重複送信防止)
+let isSending = false;
+let isSendingSpecial = false;
+
+// Firebase Listener Unsubscribe Handles
+let unsubscribeActiveUsers = null;
+let unsubscribeMessages = null;
+let unsubscribeTyping = null;
+let unsubscribeTopic = null;
+
 // Whisper (DM) State
 let whisperTargetId = null;
 let whisperTargetName = null;
@@ -352,8 +362,14 @@ async function switchRoom(newRoomId, roomTitle) {
 
 // Realtime Listeners
 function initFirebaseRealtimeSync() {
+  // 重複購読・二重描画を防止するため、既存リスナーを全て解除
+  if (unsubscribeActiveUsers) unsubscribeActiveUsers();
+  if (unsubscribeMessages) unsubscribeMessages();
+  if (unsubscribeTyping) unsubscribeTyping();
+  if (unsubscribeTopic) unsubscribeTopic();
+
   // 1. オンラインリスト
-  onValue(roomRef('active_users'), (snapshot) => {
+  unsubscribeActiveUsers = onValue(roomRef('active_users'), (snapshot) => {
     const userListEl = document.getElementById('online-user-list');
     const onlineCountEl = document.getElementById('online-count');
     userListEl.innerHTML = '';
@@ -386,15 +402,18 @@ function initFirebaseRealtimeSync() {
     }
   });
 
-  // 2. メッセージ同期
+  // 2. メッセージ同期 (直近50件制限 ＆ 二重描画ガード)
   const messagesQuery = query(roomRef('messages'), limitToLast(50));
   const loadingEl = document.getElementById('messages-loading');
 
-  onChildAdded(messagesQuery, (snapshot) => {
+  unsubscribeMessages = onChildAdded(messagesQuery, (snapshot) => {
     if (loadingEl) loadingEl.style.display = 'none';
     const msgId = snapshot.key;
     const msgData = snapshot.val();
     
+    // すでにレンダリング済みのメッセージIDならスキップ（連投・重複防止）
+    if (allMessages.has(msgId)) return;
+
     allMessages.set(msgId, { id: msgId, ...msgData });
     renderSingleMessage(msgId, msgData);
 
@@ -423,7 +442,7 @@ function initFirebaseRealtimeSync() {
   });
 
   // 3. タイピング監視
-  onValue(roomRef('typing'), (snapshot) => {
+  unsubscribeTyping = onValue(roomRef('typing'), (snapshot) => {
     const indicator = document.getElementById('typing-indicator');
     const textEl = document.getElementById('typing-users-text');
     if (!snapshot.exists()) {
@@ -450,7 +469,7 @@ function initFirebaseRealtimeSync() {
   });
 
   // 4. お題・トピック監視
-  onValue(roomRef('topic'), (snapshot) => {
+  unsubscribeTopic = onValue(roomRef('topic'), (snapshot) => {
     const topicEl = document.getElementById('room-topic-text');
     if (snapshot.exists()) {
       topicEl.textContent = snapshot.val();
@@ -897,6 +916,8 @@ function setupStampsAndMinigames() {
 }
 
 async function sendSpecialMessage(msgType, text) {
+  if (isSendingSpecial) return;
+  isSendingSpecial = true;
   try {
     const newMsgRef = push(roomRef('messages'));
     const msgObj = {
@@ -916,6 +937,8 @@ async function sendSpecialMessage(msgType, text) {
     playSound('send');
   } catch (err) {
     showToast('送信に失敗しました', 'error');
+  } finally {
+    isSendingSpecial = false;
   }
 }
 
@@ -1020,9 +1043,11 @@ function setupChatControls() {
   });
 
   async function sendMessageHandler() {
+    if (isSending) return;
     const text = textInput.value.trim();
     if (!text && !selectedFileObject) return;
 
+    isSending = true;
     try {
       const newMsgRef = push(roomRef('messages'));
       const msgObj = {
@@ -1057,6 +1082,8 @@ function setupChatControls() {
     } catch (err) {
       console.error("Send message error:", err);
       showToast('メッセージ送信に失敗しました', 'error');
+    } finally {
+      isSending = false;
     }
   }
 
