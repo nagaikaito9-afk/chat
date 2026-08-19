@@ -55,8 +55,9 @@ let starredMsgSet = new Set(JSON.parse(localStorage.getItem('cyberchat_starred_m
 // Active Quiz State
 let activeMathQuizAnswer = null;
 
-// Heartbeat Timer Handle
+// Heartbeat & Typing Timer Handles
 let heartbeatTimer = null;
+let typingTimer = null;
 
 // Screen Sharing State
 let isScreenSharing = false;
