@@ -460,7 +460,7 @@ if (document.readyState === 'loading') {
   initApp();
 }
 
-// 🟢 部屋にいるのに消えるバグ修正 Presence & Heartbeat Handler
+// 🟢 部屋にいるのに消える・オフラインなのに残るバグ修正 Presence & Heartbeat Handler
 function setupPresenceConnectionHeartbeat() {
   const connectedRef = ref(db, '.info/connected');
   onValue(connectedRef, (snap) => {
@@ -471,10 +471,25 @@ function setupPresenceConnectionHeartbeat() {
 
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(() => {
-    if (myName) {
+    if (myName && myUserId) {
       update(roomRef(`active_users/${myUserId}`), { lastSeen: Date.now() });
     }
-  }, 10000);
+  }, 8000);
+
+  const cleanUpPresence = () => {
+    if (myUserId) {
+      remove(roomRef(`active_users/${myUserId}`));
+    }
+  };
+
+  window.addEventListener('beforeunload', cleanUpPresence);
+  window.addEventListener('pagehide', cleanUpPresence);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && myName) {
+      registerOnlineUser();
+    }
+  });
 }
 
 // 🚫 リアルタイムBAN判定リスナー
@@ -590,6 +605,46 @@ function setupAdminSystem() {
     input.value = '';
     showToast('全体アナウンスを放送しました！', 'success');
   });
+
+  // 🔑 Admin AI API Key Management (Unlock with "hatosabure-Unei-API-key")
+  const API_UNLOCK_PASSWORD = "hatosabure-Unei-API-key";
+  const btnUnlockApi = document.getElementById('btn-unlock-admin-api');
+  const passUnlockInput = document.getElementById('admin-api-unlock-pass');
+  const unlockMsg = document.getElementById('admin-api-unlock-msg');
+  const keyEditBox = document.getElementById('admin-api-key-edit-box');
+  const adminAiKeyInput = document.getElementById('admin-ai-key-input');
+  const btnSaveAdminAiKey = document.getElementById('btn-save-admin-ai-key');
+  const toggleAdminAiKeyVis = document.getElementById('toggle-admin-ai-key-vis');
+
+  if (toggleAdminAiKeyVis && adminAiKeyInput) {
+    toggleAdminAiKeyVis.addEventListener('click', () => {
+      adminAiKeyInput.type = adminAiKeyInput.type === 'password' ? 'text' : 'password';
+    });
+  }
+
+  if (btnUnlockApi && passUnlockInput) {
+    btnUnlockApi.addEventListener('click', () => {
+      unlockMsg.classList.add('hidden');
+      const inputPass = passUnlockInput.value.trim();
+
+      if (inputPass === API_UNLOCK_PASSWORD) {
+        keyEditBox.classList.remove('hidden');
+        if (adminAiKeyInput) adminAiKeyInput.value = getAiApiKey();
+        showToast('🔑 APIキー編集のロックを解除しました！', 'success');
+      } else {
+        unlockMsg.textContent = 'ロック解除パスワードが正しくありません。(hatosabure-Unei-API-key を入力してください)';
+        unlockMsg.classList.remove('hidden');
+      }
+    });
+  }
+
+  if (btnSaveAdminAiKey && adminAiKeyInput) {
+    btnSaveAdminAiKey.addEventListener('click', () => {
+      const newKey = adminAiKeyInput.value.trim();
+      localStorage.setItem('cyberchat_ai_key', newKey);
+      showToast('💾 AI APIキーを保存しました！', 'success');
+    });
+  }
 }
 
 function openAdminPanel() {
@@ -1206,7 +1261,7 @@ function initFirebaseRealtimeSync() {
   if (unsubscribeTopic) unsubscribeTopic();
   if (unsubscribeScreen) unsubscribeScreen();
 
-  // 1. オンラインリスト（60秒以内の生存確認で確実表示）
+  // 1. オンラインリスト（30秒以内の生存確認で確実表示＆古いデータの自動削除）
   unsubscribeActiveUsers = onValue(roomRef('active_users'), (snapshot) => {
     const userListEl = document.getElementById('online-user-list');
     const onlineCountEl = document.getElementById('online-count');
@@ -1219,7 +1274,10 @@ function initFirebaseRealtimeSync() {
       let count = 0;
 
       Object.entries(users).forEach(([uid, uData]) => {
-        if (uData.lastSeen && (now - uData.lastSeen > 90000)) return; // 90秒音信不通はスキップ
+        if (!uData || (uData.lastSeen && (now - uData.lastSeen > 30000))) {
+          remove(roomRef(`active_users/${uid}`)).catch(() => {});
+          return;
+        }
 
         activeUsersMap.set(uid, uData);
         count++;
@@ -1242,6 +1300,10 @@ function initFirebaseRealtimeSync() {
       onlineCountEl.textContent = `${count}人`;
     } else {
       onlineCountEl.textContent = '0人';
+    }
+
+    if (typeof renderFriendsListUI === 'function') {
+      renderFriendsListUI();
     }
   });
 
@@ -1355,7 +1417,11 @@ function initFirebaseRealtimeSync() {
   });
 }
 
-// 🤖 AI CyberBot Responder (@bot)
+// 🤖 AI CyberBot Responder (@bot Integration)
+function getAiApiKey() {
+  return localStorage.getItem('cyberchat_ai_key') || '';
+}
+
 function setupAiBotControls() {
   const callBotBtn = document.getElementById('btn-call-ai-bot');
   if (callBotBtn) {
@@ -1365,16 +1431,71 @@ function setupAiBotControls() {
   }
 }
 
+async function fetchAiBotResponse(prompt, senderName) {
+  if (!prompt || prompt.trim() === '') {
+    return `こんにちは！${senderName} さん！🤖 CyberBot です。質問、計算、お悩み相談、会話など何でも気軽に話しかけてくださいね！\n例: 「@bot 今日の運勢は？」「@bot 12 x 15 は？」「@bot 最新のAIニュースを教えて」`;
+  }
+
+  const apiKey = getAiApiKey();
+  if (apiKey) {
+    const models = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              role: 'user',
+              parts: [{
+                text: `あなたはCyberChatの知性的でフレンドリーなAIアシスタント CyberBot 🤖 です。ユーザー「${senderName}」からの次のメッセージに対して、丁寧かつ分かりやすく、親しみやすい日本語で回答してください。\n\n質問: ${prompt}`
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 600
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text && text.trim()) {
+            return text.trim();
+          }
+        }
+      } catch (e) {
+        console.warn(`Gemini API fetch error (${model}):`, e);
+      }
+    }
+  }
+
+  return generateLocalAiResponse(prompt, senderName);
+}
+        if (text && text.trim()) {
+          return text.trim();
+        }
+      }
+    } catch (e) {
+      console.warn(`Gemini API fetch error (${model}):`, e);
+    }
+  }
+
+  return generateLocalAiResponse(prompt, senderName);
+}
+
 function checkAiBotTrigger(msgData) {
   if (!msgData.text || msgData.userId === 'cyberbot_ai' || msgData.type === 'system') return;
 
   const text = msgData.text.trim();
   if (text.startsWith('@bot') || text.startsWith('@CyberBot') || text.includes('@bot')) {
+    const prompt = text.replace(/@bot|@CyberBot/g, '').trim();
+
     setTimeout(async () => {
-      const prompt = text.replace(/@bot|@CyberBot/g, '').trim();
-      const botResponse = generateAiResponse(prompt, msgData.name);
-      
       try {
+        const botResponse = await fetchAiBotResponse(prompt, msgData.name);
         const botRef = push(roomRef('messages'));
         await set(botRef, {
           userId: 'cyberbot_ai',
@@ -1394,13 +1515,13 @@ function checkAiBotTrigger(msgData) {
       } catch (e) {
         console.warn("AI Bot response error:", e);
       }
-    }, 1200);
+    }, 600);
   }
 }
 
-function generateAiResponse(prompt, senderName) {
+function generateLocalAiResponse(prompt, senderName) {
   if (!prompt) {
-    return `こんにちは！${senderName}さん！🤖 何か聞きたいことや、計算・占い・雑談の相手なら任せてください！\n例: 「@bot 今日の運勢は？」「@bot 12 x 15 は？」`;
+    return `こんにちは！${senderName}さん！🤖 何か聞きたいことや、計算・占い・雑談の相手なら任せてください！`;
   }
 
   const p = prompt.toLowerCase();
@@ -1419,27 +1540,22 @@ function generateAiResponse(prompt, senderName) {
     return jokes[Math.floor(Math.random() * jokes.length)];
   }
 
-  // 簡単な算数・数学計算判定
   const mathMatch = prompt.match(/(\d+)\s*([\+\-\*\/x×÷])\s*(\d+)/);
   if (mathMatch) {
     const num1 = parseFloat(mathMatch[1]);
     const op = mathMatch[2];
     const num2 = parseFloat(mathMatch[3]);
-    let ans = 0;
-    if (op === '+' || op === '＋') ans = num1 + num2;
-    else if (op === '-' || op === 'ー') ans = num1 - num2;
-    else if (op === '*' || op === 'x' || op === '×') ans = num1 * num2;
-    else if (op === '/' || op === '÷') ans = num2 !== 0 ? (num1 / num2) : '0で割ることはできません';
-
-    return `🧠 計算結果: ${num1} ${op} ${num2} = 【 ${ans} 】 です！`;
+    let result = 0;
+    if (op === '+') result = num1 + num2;
+    else if (op === '-') result = num1 - num2;
+    else if (op === '*' || op === 'x' || op === '×') result = num1 * num2;
+    else if (op === '/' || op === '÷') result = num2 !== 0 ? (num1 / num2) : '0で割ることはできません';
+    return `計算結果: ${num1} ${op} ${num2} = ${result} です！🧮`;
   }
 
-  const defaultReplies = [
-    `「${prompt}」ですね！${senderName}さんのお話、とても興味深いです！✨`,
-    `なるほど！${senderName}さんの意見に共感します！🤖 チャットが賑やかで楽しいですね！`,
-    `ご質問ありがとうございます！${senderName}さん、今日も元気にチャットを楽しみましょう！⚡`
-  ];
-  return defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
+  return `「${prompt}」についてのお問い合わせですね！${senderName}さん、AIとしてお答えします！何か他にお手伝いできることはありますか？🤖`;
+}
+
 }
 
 // 🧠 数学スピードクイズ機能

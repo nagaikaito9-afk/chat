@@ -593,6 +593,33 @@
           </div>
         </div>
 
+        <!-- 🤖 AI Bot (Gemini) APIキー設定セクション -->
+        <div class="admin-section-box">
+          <h4><i class="fa-solid fa-robot text-primary"></i> AI Bot (Gemini) APIキー設定</h4>
+          <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:10px;">
+            APIキーを編集するには専用パスワード <code>hatosabure-Unei-API-key</code> を入力して解除してください。
+          </p>
+
+          <div class="input-group">
+            <label for="admin-api-unlock-pass"><i class="fa-solid fa-lock text-warning"></i> APIキー編集用パスワード</label>
+            <div class="trip-input-wrapper" style="display:flex; gap:6px;">
+              <input type="password" id="admin-api-unlock-pass" placeholder="hatosabure-Unei-API-key を入力" autocomplete="off" style="flex:1;">
+              <button type="button" id="btn-unlock-admin-api" class="btn-secondary btn-sm"><i class="fa-solid fa-key"></i> ロック解除</button>
+            </div>
+            <div id="admin-api-unlock-msg" class="error-banner hidden" style="margin-top:6px;"></div>
+          </div>
+
+          <div id="admin-api-key-edit-box" class="input-group hidden" style="margin-top:12px;">
+            <label for="admin-ai-key-input"><i class="fa-solid fa-key text-success"></i> APIキー編集</label>
+            <div class="trip-input-wrapper" style="display:flex; gap:6px;">
+              <input type="password" id="admin-ai-key-input" placeholder="APIキーを入力" autocomplete="off" style="flex:1;">
+              <button type="button" id="toggle-admin-ai-key-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
+              <button type="button" id="btn-save-admin-ai-key" class="btn-primary btn-sm"><i class="fa-solid fa-floppy-disk"></i> 保存</button>
+            </div>
+            <span class="input-hint">※APIキーはGitHubのリポジトリにコミットされず、ローカルにのみ保存されます。</span>
+          </div>
+        </div>
+
         <!-- 👥 オンラインユーザー管理 & BAN操作 -->
         <div class="admin-section-box">
           <h4><i class="fa-solid fa-users-slash text-danger"></i> 参加中メンバーのBAN（アクセス禁止）/ 追放</h4>
