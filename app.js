@@ -1,11 +1,11 @@
 // Import Firebase v10 Modular SDK via CDN
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { 
-  getDatabase, ref, set, push, onValue, onChildAdded, onChildChanged, 
-  remove, get, serverTimestamp, onDisconnect 
+  getDatabase, ref, set, push, onValue, onChildAdded, onChildChanged, onChildRemoved,
+  remove, get, update, serverTimestamp, onDisconnect 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-// User-provided Firebase Configuration
+// Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBcwXMn0N7qct45IORGaVqF_pdeGgb9NIA",
   authDomain: "chat-3e0cc.firebaseapp.com",
@@ -20,22 +20,34 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Global App State
+// Global State
 let myUserId = localStorage.getItem('cyberchat_user_id') || 'usr_' + Math.random().toString(36).substring(2, 10);
 localStorage.setItem('cyberchat_user_id', myUserId);
 
 let myName = '';
 let myTrip = '◆(なし)';
+let myAvatar = '🤖';
 let soundEnabled = true;
 let isScrolledToBottom = true;
 let unreadMessagesCount = 0;
-let selectedImageBase64 = null;
+let selectedFileObject = null;
 let currentFilter = 'all';
 let searchKeyword = '';
 let allMessages = new Map();
 let activeUsersMap = new Map();
+let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored_users') || '[]'));
 
-// Sound Synthesizer (Web Audio API)
+// Voice Chat / Voice Recording State
+let isVoiceRoomJoined = false;
+let isMicMuted = false;
+let localAudioStream = null;
+let mediaRecorder = null;
+let recordedAudioChunks = [];
+let voiceRecTimer = null;
+let voiceRecSeconds = 0;
+let peerConnections = new Map();
+
+// Web Audio API Synthesizer
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function playSound(type) {
   if (!soundEnabled) return;
@@ -59,29 +71,26 @@ function playSound(type) {
       osc.stop(now + 0.12);
     } else if (type === 'receive') {
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(587.33, now); // D5
-      osc.frequency.setValueAtTime(880, now + 0.08); // A5
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.setValueAtTime(880, now + 0.08);
       gain.gain.setValueAtTime(0.12, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
       osc.start(now);
       osc.stop(now + 0.18);
     }
   } catch (e) {
-    console.warn("Audio play failed:", e);
+    console.warn("Audio error:", e);
   }
 }
 
 // SHA-256 Trip Generator
 async function generateTrip(tripKey) {
-  if (!tripKey || tripKey.trim() === '') {
-    return '◆(なし)';
-  }
+  if (!tripKey || tripKey.trim() === '') return '◆(なし)';
   const encoder = new TextEncoder();
   const data = encoder.encode(tripKey);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  // 10桁の英数字トリップにフォーマット
   return '◆' + hashHex.substring(0, 10);
 }
 
@@ -92,12 +101,10 @@ function showToast(msg, type = 'info') {
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i> <span>${escapeHtml(msg)}</span>`;
   container.appendChild(toast);
-  setTimeout(() => {
-    toast.remove();
-  }, 3500);
+  setTimeout(() => toast.remove(), 3500);
 }
 
-// HTML Escaping Utility
+// HTML Escaper
 function escapeHtml(str) {
   if (!str) return '';
   return str
@@ -108,61 +115,52 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// Format Timestamp
 function formatTime(timestamp) {
   if (!timestamp) return '';
   const date = new Date(timestamp);
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
+  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 }
 
-// Duplicate Name Check with Firebase RTDB
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// Duplicate Name Check
 async function checkDuplicateName(nameToCheck, excludeUserId = null) {
   try {
     const snapshot = await get(ref(db, 'active_users'));
     if (!snapshot.exists()) return false;
-    
     const users = snapshot.val();
     const targetLower = nameToCheck.trim().toLowerCase();
-    
     for (const uid in users) {
       if (excludeUserId && uid === excludeUserId) continue;
       if (users[uid] && users[uid].name && users[uid].name.trim().toLowerCase() === targetLower) {
-        return true; // Duplicated!
+        return true;
       }
     }
     return false;
   } catch (e) {
-    console.warn("Duplicate check error or initial DB read:", e);
+    console.warn("Duplicate check error:", e);
     return false;
   }
 }
 
-// User Avatar Color Helper
-function getAvatarBg(name) {
-  const colors = [
-    'linear-gradient(135deg, #00f0ff 0%, #7000ff 100%)',
-    'linear-gradient(135deg, #ff007f 0%, #7000ff 100%)',
-    'linear-gradient(135deg, #00ff88 0%, #00b8ff 100%)',
-    'linear-gradient(135deg, #ffb800 0%, #ff0055 100%)',
-    'linear-gradient(135deg, #9d4edd 0%, #560bad 100%)'
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
-
-// Initialize Application & Event Listeners
+// App Initialization
 function initApp() {
+  setupAvatarPickers();
   setupTripInputListeners();
   setupJoinForm();
   setupChatControls();
   setupPollModal();
   setupProfileModal();
+  setupEditMsgModal();
   setupImageModal();
+  setupVoiceChatAndRec();
+  renderIgnoredUsersUI();
 }
 
 if (document.readyState === 'loading') {
@@ -171,40 +169,45 @@ if (document.readyState === 'loading') {
   initApp();
 }
 
-// Trip Preview Update
+// Avatar Grid Selector
+function setupAvatarPickers() {
+  document.querySelectorAll('#join-avatar-picker .avatar-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      document.querySelectorAll('#join-avatar-picker .avatar-opt').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      myAvatar = opt.dataset.avatar;
+    });
+  });
+
+  document.querySelectorAll('#edit-avatar-picker .avatar-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      document.querySelectorAll('#edit-avatar-picker .avatar-opt').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+    });
+  });
+}
+
 function setupTripInputListeners() {
   const joinTripKeyInput = document.getElementById('join-tripkey');
   const joinTripPreview = document.getElementById('trip-preview-code');
-  
   if (joinTripKeyInput) {
     joinTripKeyInput.addEventListener('input', async () => {
-      const code = await generateTrip(joinTripKeyInput.value);
-      joinTripPreview.textContent = code;
+      joinTripPreview.textContent = await generateTrip(joinTripKeyInput.value);
     });
   }
 
   const editTripKeyInput = document.getElementById('edit-tripkey');
   const editTripPreview = document.getElementById('edit-trip-preview-code');
-
   if (editTripKeyInput) {
     editTripKeyInput.addEventListener('input', async () => {
-      const code = await generateTrip(editTripKeyInput.value);
-      editTripPreview.textContent = code;
+      editTripPreview.textContent = await generateTrip(editTripKeyInput.value);
     });
   }
 
-  // Toggle Password Visibility
   const toggleJoinVis = document.getElementById('toggle-trip-vis');
   if (toggleJoinVis && joinTripKeyInput) {
     toggleJoinVis.addEventListener('click', () => {
       joinTripKeyInput.type = joinTripKeyInput.type === 'password' ? 'text' : 'password';
-    });
-  }
-  
-  const toggleEditVis = document.getElementById('toggle-edit-trip-vis');
-  if (toggleEditVis && editTripKeyInput) {
-    toggleEditVis.addEventListener('click', () => {
-      editTripKeyInput.type = editTripKeyInput.type === 'password' ? 'text' : 'password';
     });
   }
 }
@@ -232,7 +235,6 @@ function setupJoinForm() {
     btnStart.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 接続中...';
 
     try {
-      // 1. 重複名前チェック
       const isDuplicate = await checkDuplicateName(inputName, myUserId);
       if (isDuplicate) {
         errorMsg.textContent = `「${inputName}」は現在オンラインの他ユーザーが使用しています。別の名前を入力してください。`;
@@ -242,37 +244,26 @@ function setupJoinForm() {
         return;
       }
 
-      // 2. トリップ生成
       myName = inputName;
       myTrip = await generateTrip(inputTripKey);
 
-      // 3. オンラインユーザー登録
       await registerOnlineUser();
 
-      // 4. アプリ画面へ切替
+      // 切り替え
       const joinModal = document.getElementById('join-modal');
       if (joinModal) {
         joinModal.classList.remove('active');
         joinModal.classList.add('hidden');
         joinModal.style.display = 'none';
       }
-      const appContainer = document.getElementById('app-container');
-      if (appContainer) {
-        appContainer.classList.remove('hidden');
-      }
+      document.getElementById('app-container').classList.remove('hidden');
 
-      // プロフィール表示更新
       updateMyProfileUI();
-
-      // システム入室メッセージ送信
-      sendSystemMessage(`${myName} (${myTrip}) がチャットに参加しました！`);
-
-      // Realtime Sync 開始
+      sendSystemMessage(`${myAvatar} ${myName} (${myTrip}) がチャットに参加しました！`);
       initFirebaseRealtimeSync();
 
     } catch (err) {
       console.error("Join error:", err);
-      // Firebaseルールやネット接続エラーの処理
       errorMsg.textContent = `接続エラー: ${err.message || 'Firebaseデータベースにアクセスできませんでした。'}`;
       errorMsg.classList.remove('hidden');
     } finally {
@@ -281,38 +272,30 @@ function setupJoinForm() {
     }
   };
 
-  if (joinForm) {
-    joinForm.addEventListener('submit', handleJoinSubmit);
-  }
-  if (btnStart) {
-    btnStart.addEventListener('click', handleJoinSubmit);
-  }
+  if (joinForm) joinForm.addEventListener('submit', handleJoinSubmit);
+  if (btnStart) btnStart.addEventListener('click', handleJoinSubmit);
 }
 
-// Online User Registration & Disconnect Hook
 async function registerOnlineUser() {
   const userRef = ref(db, `active_users/${myUserId}`);
   await set(userRef, {
     name: myName,
     trip: myTrip,
+    avatar: myAvatar,
     joinedAt: Date.now()
   });
-
-  // ブラウザ終了/切断時にオンラインリストから自動削除
   onDisconnect(userRef).remove();
 }
 
 function updateMyProfileUI() {
   document.getElementById('my-name-display').textContent = myName;
   document.getElementById('my-trip-display').textContent = myTrip;
-  const avatar = document.getElementById('my-avatar');
-  avatar.textContent = myName.charAt(0).toUpperCase();
-  avatar.style.background = getAvatarBg(myName);
+  document.getElementById('my-avatar').textContent = myAvatar;
 }
 
-// Firebase Realtime Listeners
+// Realtime Listeners
 function initFirebaseRealtimeSync() {
-  // 1. オンラインユーザーリスト同期
+  // 1. オンラインリスト
   onValue(ref(db, 'active_users'), (snapshot) => {
     const userListEl = document.getElementById('online-user-list');
     const onlineCountEl = document.getElementById('online-count');
@@ -320,18 +303,23 @@ function initFirebaseRealtimeSync() {
     
     if (snapshot.exists()) {
       const users = snapshot.val();
+      activeUsersMap.clear();
       const count = Object.keys(users).length;
       onlineCountEl.textContent = `${count}人`;
 
       Object.entries(users).forEach(([uid, uData]) => {
+        activeUsersMap.set(uid, uData);
+        if (ignoredUsersSet.has(uid)) return; // 無視ユーザーは表示しない
+
         const li = document.createElement('li');
         li.className = 'user-item';
         li.innerHTML = `
-          <div class="avatar-sm" style="background: ${getAvatarBg(uData.name || '?')}">${escapeHtml((uData.name || '?').charAt(0).toUpperCase())}</div>
+          <div class="avatar-sm">${escapeHtml(uData.avatar || '🤖')}</div>
           <div class="user-item-info">
             <div class="user-item-name">${escapeHtml(uData.name)} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
             <div class="user-item-trip">${escapeHtml(uData.trip || '◆(なし)')}</div>
           </div>
+          ${uid !== myUserId ? `<button class="btn-mute-user" onclick="window.ignoreUser('${uid}', '${escapeHtml(uData.name)}')" title="無視（ブロック）"><i class="fa-solid fa-user-slash"></i></button>` : ''}
         `;
         userListEl.appendChild(li);
       });
@@ -352,8 +340,7 @@ function initFirebaseRealtimeSync() {
     allMessages.set(msgId, { id: msgId, ...msgData });
     renderSingleMessage(msgId, msgData);
 
-    // 新着音
-    if (msgData.userId !== myUserId && msgData.type !== 'system') {
+    if (msgData.userId !== myUserId && msgData.type !== 'system' && !ignoredUsersSet.has(msgData.userId)) {
       playSound('receive');
     }
   });
@@ -364,10 +351,19 @@ function initFirebaseRealtimeSync() {
     allMessages.set(msgId, { id: msgId, ...msgData });
     updateMessageUI(msgId, msgData);
   });
+
+  onChildRemoved(messagesRef, (snapshot) => {
+    const msgId = snapshot.key;
+    allMessages.delete(msgId);
+    const node = document.getElementById(`msg-${msgId}`);
+    if (node) node.remove();
+  });
 }
 
-// Message Rendering
+// Render Single Message
 function renderSingleMessage(msgId, msg) {
+  if (ignoredUsersSet.has(msg.userId)) return; // 無視ユーザーのメッセージはスキップ
+
   const container = document.getElementById('messages-container');
   const isSelf = msg.userId === myUserId;
 
@@ -379,41 +375,81 @@ function renderSingleMessage(msgId, msg) {
   if (msg.type === 'system') {
     msgWrapper.innerHTML = `<div class="system-bubble"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(msg.text)}</div>`;
   } else {
-    // 構成要素: sender header
+    // 編集・削除用操作ボタン
+    const actionsMenuHtml = `
+      <button class="msg-actions-menu-btn" onclick="window.toggleMsgMenu('${msgId}')">
+        <i class="fa-solid fa-ellipsis-vertical"></i>
+      </button>
+      <div id="msg-menu-${msgId}" class="msg-dropdown-menu hidden animate-scale-up">
+        ${isSelf && !msg.deleted ? `<button onclick="window.openEditMsgModal('${msgId}')"><i class="fa-solid fa-pen"></i> 編集</button>` : ''}
+        ${isSelf && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
+        ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
+      </div>
+    `;
+
     const metaHtml = `
       <div class="msg-meta">
+        <span class="msg-avatar-icon">${escapeHtml(msg.avatar || '🤖')}</span>
         <span class="msg-sender-name">${escapeHtml(msg.name)} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
-        <span class="msg-time">${formatTime(msg.timestamp)}</span>
+        <span class="msg-time">${formatTime(msg.timestamp)} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
     `;
 
     let contentHtml = '';
-    if (msg.type === 'image') {
+    if (msg.deleted) {
+      contentHtml = `<div class="msg-bubble" style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</div>`;
+    } else if (msg.type === 'image') {
       contentHtml = `
         <div class="msg-bubble">
-          ${msg.text ? `<p>${escapeHtml(msg.text)}</p>` : ''}
-          <img src="${msg.imageUrl}" class="msg-image" alt="投稿画像" onclick="window.openImageModal('${msg.imageUrl}')">
+          ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
+          <img src="${msg.fileUrl}" class="msg-image" alt="投稿画像" onclick="window.openImageModal('${msg.fileUrl}')">
+        </div>
+      `;
+    } else if (msg.type === 'video') {
+      contentHtml = `
+        <div class="msg-bubble">
+          ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
+          <video src="${msg.fileUrl}" controls class="msg-video"></video>
+        </div>
+      `;
+    } else if (msg.type === 'audio' || msg.type === 'voice') {
+      contentHtml = `
+        <div class="msg-bubble">
+          ${msg.type === 'voice' ? '<div style="font-size:0.8rem; font-weight:600; margin-bottom:4px;"><i class="fa-solid fa-microphone text-success"></i> ボイスメッセージ</div>' : ''}
+          <audio src="${msg.fileUrl}" controls class="msg-audio"></audio>
+        </div>
+      `;
+    } else if (msg.type === 'file') {
+      contentHtml = `
+        <div class="msg-bubble">
+          ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
+          <div class="msg-file-card">
+            <i class="fa-solid fa-file-lines file-icon"></i>
+            <div class="file-details">
+              <div class="file-name">${escapeHtml(msg.fileName || '添付ファイル')}</div>
+              <div class="file-size">${formatFileSize(msg.fileSize || 0)}</div>
+            </div>
+            <a href="${msg.fileUrl}" download="${escapeHtml(msg.fileName || 'file')}" class="btn-file-download" title="ダウンロード">
+              <i class="fa-solid fa-download"></i>
+            </a>
+          </div>
         </div>
       `;
     } else if (msg.type === 'poll') {
       contentHtml = renderPollCardHtml(msgId, msg.poll);
     } else {
-      // Standard Text
       contentHtml = `<div class="msg-bubble">${formatMessageText(msg.text)}</div>`;
     }
 
-    // リアクションバー
     const reactionsHtml = `<div class="msg-reactions" id="reactions-${msgId}">${renderReactionsHtml(msgId, msg.reactions)}</div>`;
 
-    msgWrapper.innerHTML = metaHtml + contentHtml + reactionsHtml;
+    msgWrapper.innerHTML = actionsMenuHtml + metaHtml + contentHtml + reactionsHtml;
   }
 
-  // フィルタ/検索条件判定
   applyFilterAndSearchToNode(msgWrapper, msg);
-
   container.appendChild(msgWrapper);
 
-  // スクロール制御
+  // チャットを開いた時の自動一番下スクロール & 送信時スクロール
   const messagesBox = document.getElementById('chat-messages');
   if (isSelf || isScrolledToBottom) {
     messagesBox.scrollTop = messagesBox.scrollHeight;
@@ -423,31 +459,24 @@ function renderSingleMessage(msgId, msg) {
   }
 }
 
-// Text Formatting (URLs to links, line breaks)
 function formatMessageText(text) {
   if (!text) return '';
   let escaped = escapeHtml(text);
-  // URL -> clickable link
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  escaped = escaped.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-primary); underline">${url}</a>`);
-  // 改行
+  escaped = escaped.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-primary); text-decoration:underline;">${url}</a>`);
   return escaped.replace(/\n/g, '<br>');
 }
 
-// Poll UI Renderer
+// Poll & Reactions
 function renderPollCardHtml(msgId, pollData) {
   if (!pollData) return '';
-
   const totalVotes = pollData.votes ? Object.keys(pollData.votes).length : 0;
   const userVoteOption = pollData.votes ? pollData.votes[myUserId] : undefined;
 
-  // 各選択肢の票数集計
   const optionCounts = (pollData.options || []).map(() => 0);
   if (pollData.votes) {
     Object.values(pollData.votes).forEach(optIdx => {
-      if (optionCounts[optIdx] !== undefined) {
-        optionCounts[optIdx]++;
-      }
+      if (optionCounts[optIdx] !== undefined) optionCounts[optIdx]++;
     });
   }
 
@@ -476,11 +505,9 @@ function renderPollCardHtml(msgId, pollData) {
   `;
 }
 
-// Reaction UI Renderer
 function renderReactionsHtml(msgId, reactionsData) {
   const emojis = ['👍', '❤️', '😂', '😮', '🎉'];
   let html = '';
-
   emojis.forEach(emoji => {
     const userList = (reactionsData && reactionsData[emoji]) ? Object.keys(reactionsData[emoji]) : [];
     const count = userList.length;
@@ -495,28 +522,136 @@ function renderReactionsHtml(msgId, reactionsData) {
     }
   });
 
-  // クイック追加ボタン
   html += `
-    <button class="reaction-trigger-btn" onclick="window.toggleQuickReactionMenu('${msgId}')" title="リアクション追加">
+    <button class="reaction-trigger-btn" onclick="window.toggleQuickReactionMenu('${msgId}')" title="リアクション">
       <i class="fa-regular fa-face-smile"></i>
     </button>
   `;
-
   return html;
 }
 
-// Voting Function (Global Scope for inline onclick)
+// Global Message Action Callbacks
+window.toggleMsgMenu = (msgId) => {
+  const menu = document.getElementById(`msg-menu-${msgId}`);
+  if (!menu) return;
+  document.querySelectorAll('.msg-dropdown-menu').forEach(m => {
+    if (m !== menu) m.classList.add('hidden');
+  });
+  menu.classList.toggle('hidden');
+
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && !e.target.closest('.msg-actions-menu-btn')) {
+        menu.classList.add('hidden');
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 50);
+};
+
+window.deleteMsg = async (msgId) => {
+  if (!confirm('このメッセージを削除しますか？')) return;
+  try {
+    await update(ref(db, `messages/${msgId}`), {
+      deleted: true,
+      text: '(このメッセージは削除されました)'
+    });
+    showToast('メッセージを削除しました');
+  } catch (err) {
+    console.error("Delete error:", err);
+    showToast('削除に失敗しました', 'error');
+  }
+};
+
+window.openEditMsgModal = (msgId) => {
+  const msg = allMessages.get(msgId);
+  if (!msg) return;
+  document.getElementById('edit-msg-id').value = msgId;
+  document.getElementById('edit-msg-textarea').value = msg.text || '';
+  document.getElementById('edit-msg-modal').classList.remove('hidden');
+};
+
+function setupEditMsgModal() {
+  const modal = document.getElementById('edit-msg-modal');
+  const saveBtn = document.getElementById('btn-save-edit-msg');
+
+  document.querySelectorAll('#edit-msg-modal .modal-close').forEach(btn => {
+    btn.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const msgId = document.getElementById('edit-msg-id').value;
+    const newText = document.getElementById('edit-msg-textarea').value.trim();
+    if (!newText) return;
+
+    try {
+      await update(ref(db, `messages/${msgId}`), {
+        text: newText,
+        edited: true
+      });
+      modal.classList.add('hidden');
+      showToast('メッセージを更新しました', 'success');
+    } catch (err) {
+      console.error("Edit error:", err);
+      showToast('更新に失敗しました', 'error');
+    }
+  });
+}
+
+window.ignoreUser = (uid, name) => {
+  if (!confirm(`「${name}」を無視（ブロック）リストに追加しますか？メッセージが非表示になります。`)) return;
+  ignoredUsersSet.add(uid);
+  localStorage.setItem('cyberchat_ignored_users', JSON.stringify(Array.from(ignoredUsersSet)));
+  
+  // 該当ユーザーのメッセージを画面から削除
+  allMessages.forEach((msg, mId) => {
+    if (msg.userId === uid) {
+      const node = document.getElementById(`msg-${mId}`);
+      if (node) node.remove();
+    }
+  });
+
+  renderIgnoredUsersUI();
+  showToast(`「${name}」を無視リストに追加しました`);
+};
+
+window.unignoreUser = (uid) => {
+  ignoredUsersSet.delete(uid);
+  localStorage.setItem('cyberchat_ignored_users', JSON.stringify(Array.from(ignoredUsersSet)));
+  renderIgnoredUsersUI();
+  showToast('無視を解除しました。ページを再読み込みするとメッセージが再表示されます');
+};
+
+function renderIgnoredUsersUI() {
+  const listEl = document.getElementById('ignored-user-list');
+  const countEl = document.getElementById('ignored-count');
+  listEl.innerHTML = '';
+  countEl.textContent = `${ignoredUsersSet.size}人`;
+
+  ignoredUsersSet.forEach(uid => {
+    const uData = activeUsersMap.get(uid) || { name: 'ユーザー ' + uid.substring(0, 6), avatar: '👤' };
+    const li = document.createElement('li');
+    li.className = 'user-item';
+    li.innerHTML = `
+      <div class="avatar-sm">${escapeHtml(uData.avatar)}</div>
+      <div class="user-item-info">
+        <div class="user-item-name">${escapeHtml(uData.name)}</div>
+      </div>
+      <button class="btn-secondary btn-sm" onclick="window.unignoreUser('${uid}')">解除</button>
+    `;
+    listEl.appendChild(li);
+  });
+}
+
 window.votePoll = async (msgId, optionIndex) => {
   try {
-    const voteRef = ref(db, `messages/${msgId}/poll/votes/${myUserId}`);
-    await set(voteRef, optionIndex);
+    await set(ref(db, `messages/${msgId}/poll/votes/${myUserId}`), optionIndex);
   } catch (err) {
-    console.error("Poll vote error:", err);
     showToast('投票に失敗しました', 'error');
   }
 };
 
-// Reactions Function
 window.toggleReaction = async (msgId, emoji) => {
   try {
     const reactionUserRef = ref(db, `messages/${msgId}/reactions/${emoji}/${myUserId}`);
@@ -560,67 +695,57 @@ window.toggleQuickReactionMenu = (msgId) => {
   }, 50);
 };
 
-// Update Message UI when votes/reactions change
 function updateMessageUI(msgId, msgData) {
   const wrapper = document.getElementById(`msg-${msgId}`);
   if (!wrapper) return;
 
-  if (msgData.type === 'poll') {
-    const bubble = wrapper.querySelector('.msg-bubble');
-    if (bubble) {
-      bubble.outerHTML = renderPollCardHtml(msgId, msgData.poll);
-    }
-  }
-
-  const reactionsContainer = document.getElementById(`reactions-${msgId}`);
-  if (reactionsContainer) {
-    reactionsContainer.innerHTML = renderReactionsHtml(msgId, msgData.reactions);
+  // 再レンダリング（編集・削除反映）
+  const newWrapper = document.createElement('div');
+  renderSingleMessage(msgId, msgData);
+  const updatedWrapper = document.getElementById(`msg-${msgId}`);
+  if (wrapper && updatedWrapper && wrapper !== updatedWrapper) {
+    wrapper.replaceWith(updatedWrapper);
   }
 }
 
-// Filter and Search Logic
 function applyFilterAndSearchToNode(node, msg) {
   let visible = true;
 
-  // 1. タイプフィルター
-  if (currentFilter === 'image' && msg.type !== 'image') visible = false;
+  if (currentFilter === 'image' && (msg.type !== 'image' && msg.type !== 'video')) visible = false;
   if (currentFilter === 'poll' && msg.type !== 'poll') visible = false;
+  if (currentFilter === 'file' && (msg.type !== 'file' && msg.type !== 'audio' && msg.type !== 'voice')) visible = false;
 
-  // 2. キーワード検索
   if (searchKeyword && visible) {
-    const textToSearch = (msg.text || '') + (msg.name || '') + (msg.poll ? msg.poll.question : '');
+    const textToSearch = (msg.text || '') + (msg.name || '') + (msg.fileName || '') + (msg.poll ? msg.poll.question : '');
     if (!textToSearch.toLowerCase().includes(searchKeyword.toLowerCase())) {
       visible = false;
     }
   }
 
-  if (visible) {
-    node.classList.remove('hidden');
-  } else {
-    node.classList.add('hidden');
-  }
+  if (visible) node.classList.remove('hidden');
+  else node.classList.add('hidden');
 }
 
 function filterAllMessages() {
   allMessages.forEach((msg, msgId) => {
     const node = document.getElementById(`msg-${msgId}`);
-    if (node) {
-      applyFilterAndSearchToNode(node, msg);
-    }
+    if (node) applyFilterAndSearchToNode(node, msg);
   });
 }
 
-// Chat Controls & Message Sending
+// Media & File Attachment Controls
 function setupChatControls() {
   const textInput = document.getElementById('message-text-input');
   const btnSend = document.getElementById('btn-send-message');
-  const fileInput = document.getElementById('image-file-input');
+  const fileInput = document.getElementById('media-file-input');
   const previewBar = document.getElementById('attachment-preview');
   const previewImg = document.getElementById('preview-img');
+  const previewIcon = document.getElementById('preview-file-icon');
+  const previewName = document.getElementById('preview-filename');
+  const previewSize = document.getElementById('preview-filesize');
   const btnRemoveAttachment = document.getElementById('btn-remove-attachment');
   const messagesBox = document.getElementById('chat-messages');
 
-  // Textarea Auto resize & Enter send
   textInput.addEventListener('input', () => {
     textInput.style.height = 'auto';
     textInput.style.height = Math.min(textInput.scrollHeight, 120) + 'px';
@@ -635,61 +760,83 @@ function setupChatControls() {
 
   btnSend.addEventListener('click', sendMessageHandler);
 
-  // Image Attachment Handling (Canvas Compression)
+  // Universal File Upload Handler (Images, Videos, Documents, Audio)
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      showToast('画像ファイルを選択してください', 'error');
+    // サイズ上限チェック (8MB)
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('ファイルサイズは8MB以下にしてください', 'error');
+      fileInput.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const img = new Image();
-      img.onload = () => {
-        // Canvas リサイズ (最大幅/高さ 800px)
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const maxDim = 800;
+    selectedFileObject = file;
+    previewName.textContent = file.name;
+    previewSize.textContent = formatFileSize(file.size);
 
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        // Canvas リサイズ (最大800px)
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 800;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
           }
-        }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
+          selectedFileObject.dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          selectedFileObject.msgType = 'image';
 
-        // JPEG 0.7 圧縮
-        selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
-        previewImg.src = selectedImageBase64;
+          previewImg.src = selectedFileObject.dataUrl;
+          previewImg.classList.remove('hidden');
+          previewIcon.classList.add('hidden');
+          previewBar.classList.remove('hidden');
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // 動画 / 音声 / 一般ファイル
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        selectedFileObject.dataUrl = evt.target.result;
+        if (file.type.startsWith('video/')) selectedFileObject.msgType = 'video';
+        else if (file.type.startsWith('audio/')) selectedFileObject.msgType = 'audio';
+        else selectedFileObject.msgType = 'file';
+
+        previewImg.classList.add('hidden');
+        previewIcon.classList.remove('hidden');
         previewBar.classList.remove('hidden');
       };
-      img.src = evt.target.result;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    }
   });
 
   btnRemoveAttachment.addEventListener('click', () => {
-    selectedImageBase64 = null;
+    selectedFileObject = null;
     fileInput.value = '';
     previewBar.classList.add('hidden');
   });
 
-  // Message Sending Handler
   async function sendMessageHandler() {
     const text = textInput.value.trim();
-    if (!text && !selectedImageBase64) return;
+    if (!text && !selectedFileObject) return;
 
     try {
       const newMsgRef = push(ref(db, 'messages'));
@@ -697,21 +844,23 @@ function setupChatControls() {
         userId: myUserId,
         name: myName,
         trip: myTrip,
-        type: selectedImageBase64 ? 'image' : 'text',
+        avatar: myAvatar,
+        type: selectedFileObject ? selectedFileObject.msgType : 'text',
         text: text,
         timestamp: Date.now()
       };
 
-      if (selectedImageBase64) {
-        msgObj.imageUrl = selectedImageBase64;
+      if (selectedFileObject) {
+        msgObj.fileUrl = selectedFileObject.dataUrl;
+        msgObj.fileName = selectedFileObject.name;
+        msgObj.fileSize = selectedFileObject.size;
       }
 
       await set(newMsgRef, msgObj);
 
-      // Reset Inputs
       textInput.value = '';
       textInput.style.height = 'auto';
-      selectedImageBase64 = null;
+      selectedFileObject = null;
       fileInput.value = '';
       previewBar.classList.add('hidden');
 
@@ -722,10 +871,8 @@ function setupChatControls() {
     }
   }
 
-  // Scroll Behavior
   messagesBox.addEventListener('scroll', () => {
-    const threshold = 80;
-    isScrolledToBottom = messagesBox.scrollHeight - messagesBox.scrollTop - messagesBox.clientHeight <= threshold;
+    isScrolledToBottom = messagesBox.scrollHeight - messagesBox.scrollTop - messagesBox.clientHeight <= 80;
     if (isScrolledToBottom) {
       unreadMessagesCount = 0;
       updateScrollBottomButton();
@@ -738,7 +885,6 @@ function setupChatControls() {
     updateScrollBottomButton();
   });
 
-  // Filter Buttons
   document.querySelectorAll('.pill-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
@@ -748,13 +894,11 @@ function setupChatControls() {
     });
   });
 
-  // Search Input
   document.getElementById('search-input').addEventListener('input', (e) => {
     searchKeyword = e.target.value.trim();
     filterAllMessages();
   });
 
-  // Toggle Sound & Theme
   const soundBtn = document.getElementById('btn-toggle-sound');
   soundBtn.addEventListener('click', () => {
     soundEnabled = !soundEnabled;
@@ -775,21 +919,13 @@ function setupChatControls() {
     }
   });
 
-  // Mobile Sidebar Toggle
   const sidebar = document.getElementById('sidebar');
-  document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
-    sidebar.classList.add('open');
-  });
-  document.getElementById('btn-close-sidebar').addEventListener('click', () => {
-    sidebar.classList.remove('open');
-  });
+  document.getElementById('btn-toggle-sidebar').addEventListener('click', () => sidebar.classList.add('open'));
+  document.getElementById('btn-close-sidebar').addEventListener('click', () => sidebar.classList.remove('open'));
 
-  // Emoji Picker Toggle
   const emojiBtn = document.getElementById('btn-emoji-toggle');
   const emojiPicker = document.getElementById('emoji-picker');
-  emojiBtn.addEventListener('click', () => {
-    emojiPicker.classList.toggle('hidden');
-  });
+  emojiBtn.addEventListener('click', () => emojiPicker.classList.toggle('hidden'));
 
   document.querySelectorAll('.emoji-grid span').forEach(span => {
     span.addEventListener('click', () => {
@@ -816,7 +952,6 @@ function updateScrollBottomButton() {
   }
 }
 
-// System Message Helper
 async function sendSystemMessage(text) {
   try {
     const sysRef = push(ref(db, 'messages'));
@@ -827,11 +962,176 @@ async function sendSystemMessage(text) {
       timestamp: Date.now()
     });
   } catch (e) {
-    console.error("System message failed:", e);
+    console.error("System msg error:", e);
   }
 }
 
-// Poll Creation Modal Logic
+// Voice Chat (WebRTC P2P) & Voice Message Recording Logic
+function setupVoiceChatAndRec() {
+  const recBtn = document.getElementById('btn-record-voice');
+  const recBar = document.getElementById('voice-rec-preview');
+  const recTimeEl = document.getElementById('voice-rec-time');
+  const btnCancelRec = document.getElementById('btn-cancel-voice');
+  const btnSendRec = document.getElementById('btn-send-voice');
+
+  // Voice Message Recording
+  recBtn.addEventListener('click', async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordedAudioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedAudioChunks.push(e.data);
+      };
+
+      mediaRecorder.start();
+      recBar.classList.remove('hidden');
+      voiceRecSeconds = 0;
+      recTimeEl.textContent = '00:00';
+
+      voiceRecTimer = setInterval(() => {
+        voiceRecSeconds++;
+        const mins = Math.floor(voiceRecSeconds / 60).toString().padStart(2, '0');
+        const secs = (voiceRecSeconds % 60).toString().padStart(2, '0');
+        recTimeEl.textContent = `${mins}:${secs}`;
+      }, 1000);
+
+    } catch (err) {
+      console.error("Mic access error:", err);
+      showToast('マイクの使用許可が必要です', 'error');
+    }
+  });
+
+  btnCancelRec.addEventListener('click', () => {
+    stopRecording(false);
+  });
+
+  btnSendRec.addEventListener('click', () => {
+    stopRecording(true);
+  });
+
+  function stopRecording(send = false) {
+    if (voiceRecTimer) clearInterval(voiceRecTimer);
+    recBar.classList.add('hidden');
+
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.onstop = async () => {
+        if (send && recordedAudioChunks.length > 0) {
+          const audioBlob = new Blob(recordedAudioChunks, { type: 'audio/webm' });
+          const reader = new FileReader();
+          reader.onload = async (evt) => {
+            const dataUrl = evt.target.result;
+            const newMsgRef = push(ref(db, 'messages'));
+            await set(newMsgRef, {
+              userId: myUserId,
+              name: myName,
+              trip: myTrip,
+              avatar: myAvatar,
+              type: 'voice',
+              fileUrl: dataUrl,
+              timestamp: Date.now()
+            });
+            playSound('send');
+          };
+          reader.readAsDataURL(audioBlob);
+        }
+        // マイクストリーム停止
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      };
+      mediaRecorder.stop();
+    }
+  }
+
+  // WebRTC Voice Room Toggle
+  const btnVcToggle = document.getElementById('btn-toggle-vc');
+  const btnMicToggle = document.getElementById('btn-toggle-mic');
+
+  btnVcToggle.addEventListener('click', async () => {
+    if (!isVoiceRoomJoined) {
+      // 参加
+      try {
+        localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        isVoiceRoomJoined = true;
+        isMicMuted = false;
+
+        btnVcToggle.classList.add('joined');
+        btnVcToggle.innerHTML = '<i class="fa-solid fa-phone-slash"></i> <span>退出</span>';
+        btnMicToggle.classList.remove('hidden');
+        document.getElementById('vc-section').classList.remove('hidden');
+
+        // 参加情報登録
+        const vcUserRef = ref(db, `voice_room/${myUserId}`);
+        await set(vcUserRef, {
+          name: myName,
+          avatar: myAvatar,
+          muted: false,
+          joinedAt: Date.now()
+        });
+        onDisconnect(vcUserRef).remove();
+
+        showToast('ボイスチャットに参加しました', 'success');
+      } catch (err) {
+        console.error("Voice room join error:", err);
+        showToast('マイクへのアクセスに失敗しました', 'error');
+      }
+    } else {
+      // 退出
+      isVoiceRoomJoined = false;
+      if (localAudioStream) {
+        localAudioStream.getTracks().forEach(track => track.stop());
+        localAudioStream = null;
+      }
+
+      btnVcToggle.classList.remove('joined');
+      btnVcToggle.innerHTML = '<i class="fa-solid fa-microphone"></i> <span>ボイスチャット</span>';
+      btnMicToggle.classList.add('hidden');
+      document.getElementById('vc-section').classList.add('hidden');
+
+      await remove(ref(db, `voice_room/${myUserId}`));
+      showToast('ボイスチャットから退出しました');
+    }
+  });
+
+  btnMicToggle.addEventListener('click', async () => {
+    if (!localAudioStream) return;
+    isMicMuted = !isMicMuted;
+    localAudioStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
+    btnMicToggle.innerHTML = isMicMuted ? '<i class="fa-solid fa-microphone-slash" style="color:var(--danger-color)"></i>' : '<i class="fa-solid fa-microphone"></i>';
+    
+    await update(ref(db, `voice_room/${myUserId}`), { muted: isMicMuted });
+    showToast(`マイクを ${isMicMuted ? 'ミュート' : '解除'} にしました`);
+  });
+
+  // ボイスチャットメンバーリスト監視
+  onValue(ref(db, 'voice_room'), (snapshot) => {
+    const vcListEl = document.getElementById('vc-user-list');
+    const vcCountEl = document.getElementById('vc-count');
+    if (!vcListEl) return;
+    vcListEl.innerHTML = '';
+
+    if (snapshot.exists()) {
+      const users = snapshot.val();
+      vcCountEl.textContent = `${Object.keys(users).length}人`;
+      Object.entries(users).forEach(([uid, uData]) => {
+        const li = document.createElement('li');
+        li.className = 'user-item';
+        li.innerHTML = `
+          <div class="avatar-sm">${escapeHtml(uData.avatar || '🤖')}</div>
+          <div class="user-item-info">
+            <div class="user-item-name">${escapeHtml(uData.name)}</div>
+          </div>
+          <i class="fa-solid ${uData.muted ? 'fa-microphone-slash style="color:var(--danger-color)"' : 'fa-microphone text-success'}"></i>
+        `;
+        vcListEl.appendChild(li);
+      });
+    } else {
+      vcCountEl.textContent = '0人';
+    }
+  });
+}
+
+// Poll & Profile Modals
 function setupPollModal() {
   const modal = document.getElementById('poll-modal');
   const openBtn = document.getElementById('btn-open-create-poll');
@@ -840,14 +1140,10 @@ function setupPollModal() {
   const submitBtn = document.getElementById('btn-submit-poll');
   const errorMsg = document.getElementById('poll-error-msg');
 
-  openBtn.addEventListener('click', () => {
-    modal.classList.remove('hidden');
-  });
+  openBtn.addEventListener('click', () => modal.classList.remove('hidden'));
 
   document.querySelectorAll('#poll-modal .modal-close').forEach(btn => {
-    btn.addEventListener('click', () => {
-      modal.classList.add('hidden');
-    });
+    btn.addEventListener('click', () => modal.classList.add('hidden'));
   });
 
   addOptBtn.addEventListener('click', () => {
@@ -868,45 +1164,29 @@ function setupPollModal() {
     const optInputs = optionsContainer.querySelectorAll('.poll-opt-input');
     const options = Array.from(optInputs).map(i => i.value.trim()).filter(val => val !== '');
 
-    if (!question) {
-      errorMsg.textContent = 'アンケートの質問を入力してください。';
-      errorMsg.classList.remove('hidden');
-      return;
-    }
-
-    if (options.length < 2) {
-      errorMsg.textContent = '選択肢を少なくとも2つ以上入力してください。';
+    if (!question || options.length < 2) {
+      errorMsg.textContent = '質問と少なくとも2つの選択肢を入力してください。';
       errorMsg.classList.remove('hidden');
       return;
     }
 
     submitBtn.disabled = true;
-
     try {
       const newMsgRef = push(ref(db, 'messages'));
       await set(newMsgRef, {
         userId: myUserId,
         name: myName,
         trip: myTrip,
+        avatar: myAvatar,
         type: 'poll',
-        poll: {
-          question: question,
-          options: options,
-          votes: {}
-        },
+        poll: { question: question, options: options, votes: {} },
         timestamp: Date.now()
       });
 
       modal.classList.add('hidden');
-      document.getElementById('poll-question').value = '';
-      optionsContainer.innerHTML = `
-        <div class="poll-opt-row"><input type="text" class="poll-opt-input" placeholder="選択肢 1" maxlength="30"></div>
-        <div class="poll-opt-row"><input type="text" class="poll-opt-input" placeholder="選択肢 2" maxlength="30"></div>
-      `;
       showToast('アンケートを投稿しました', 'success');
       playSound('send');
     } catch (err) {
-      console.error("Submit poll error:", err);
       errorMsg.textContent = 'アンケートの投稿に失敗しました。';
       errorMsg.classList.remove('hidden');
     } finally {
@@ -915,7 +1195,6 @@ function setupPollModal() {
   });
 }
 
-// Edit Profile Modal Logic (Name & Trip Free Change)
 function setupProfileModal() {
   const modal = document.getElementById('profile-modal');
   const openBtn = document.getElementById('btn-open-edit-profile');
@@ -933,9 +1212,7 @@ function setupProfileModal() {
   });
 
   document.querySelectorAll('#profile-modal .modal-close').forEach(btn => {
-    btn.addEventListener('click', () => {
-      modal.classList.add('hidden');
-    });
+    btn.addEventListener('click', () => modal.classList.add('hidden'));
   });
 
   saveBtn.addEventListener('click', async () => {
@@ -950,9 +1227,7 @@ function setupProfileModal() {
     }
 
     saveBtn.disabled = true;
-
     try {
-      // 名前が変更された場合は重複チェック
       if (newName.toLowerCase() !== myName.toLowerCase()) {
         const isDuplicate = await checkDuplicateName(newName, myUserId);
         if (isDuplicate) {
@@ -964,28 +1239,16 @@ function setupProfileModal() {
       }
 
       const oldName = myName;
-      const oldTrip = myTrip;
-
       myName = newName;
-      if (newTripKey) {
-        myTrip = await generateTrip(newTripKey);
-      }
+      if (newTripKey) myTrip = await generateTrip(newTripKey);
 
-      // オンライン情報の更新
       await registerOnlineUser();
-
-      // UI更新
       updateMyProfileUI();
       modal.classList.add('hidden');
 
-      // 変更通知メッセージ
-      if (oldName !== myName || oldTrip !== myTrip) {
-        sendSystemMessage(`${oldName} が名前/トリップを 「${myName} (${myTrip})」 に変更しました`);
-      }
-
+      sendSystemMessage(`${oldName} がプロフィールを更新しました`);
       showToast('プロフィールを変更しました', 'success');
     } catch (err) {
-      console.error("Save profile error:", err);
       errorMsg.textContent = '変更の保存に失敗しました。';
       errorMsg.classList.remove('hidden');
     } finally {
@@ -994,7 +1257,6 @@ function setupProfileModal() {
   });
 }
 
-// Fullscreen Image Modal
 function setupImageModal() {
   const modal = document.getElementById('image-modal');
   const fullImg = document.getElementById('full-image-display');

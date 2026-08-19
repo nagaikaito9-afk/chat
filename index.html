@@ -32,7 +32,7 @@
           <i class="fa-solid fa-comments brand-icon"></i>
           <h2>CyberChat</h2>
         </div>
-        <p class="join-subtitle">名前とトリップキーを入力してチャットに参加しよう</p>
+        <p class="join-subtitle">名前、トリップ、アイコンを設定して参加しよう</p>
       </div>
 
       <form id="join-form" onsubmit="return false;">
@@ -40,6 +40,22 @@
           <label for="join-username"><i class="fa-solid fa-user"></i> ユーザー名 <span class="required">*</span></label>
           <input type="text" id="join-username" placeholder="例: たなか" maxlength="20" required autocomplete="off">
           <span class="input-hint">※既に他の人が使用している名前は使えません</span>
+        </div>
+
+        <div class="input-group">
+          <label><i class="fa-solid fa-face-smile"></i> アイコンを選択</label>
+          <div id="join-avatar-picker" class="avatar-picker-grid">
+            <span class="avatar-opt active" data-avatar="🤖">🤖</span>
+            <span class="avatar-opt" data-avatar="🐱">🐱</span>
+            <span class="avatar-opt" data-avatar="🦊">🦊</span>
+            <span class="avatar-opt" data-avatar="👑">👑</span>
+            <span class="avatar-opt" data-avatar="🚀">🚀</span>
+            <span class="avatar-opt" data-avatar="💎">💎</span>
+            <span class="avatar-opt" data-avatar="🐲">🐲</span>
+            <span class="avatar-opt" data-avatar="⚡">⚡</span>
+            <span class="avatar-opt" data-avatar="🌸">🌸</span>
+            <span class="avatar-opt" data-avatar="🎮">🎮</span>
+          </div>
         </div>
 
         <div class="input-group">
@@ -76,12 +92,12 @@
 
       <!-- 自分のプロフィールカード -->
       <div class="my-profile-card">
-        <div class="avatar-circle" id="my-avatar">?</div>
+        <div class="avatar-circle" id="my-avatar">🤖</div>
         <div class="profile-info">
           <div class="profile-name" id="my-name-display">ゲスト</div>
           <div class="profile-trip" id="my-trip-display">◆------</div>
         </div>
-        <button id="btn-open-edit-profile" class="btn-icon" title="名前・トリップを変更">
+        <button id="btn-open-edit-profile" class="btn-icon" title="名前・アイコン・トリップを変更">
           <i class="fa-solid fa-pen-to-square"></i>
         </button>
       </div>
@@ -94,8 +110,20 @@
 
       <div class="filter-pills">
         <button class="pill-btn active" data-filter="all">すべて</button>
-        <button class="pill-btn" data-filter="image"><i class="fa-regular fa-image"></i> 画像</button>
+        <button class="pill-btn" data-filter="image"><i class="fa-regular fa-image"></i> メディア</button>
         <button class="pill-btn" data-filter="poll"><i class="fa-solid fa-chart-simple"></i> アンケート</button>
+        <button class="pill-btn" data-filter="file"><i class="fa-solid fa-paperclip"></i> ファイル</button>
+      </div>
+
+      <!-- ボイスチャット参加メンバー一覧 -->
+      <div id="vc-section" class="vc-sidebar-section hidden">
+        <div class="section-title">
+          <span><i class="fa-solid fa-microphone text-success pulse"></i> ボイスチャット参加中</span>
+          <span class="user-count-badge" id="vc-count">0人</span>
+        </div>
+        <ul id="vc-user-list" class="online-user-list">
+          <!-- 動的生成 -->
+        </ul>
       </div>
 
       <!-- オンラインユーザーリスト -->
@@ -106,6 +134,17 @@
         </div>
         <ul id="online-user-list" class="online-user-list">
           <!-- JSで動的生成 -->
+        </ul>
+      </div>
+
+      <!-- 無視（ブロック）リスト管理 -->
+      <div id="ignored-section" class="ignored-sidebar-section">
+        <div class="section-title">
+          <span><i class="fa-solid fa-user-slash"></i> 無視リスト</span>
+          <span class="user-count-badge" id="ignored-count">0人</span>
+        </div>
+        <ul id="ignored-user-list" class="ignored-user-list">
+          <!-- 動的生成 -->
         </ul>
       </div>
     </aside>
@@ -125,6 +164,15 @@
         </div>
 
         <div class="header-actions">
+          <!-- ボイスチャット参加ボタン -->
+          <button id="btn-toggle-vc" class="btn-vc" title="ボイスチャットに参加/退出">
+            <i class="fa-solid fa-microphone"></i>
+            <span>ボイスチャット</span>
+          </button>
+          <button id="btn-toggle-mic" class="btn-icon hidden" title="マイク ミュート/解除">
+            <i class="fa-solid fa-microphone-slash"></i>
+          </button>
+
           <button id="btn-toggle-sound" class="btn-icon active" title="通知音 ON/OFF">
             <i class="fa-solid fa-volume-high"></i>
           </button>
@@ -148,16 +196,28 @@
         <span id="unread-count" class="unread-badge hidden">0</span>
       </button>
 
-      <!-- 画像添付プレビューバー -->
+      <!-- メディア・ファイル添付プレビューバー -->
       <div id="attachment-preview" class="attachment-preview-bar hidden">
-        <div class="preview-thumb-wrapper">
-          <img id="preview-img" src="" alt="添付画像">
+        <div class="preview-thumb-wrapper" id="preview-thumb-container">
+          <img id="preview-img" src="" alt="添付ファイル" class="hidden">
+          <div id="preview-file-icon" class="file-icon-placeholder hidden"><i class="fa-solid fa-file-arrow-up"></i></div>
           <button id="btn-remove-attachment" class="btn-remove-thumb"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="preview-info">
-          <span class="preview-title">画像が選択されました</span>
-          <span class="preview-hint">送信ボタンを押すと投稿されます</span>
+          <span class="preview-title" id="preview-filename">ファイルが選択されました</span>
+          <span class="preview-hint" id="preview-filesize">送信ボタンを押すと投稿されます</span>
         </div>
+      </div>
+
+      <!-- ボイス録音中プレビューバー -->
+      <div id="voice-rec-preview" class="attachment-preview-bar voice-rec-bar hidden">
+        <div class="rec-dot pulse"></div>
+        <div class="preview-info">
+          <span class="preview-title">ボイスメッセージ録音中...</span>
+          <span class="preview-hint" id="voice-rec-time">00:00</span>
+        </div>
+        <button id="btn-cancel-voice" class="btn-secondary btn-sm"><i class="fa-solid fa-trash"></i> キャンセル</button>
+        <button id="btn-send-voice" class="btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i> 録音を送信</button>
       </div>
 
       <!-- 入力フッター -->
@@ -178,10 +238,14 @@
               <i class="fa-regular fa-face-smile"></i>
             </button>
 
-            <label for="image-file-input" class="btn-icon-tool" title="画像を共有">
-              <i class="fa-regular fa-image"></i>
-              <input type="file" id="image-file-input" accept="image/*" class="hidden-file-input">
+            <label for="media-file-input" class="btn-icon-tool" title="画像・動画・ファイルを共有">
+              <i class="fa-solid fa-paperclip"></i>
+              <input type="file" id="media-file-input" accept="image/*,video/*,audio/*,.pdf,.zip,.doc,.docx,.txt,.csv" class="hidden-file-input">
             </label>
+
+            <button type="button" id="btn-record-voice" class="btn-icon-tool" title="ボイスメッセージ送信">
+              <i class="fa-solid fa-microphone"></i>
+            </button>
 
             <button type="button" id="btn-open-create-poll" class="btn-icon-tool" title="アンケートを作成">
               <i class="fa-solid fa-chart-simple"></i>
@@ -239,7 +303,7 @@
   <div id="profile-modal" class="modal-overlay hidden">
     <div class="modal-card glass-panel animate-scale-up">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-user-pen"></i> 名前とトリップを変更</h3>
+        <h3><i class="fa-solid fa-user-pen"></i> プロフィールを変更</h3>
         <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
@@ -247,6 +311,22 @@
           <label for="edit-username">新しいユーザー名 <span class="required">*</span></label>
           <input type="text" id="edit-username" placeholder="新しい名前を入力" maxlength="20">
           <span class="input-hint">※他の参加者と重複する名前は指定できません</span>
+        </div>
+
+        <div class="input-group">
+          <label><i class="fa-solid fa-face-smile"></i> アイコンを変更</label>
+          <div id="edit-avatar-picker" class="avatar-picker-grid">
+            <span class="avatar-opt" data-avatar="🤖">🤖</span>
+            <span class="avatar-opt" data-avatar="🐱">🐱</span>
+            <span class="avatar-opt" data-avatar="🦊">🦊</span>
+            <span class="avatar-opt" data-avatar="👑">👑</span>
+            <span class="avatar-opt" data-avatar="🚀">🚀</span>
+            <span class="avatar-opt" data-avatar="💎">💎</span>
+            <span class="avatar-opt" data-avatar="🐲">🐲</span>
+            <span class="avatar-opt" data-avatar="⚡">⚡</span>
+            <span class="avatar-opt" data-avatar="🌸">🌸</span>
+            <span class="avatar-opt" data-avatar="🎮">🎮</span>
+          </div>
         </div>
 
         <div class="input-group">
@@ -265,6 +345,27 @@
       <div class="modal-footer">
         <button class="btn-secondary modal-close">キャンセル</button>
         <button id="btn-save-profile" class="btn-primary"><i class="fa-solid fa-check"></i> 変更を保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- メッセージ編集モーダル -->
+  <div id="edit-msg-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-pen-to-square"></i> メッセージを編集</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-msg-id">
+        <div class="input-group">
+          <label for="edit-msg-textarea">編集内容</label>
+          <textarea id="edit-msg-textarea" rows="4" style="width:100%; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--glass-border); color:var(--text-primary); border-radius:var(--radius-md);"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">キャンセル</button>
+        <button id="btn-save-edit-msg" class="btn-primary"><i class="fa-solid fa-check"></i> 更新する</button>
       </div>
     </div>
   </div>
