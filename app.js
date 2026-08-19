@@ -3843,6 +3843,18 @@ function setupFriendModalControls() {
     btnOpen.addEventListener('click', () => modal.classList.remove('hidden'));
   }
 
+  if (modal) {
+    document.querySelectorAll('#friend-modal .modal-close').forEach(btn => {
+      btn.addEventListener('click', () => modal.classList.add('hidden'));
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+      }
+    });
+  }
+
   document.querySelectorAll('.friend-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.friend-tab-btn').forEach(b => b.classList.remove('active'));
