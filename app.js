@@ -914,6 +914,7 @@ async function completeUserLogin() {
 // Avatar Grid Selector & Custom Image Uploader
 function setupAvatarPickers() {
   const joinGrid = document.getElementById('join-avatar-picker');
+  const regGrid = document.getElementById('reg-avatar-picker');
   const editGrid = document.getElementById('edit-avatar-picker');
 
   // Populate 50 icons in grids
@@ -938,6 +939,7 @@ function setupAvatarPickers() {
   };
 
   populateGrid(joinGrid, 'join');
+  populateGrid(regGrid, 'reg');
   populateGrid(editGrid, 'edit');
 
   // Tab Switching (Presets vs Custom Image)
@@ -998,8 +1000,10 @@ function setupAvatarPickers() {
   };
 
   bindImageFileUploader('join-avatar-file-input', 'join-avatar-preview');
+  bindImageFileUploader('reg-avatar-file-input', 'reg-avatar-preview');
   bindImageFileUploader('edit-avatar-file-input', 'edit-avatar-preview');
   bindImageUrlApplier('btn-join-apply-url', 'join-avatar-url-input', 'join-avatar-preview');
+  bindImageUrlApplier('btn-reg-apply-url', 'reg-avatar-url-input', 'reg-avatar-preview');
   bindImageUrlApplier('btn-edit-apply-url', 'edit-avatar-url-input', 'edit-avatar-preview');
 }
 
