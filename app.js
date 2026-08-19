@@ -35,6 +35,7 @@ let myStatus = '💬 雑談歓迎';
 let currentRoomId = 'public_main';
 
 let deviceMode = localStorage.getItem('cyberchat_device_mode') || 'pc';
+let currentTheme = localStorage.getItem('cyberchat_theme') || 'cyber';
 let isAdminMode = false;
 const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371";
 
@@ -50,12 +51,18 @@ let bannedUsersMap = new Map();
 let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored_users') || '[]'));
 let starredMsgSet = new Set(JSON.parse(localStorage.getItem('cyberchat_starred_msgs') || '[]'));
 
+// Active Quiz State
+let activeMathQuizAnswer = null;
+
+// Heartbeat Timer Handle
+let heartbeatTimer = null;
+
 // Screen Sharing State
 let isScreenSharing = false;
 let screenStream = null;
 let screenFrameInterval = null;
 
-// Sending Locks (二重送信防止)
+// Sending Locks
 let isSending = false;
 let isSendingSpecial = false;
 
@@ -66,19 +73,13 @@ let unsubscribeTyping = null;
 let unsubscribeTopic = null;
 let unsubscribeSignals = null;
 let unsubscribeScreen = null;
-let unsubscribeBannedUsers = null;
 
-// Whisper (DM) State
+// Whisper & Reply State
 let whisperTargetId = null;
 let whisperTargetName = null;
-
-// Reply (返信) State
 let replyTargetId = null;
 let replyTargetName = null;
 let replyTargetText = null;
-
-// Typing Indicator Timer
-let typingTimer = null;
 
 // Voice Chat & WebRTC Peer Connections
 let isVoiceRoomJoined = false;
@@ -96,10 +97,10 @@ let bgmOsc = null;
 let bgmGain = null;
 let isBgmPlaying = false;
 
-// Paint Board Canvas State
+// Canvas Paint Board State
 let isPainting = false;
 
-// Database Path Helper
+// Database Path Helpers
 function roomRef(subPath) {
   return ref(db, `rooms/${currentRoomId}/${subPath}`);
 }
@@ -142,7 +143,7 @@ function playSound(type) {
   }
 }
 
-// Soundboard Effects (効果音ポン出し)
+// Soundboard Effects
 window.playSfx = (sfxType) => {
   try {
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -297,7 +298,7 @@ async function checkDuplicateName(nameToCheck, excludeUserId = null) {
   }
 }
 
-// Device Mode Manager (スマホ / PC 表示切り替え)
+// Device Mode Manager
 function setDeviceMode(mode) {
   deviceMode = mode;
   localStorage.setItem('cyberchat_device_mode', mode);
@@ -319,9 +320,7 @@ function setDeviceMode(mode) {
 
 function setupDeviceModeSelectors() {
   document.querySelectorAll('.device-btn[data-mode]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      setDeviceMode(btn.dataset.mode);
-    });
+    btn.addEventListener('click', () => setDeviceMode(btn.dataset.mode));
   });
 
   const toggleBtn = document.getElementById('btn-toggle-device-mode');
@@ -336,9 +335,55 @@ function setupDeviceModeSelectors() {
   setDeviceMode(deviceMode);
 }
 
+// Theme Picker Setup
+function setupThemePicker() {
+  const toggleBtn = document.getElementById('btn-theme-picker-toggle');
+  const popup = document.getElementById('theme-picker-popup');
+
+  if (toggleBtn && popup) {
+    toggleBtn.addEventListener('click', () => {
+      popup.classList.toggle('hidden');
+    });
+
+    document.querySelectorAll('.theme-opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const themeName = btn.dataset.themeName;
+        applyTheme(themeName);
+        popup.classList.add('hidden');
+      });
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', (e) => {
+        if (!popup.contains(e.target) && !toggleBtn.contains(e.target)) {
+          popup.classList.add('hidden');
+        }
+      });
+    }, 100);
+  }
+
+  applyTheme(currentTheme);
+}
+
+function applyTheme(themeName) {
+  currentTheme = themeName;
+  localStorage.setItem('cyberchat_theme', themeName);
+
+  if (themeName === 'cyber') {
+    document.body.removeAttribute('data-theme');
+  } else {
+    document.body.setAttribute('data-theme', themeName);
+  }
+
+  document.querySelectorAll('.theme-opt-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.themeName === themeName);
+  });
+}
+
 // App Initialization
 function initApp() {
   setupDeviceModeSelectors();
+  setupThemePicker();
   setupAvatarPickers();
   setupTripInputListeners();
   setupJoinForm();
@@ -359,14 +404,33 @@ function initApp() {
   setupPaintModal();
   setupReplyBanner();
   setupAdminSystem();
+  setupAiBotControls();
   renderIgnoredUsersUI();
   initBanCheckListener();
+  setupPresenceConnectionHeartbeat();
 }
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
   initApp();
+}
+
+// 🟢 部屋にいるのに消えるバグ修正 Presence & Heartbeat Handler
+function setupPresenceConnectionHeartbeat() {
+  const connectedRef = ref(db, '.info/connected');
+  onValue(connectedRef, (snap) => {
+    if (snap.val() === true && myName) {
+      registerOnlineUser();
+    }
+  });
+
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    if (myName) {
+      update(roomRef(`active_users/${myUserId}`), { lastSeen: Date.now() });
+    }
+  }, 10000);
 }
 
 // 🚫 リアルタイムBAN判定リスナー
@@ -378,7 +442,6 @@ function initBanCheckListener() {
     }
   });
 
-  // 全体BANリスト同期（運営用）
   onValue(globalRef('banned_users'), (snapshot) => {
     bannedUsersMap.clear();
     if (snapshot.exists()) {
@@ -389,7 +452,7 @@ function initBanCheckListener() {
   });
 }
 
-// 👑 運営専用管理システム Setup
+// 👑 運営管理システム
 function setupAdminSystem() {
   const openAuthBtn = document.getElementById('btn-open-admin-auth');
   const authModal = document.getElementById('admin-auth-modal');
@@ -447,7 +510,6 @@ function setupAdminSystem() {
     if (e.key === 'Enter') handleAuthSubmit();
   });
 
-  // 運営コントロールパネルの各種一括ボタン
   document.getElementById('btn-admin-clear-messages').addEventListener('click', async () => {
     if (!confirm('【警告】このルームの全メッセージを消去します。よろしいですか？')) return;
     try {
@@ -559,7 +621,7 @@ window.adminUnbanUser = async (uid, name) => {
   }
 };
 
-// Google Auth Redirect Result Handling (ページ復帰時の判定)
+// Google Auth Redirect Result Handling
 async function checkGoogleRedirectResult() {
   try {
     const result = await getRedirectResult(auth);
@@ -590,7 +652,7 @@ async function checkGoogleRedirectResult() {
   }
 }
 
-// Google Auth Handler (Pop-up Block 対策完全修正)
+// Google Auth Handler
 function setupGoogleAuth() {
   const btnGoogle = document.getElementById('btn-google-login');
   if (!btnGoogle) return;
@@ -762,14 +824,15 @@ function setupJoinForm() {
 
 async function registerOnlineUser() {
   const userRef = roomRef(`active_users/${myUserId}`);
+  onDisconnect(userRef).remove();
   await set(userRef, {
     name: myName,
     trip: myTrip,
     avatar: myAvatar,
     status: myStatus,
-    joinedAt: Date.now()
+    joinedAt: Date.now(),
+    lastSeen: Date.now()
   });
-  onDisconnect(userRef).remove();
 }
 
 function updateMyProfileUI() {
@@ -819,7 +882,7 @@ function initFirebaseRealtimeSync() {
   if (unsubscribeTopic) unsubscribeTopic();
   if (unsubscribeScreen) unsubscribeScreen();
 
-  // 1. オンラインリスト
+  // 1. オンラインリスト（60秒以内の生存確認で確実表示）
   unsubscribeActiveUsers = onValue(roomRef('active_users'), (snapshot) => {
     const userListEl = document.getElementById('online-user-list');
     const onlineCountEl = document.getElementById('online-count');
@@ -828,11 +891,14 @@ function initFirebaseRealtimeSync() {
     if (snapshot.exists()) {
       const users = snapshot.val();
       activeUsersMap.clear();
-      const count = Object.keys(users).length;
-      onlineCountEl.textContent = `${count}人`;
+      const now = Date.now();
+      let count = 0;
 
       Object.entries(users).forEach(([uid, uData]) => {
+        if (uData.lastSeen && (now - uData.lastSeen > 90000)) return; // 90秒音信不通はスキップ
+
         activeUsersMap.set(uid, uData);
+        count++;
         if (ignoredUsersSet.has(uid)) return;
 
         const li = document.createElement('li');
@@ -848,6 +914,7 @@ function initFirebaseRealtimeSync() {
         `;
         userListEl.appendChild(li);
       });
+      onlineCountEl.textContent = `${count}人`;
     } else {
       onlineCountEl.textContent = '0人';
     }
@@ -866,6 +933,12 @@ function initFirebaseRealtimeSync() {
 
     allMessages.set(msgId, { id: msgId, ...msgData });
     renderSingleMessage(msgId, msgData);
+
+    // クイズ回答判定
+    checkQuizAnswer(msgData);
+
+    // AI Bot自動応答判定 (@bot)
+    checkAiBotTrigger(msgData);
 
     const container = document.getElementById('messages-container');
     if (container && container.children.length > 60) {
@@ -928,7 +1001,7 @@ function initFirebaseRealtimeSync() {
     }
   });
 
-  // 5. 画面共有状態（全員へリアルタイム配信）
+  // 5. 画面共有状態
   unsubscribeScreen = onValue(roomRef('screen_share'), (snapshot) => {
     const box = document.getElementById('screen-share-overlay');
     const sharerNameEl = document.getElementById('screen-sharer-name');
@@ -956,6 +1029,174 @@ function initFirebaseRealtimeSync() {
     }
   });
 }
+
+// 🤖 AI CyberBot Responder (@bot)
+function setupAiBotControls() {
+  const callBotBtn = document.getElementById('btn-call-ai-bot');
+  if (callBotBtn) {
+    callBotBtn.addEventListener('click', () => {
+      insertSnippet('🤖 @bot ');
+    });
+  }
+}
+
+function checkAiBotTrigger(msgData) {
+  if (!msgData.text || msgData.userId === 'cyberbot_ai' || msgData.type === 'system') return;
+
+  const text = msgData.text.trim();
+  if (text.startsWith('@bot') || text.startsWith('@CyberBot') || text.includes('@bot')) {
+    setTimeout(async () => {
+      const prompt = text.replace(/@bot|@CyberBot/g, '').trim();
+      const botResponse = generateAiResponse(prompt, msgData.name);
+      
+      try {
+        const botRef = push(roomRef('messages'));
+        await set(botRef, {
+          userId: 'cyberbot_ai',
+          name: '🤖 CyberBot [AIアシスタント]',
+          trip: '◆AI_BOT_01',
+          avatar: '🤖',
+          type: 'text',
+          text: botResponse,
+          replyTo: {
+            msgId: msgData.id,
+            senderName: msgData.name,
+            text: msgData.text
+          },
+          timestamp: Date.now()
+        });
+        playSound('receive');
+      } catch (e) {
+        console.warn("AI Bot response error:", e);
+      }
+    }, 1200);
+  }
+}
+
+function generateAiResponse(prompt, senderName) {
+  if (!prompt) {
+    return `こんにちは！${senderName}さん！🤖 何か聞きたいことや、計算・占い・雑談の相手なら任せてください！\n例: 「@bot 今日の運勢は？」「@bot 12 x 15 は？」`;
+  }
+
+  const p = prompt.toLowerCase();
+  
+  if (p.includes('運勢') || p.includes('占い') || p.includes('おみくじ')) {
+    const fortunes = ['✨ 超大吉 (最高の一日！)', '🌟 大吉 (願い事が叶うかも)', '😊 中吉 (良い感じ！)', '👍 吉 (穏やか)', '🍀 小吉 (ラッキーアイテムはコーヒー)'];
+    return `${senderName}さんの今日の運勢は... ${fortunes[Math.floor(Math.random() * fortunes.length)]} です！🎉`;
+  }
+
+  if (p.includes('冗談') || p.includes('ジョーク') || p.includes('笑わせて')) {
+    const jokes = [
+      '【AIジョーク】プログラマーがスーパーに買い物に行きました。「牛乳を1つ買ってきて。もし卵があったら6個買ってきて」と言われたプログラマーは、牛乳を6つ買って帰りました。',
+      '【AIダジャレ】アルミ缶の上にあるミカン！🍊',
+      '【AI雑学】ペンギンの膝は実は曲がっていて、常に空気椅子状態なんですよ！🐧'
+    ];
+    return jokes[Math.floor(Math.random() * jokes.length)];
+  }
+
+  // 簡単な算数・数学計算判定
+  const mathMatch = prompt.match(/(\d+)\s*([\+\-\*\/x×÷])\s*(\d+)/);
+  if (mathMatch) {
+    const num1 = parseFloat(mathMatch[1]);
+    const op = mathMatch[2];
+    const num2 = parseFloat(mathMatch[3]);
+    let ans = 0;
+    if (op === '+' || op === '＋') ans = num1 + num2;
+    else if (op === '-' || op === 'ー') ans = num1 - num2;
+    else if (op === '*' || op === 'x' || op === '×') ans = num1 * num2;
+    else if (op === '/' || op === '÷') ans = num2 !== 0 ? (num1 / num2) : '0で割ることはできません';
+
+    return `🧠 計算結果: ${num1} ${op} ${num2} = 【 ${ans} 】 です！`;
+  }
+
+  const defaultReplies = [
+    `「${prompt}」ですね！${senderName}さんのお話、とても興味深いです！✨`,
+    `なるほど！${senderName}さんの意見に共感します！🤖 チャットが賑やかで楽しいですね！`,
+    `ご質問ありがとうございます！${senderName}さん、今日も元気にチャットを楽しみましょう！⚡`
+  ];
+  return defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
+}
+
+// 🧠 数学スピードクイズ機能
+window.startMathQuizGame = async () => {
+  const num1 = Math.floor(Math.random() * 20) + 5;
+  const num2 = Math.floor(Math.random() * 15) + 3;
+  const isMult = Math.random() > 0.5;
+
+  const questionText = isMult ? `${num1} × ${num2}` : `${num1 * num2} ÷ ${num1}`;
+  activeMathQuizAnswer = isMult ? (num1 * num2) : num2;
+
+  try {
+    const quizRef = push(roomRef('messages'));
+    await set(quizRef, {
+      userId: 'quiz_bot',
+      name: '🧠 数学スピードクイズ',
+      trip: '◆MATH_QUIZ',
+      avatar: '🧠',
+      type: 'game',
+      text: `<div class="quiz-card"><div class="quiz-title">🧠 早押し数学クイズ問題！</div><div class="quiz-question">【問題】 ${questionText} = ?</div><div class="quiz-hint">答えを数字でメッセージ送信してください！一番早い人が勝ち！</div></div>`,
+      timestamp: Date.now()
+    });
+    showToast('数学スピードクイズを出題しました！', 'success');
+  } catch (e) {
+    showToast('クイズ出題失敗', 'error');
+  }
+};
+
+function checkQuizAnswer(msgData) {
+  if (!activeMathQuizAnswer || msgData.userId === 'quiz_bot' || !msgData.text) return;
+
+  const userNum = parseInt(msgData.text.trim(), 10);
+  if (!isNaN(userNum) && userNum === activeMathQuizAnswer) {
+    const winAns = activeMathQuizAnswer;
+    activeMathQuizAnswer = null;
+
+    setTimeout(async () => {
+      sendSystemMessage(`🎉 【${msgData.name}】さんが数学クイズに見事正解しました！！ 👏 (正解: ${winAns})`);
+      playSound('fanfare');
+    }, 500);
+  }
+}
+
+// ✌️ じゃんけん対戦機能
+window.startRpsBattle = async () => {
+  try {
+    const rpsRef = push(roomRef('messages'));
+    const msgId = rpsRef.key;
+    await set(rpsRef, {
+      userId: myUserId,
+      name: myName,
+      trip: myTrip,
+      avatar: myAvatar,
+      type: 'rps',
+      text: `<div class="rps-card" id="rps-box-${msgId}"><div class="rps-title">✌️ じゃんけん対戦者募集！</div><div>手を1つ選んで勝負！</div><div class="rps-btns"><button class="rps-choice-btn" onclick="window.playRpsChallenge('${msgId}', '✊')">✊ グー</button><button class="rps-choice-btn" onclick="window.playRpsChallenge('${msgId}', '✌️')">✌️ チョキ</button><button class="rps-choice-btn" onclick="window.playRpsChallenge('${msgId}', '✋')">✋ パー</button></div></div>`,
+      timestamp: Date.now()
+    });
+    showToast('じゃんけん対戦募集を投稿しました！', 'success');
+  } catch (e) {
+    showToast('じゃんけん投稿失敗', 'error');
+  }
+};
+
+window.playRpsChallenge = (msgId, myChoice) => {
+  const choices = ['✊', '✌️', '✋'];
+  const botChoice = choices[Math.floor(Math.random() * choices.length)];
+
+  let resultText = '';
+  if (myChoice === botChoice) resultText = '引き分け！ (あいこ)';
+  else if (
+    (myChoice === '✊' && botChoice === '✌️') ||
+    (myChoice === '✌️' && botChoice === '✋') ||
+    (myChoice === '✋' && botChoice === '✊')
+  ) {
+    resultText = '🎉 あなたの勝ち！';
+  } else {
+    resultText = '💀 あなたの負け！';
+  }
+
+  showToast(`あなた: ${myChoice} vs 相手: ${botChoice} -> ${resultText}`, 'info');
+  sendSpecialMessage('game', `✌️ じゃんけん対戦結果: 【${myName}】 ${myChoice} vs ${botChoice} 相手 ➡ ${resultText}`);
+};
 
 // Reply Manager (返信機能)
 window.replyToMsg = (msgId) => {
@@ -1066,8 +1307,8 @@ function renderSingleMessage(msgId, msg) {
       contentHtml = `<div class="${bubbleClass}" style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</div>`;
     } else if (msg.type === 'stamp') {
       contentHtml = `<div class="${bubbleClass}">${quoteCardHtml}<div class="stamp-card-img">${escapeHtml(msg.text)}</div></div>`;
-    } else if (msg.type === 'game') {
-      contentHtml = `<div class="${bubbleClass}">${quoteCardHtml}<div class="game-card">${formatMessageText(msg.text)}</div></div>`;
+    } else if (msg.type === 'game' || msg.type === 'rps') {
+      contentHtml = `<div class="${bubbleClass}">${quoteCardHtml}${msg.text}</div>`;
     } else if (msg.type === 'image') {
       contentHtml = `
         <div class="${bubbleClass}">
@@ -1567,7 +1808,7 @@ async function sendSpecialMessageWithMedia(msgType, text, fileUrl) {
   }
 }
 
-// Screen Sharing Logic (クリックで大画面シアターモード切り替え)
+// Screen Sharing Logic
 function setupScreenShare() {
   const btnToggle = document.getElementById('btn-toggle-screen');
   const box = document.getElementById('screen-share-overlay');
@@ -1961,18 +2202,6 @@ function setupChatControls() {
     soundBtn.classList.toggle('active', soundEnabled);
     soundBtn.innerHTML = soundEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
     showToast(`通知音を ${soundEnabled ? 'ON' : 'OFF'} に設定しました`);
-  });
-
-  const themeBtn = document.getElementById('btn-toggle-theme');
-  themeBtn.addEventListener('click', () => {
-    const isDark = document.body.getAttribute('data-theme') !== 'light';
-    if (isDark) {
-      document.body.setAttribute('data-theme', 'light');
-      themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
-    } else {
-      document.body.removeAttribute('data-theme');
-      themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
-    }
   });
 
   const sidebar = document.getElementById('sidebar');
