@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberChat - リアルタイム自由チャット</title>
+  <title>CyberChat - リアルタイム自由チャット (チャベリ超え版)</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,7 +32,7 @@
           <i class="fa-solid fa-comments brand-icon"></i>
           <h2>CyberChat</h2>
         </div>
-        <p class="join-subtitle">名前、トリップ、アイコンを設定して参加しよう</p>
+        <p class="join-subtitle">名前、アイコン、気分を設定して自由に話そう</p>
       </div>
 
       <form id="join-form" onsubmit="return false;">
@@ -56,6 +56,18 @@
             <span class="avatar-opt" data-avatar="🌸">🌸</span>
             <span class="avatar-opt" data-avatar="🎮">🎮</span>
           </div>
+        </div>
+
+        <div class="input-group">
+          <label for="join-status"><i class="fa-solid fa-heart-pulse"></i> 一言ステータス / 気分</label>
+          <select id="join-status" class="status-select">
+            <option value="💬 雑談歓迎">💬 雑談歓迎</option>
+            <option value="🎮 ゲーム中">🎮 ゲーム中</option>
+            <option value="☕ 作業中...">☕ 作業中...</option>
+            <option value="😴 寝落ち寸前">😴 寝落ち寸前</option>
+            <option value="🎵 音楽鑑賞">🎵 音楽鑑賞</option>
+            <option value="❓ 質問・相談">❓ 質問・相談</option>
+          </select>
         </div>
 
         <div class="input-group">
@@ -95,9 +107,10 @@
         <div class="avatar-circle" id="my-avatar">🤖</div>
         <div class="profile-info">
           <div class="profile-name" id="my-name-display">ゲスト</div>
+          <div class="profile-status-badge" id="my-status-display">💬 雑談歓迎</div>
           <div class="profile-trip" id="my-trip-display">◆------</div>
         </div>
-        <button id="btn-open-edit-profile" class="btn-icon" title="名前・アイコン・トリップを変更">
+        <button id="btn-open-edit-profile" class="btn-icon" title="名前・アイコン・ステータスを変更">
           <i class="fa-solid fa-pen-to-square"></i>
         </button>
       </div>
@@ -158,7 +171,7 @@
             <i class="fa-solid fa-bars"></i>
           </button>
           <div class="chat-room-info">
-            <h1><i class="fa-solid fa-globe"></i> パブリックルーム</h1>
+            <h1 id="current-room-title"><i class="fa-solid fa-comments"></i> 💬 メイン雑談</h1>
             <span class="room-status"><i class="fa-solid fa-bolt"></i> リアルタイム同期中</span>
           </div>
         </div>
@@ -182,6 +195,23 @@
         </div>
       </header>
 
+      <!-- ルーム切り替えタブバー -->
+      <div class="room-tabs-bar glass-panel">
+        <button class="room-tab active" data-room="public_main"><i class="fa-solid fa-comments"></i> 💬 メイン雑談</button>
+        <button class="room-tab" data-room="public_game"><i class="fa-solid fa-gamepad"></i> 🎮 ゲーム</button>
+        <button class="room-tab" data-room="public_music"><i class="fa-solid fa-music"></i> 🎵 音楽・アニメ</button>
+        <button class="room-tab" data-room="public_help"><i class="fa-solid fa-handshake-angle"></i> ❓ 相談・質問</button>
+        <button id="btn-custom-room" class="room-tab btn-custom-tab"><i class="fa-solid fa-key"></i> 🔒 部屋を作成/合言葉入室</button>
+      </div>
+
+      <!-- お題・トピックピン留めバー -->
+      <div class="topic-pin-bar glass-panel">
+        <i class="fa-solid fa-thumbtack topic-icon"></i>
+        <span class="topic-label">本日のお題:</span>
+        <span id="room-topic-text" class="topic-text">みんなの好きな食べ物や最近ハマっていることは？</span>
+        <button id="btn-edit-topic" class="btn-edit-topic-icon" title="お題を変更"><i class="fa-solid fa-pen"></i></button>
+      </div>
+
       <!-- メッセージ表示エリア -->
       <div id="chat-messages" class="chat-messages">
         <div id="messages-loading" class="loading-state">
@@ -195,6 +225,17 @@
         <i class="fa-solid fa-arrow-down"></i>
         <span id="unread-count" class="unread-badge hidden">0</span>
       </button>
+
+      <!-- タイピング表示インジケーター -->
+      <div id="typing-indicator" class="typing-indicator-bar hidden">
+        <i class="fa-solid fa-pen-nib fa-bounce"></i> <span id="typing-users-text">誰かがメッセージを入力中...</span>
+      </div>
+
+      <!-- 内緒話（DM）ターゲット表示バー -->
+      <div id="whisper-banner" class="whisper-banner-bar hidden">
+        <span><i class="fa-solid fa-lock"></i> <strong id="whisper-target-name">〇〇</strong> さんへ内緒話（秘密メッセージ）を送信中</span>
+        <button id="btn-cancel-whisper" class="btn-cancel-whisper"><i class="fa-solid fa-xmark"></i> 解除</button>
+      </div>
 
       <!-- メディア・ファイル添付プレビューバー -->
       <div id="attachment-preview" class="attachment-preview-bar hidden">
@@ -232,16 +273,47 @@
           </div>
         </div>
 
+        <!-- スタンプパレット -->
+        <div id="stamp-picker" class="stamp-picker-popup hidden">
+          <div class="stamp-grid">
+            <button class="stamp-btn" data-stamp="おはよー！☀️">おはよー！☀️</button>
+            <button class="stamp-btn" data-stamp="お疲れ様！🍵">お疲れ様！🍵</button>
+            <button class="stamp-btn" data-stamp="神✨">神✨</button>
+            <button class="stamp-btn" data-stamp="草ww">草ww</button>
+            <button class="stamp-btn" data-stamp="それな！👉">それな！👉</button>
+            <button class="stamp-btn" data-stamp="ありがとう！🙏">ありがとう！🙏</button>
+            <button class="stamp-btn" data-stamp="了解！👍">了解！👍</button>
+            <button class="stamp-btn" data-stamp="ナイス！👏">ナイス！👏</button>
+            <button class="stamp-btn" data-stamp="祝🎉">祝🎉</button>
+            <button class="stamp-btn" data-stamp="壁|ω・`)">壁|ω・`)</button>
+          </div>
+        </div>
+
         <div class="chat-input-row">
           <div class="tool-buttons">
             <button type="button" id="btn-emoji-toggle" class="btn-icon-tool" title="絵文字">
               <i class="fa-regular fa-face-smile"></i>
             </button>
 
+            <button type="button" id="btn-stamp-toggle" class="btn-icon-tool" title="BIGスタンプ">
+              <i class="fa-solid fa-icons"></i>
+            </button>
+
             <label for="media-file-input" class="btn-icon-tool" title="画像・動画・ファイルを共有">
               <i class="fa-solid fa-paperclip"></i>
               <input type="file" id="media-file-input" accept="image/*,video/*,audio/*,.pdf,.zip,.doc,.docx,.txt,.csv" class="hidden-file-input">
             </label>
+
+            <!-- ミニゲームボタン (ダイス・おみくじ・コイン) -->
+            <button type="button" id="btn-game-dice" class="btn-icon-tool" title="サイコロを振る (1D100)">
+              <i class="fa-solid fa-dice"></i>
+            </button>
+            <button type="button" id="btn-game-omikuji" class="btn-icon-tool" title="おみくじを引く">
+              <i class="fa-solid fa-torii-gate"></i>
+            </button>
+            <button type="button" id="btn-game-coin" class="btn-icon-tool" title="コイントス (表/裏)">
+              <i class="fa-solid fa-coins"></i>
+            </button>
 
             <button type="button" id="btn-record-voice" class="btn-icon-tool" title="ボイスメッセージ送信">
               <i class="fa-solid fa-microphone"></i>
@@ -260,6 +332,47 @@
         </div>
       </footer>
     </main>
+  </div>
+
+  <!-- カスタムルーム作成/入室モーダル -->
+  <div id="custom-room-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-key"></i> 秘密の部屋（合言葉ルーム）を作成・入室</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="custom-room-name">部屋の合言葉 / ID <span class="required">*</span></label>
+          <input type="text" id="custom-room-name" placeholder="例: secret123" maxlength="30">
+          <span class="input-hint">※同じ合言葉を入力した人同士で秘密のチャットができます</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">キャンセル</button>
+        <button id="btn-join-custom-room" class="btn-primary"><i class="fa-solid fa-right-to-bracket"></i> 部屋に入る</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- お題編集モーダル -->
+  <div id="topic-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-thumbtack"></i> ルームのお題を変更</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="topic-input">新しいお題テキスト</label>
+          <input type="text" id="topic-input" placeholder="例: 今週のおすすめアニメは？" maxlength="60">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">キャンセル</button>
+        <button id="btn-save-topic" class="btn-primary"><i class="fa-solid fa-check"></i> 更新する</button>
+      </div>
+    </div>
   </div>
 
   <!-- アンケート作成モーダル -->
@@ -310,7 +423,18 @@
         <div class="input-group">
           <label for="edit-username">新しいユーザー名 <span class="required">*</span></label>
           <input type="text" id="edit-username" placeholder="新しい名前を入力" maxlength="20">
-          <span class="input-hint">※他の参加者と重複する名前は指定できません</span>
+        </div>
+
+        <div class="input-group">
+          <label for="edit-status">一言ステータス</label>
+          <select id="edit-status" class="status-select">
+            <option value="💬 雑談歓迎">💬 雑談歓迎</option>
+            <option value="🎮 ゲーム中">🎮 ゲーム中</option>
+            <option value="☕ 作業中...">☕ 作業中...</option>
+            <option value="😴 寝落ち寸前">😴 寝落ち寸前</option>
+            <option value="🎵 音楽鑑賞">🎵 音楽鑑賞</option>
+            <option value="❓ 質問・相談">❓ 質問・相談</option>
+          </select>
         </div>
 
         <div class="input-group">

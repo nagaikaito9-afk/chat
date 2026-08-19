@@ -2,7 +2,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { 
   getDatabase, ref, set, push, onValue, onChildAdded, onChildChanged, onChildRemoved,
-  remove, get, update, serverTimestamp, onDisconnect 
+  remove, get, update, serverTimestamp, onDisconnect, query, limitToLast 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 // Firebase Configuration
@@ -27,6 +27,9 @@ localStorage.setItem('cyberchat_user_id', myUserId);
 let myName = '';
 let myTrip = '◆(なし)';
 let myAvatar = '🤖';
+let myStatus = '💬 雑談歓迎';
+let currentRoomId = 'public_main';
+
 let soundEnabled = true;
 let isScrolledToBottom = true;
 let unreadMessagesCount = 0;
@@ -37,7 +40,15 @@ let allMessages = new Map();
 let activeUsersMap = new Map();
 let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored_users') || '[]'));
 
-// Voice Chat / Voice Recording State
+// Whisper (DM) State
+let whisperTargetId = null;
+let whisperTargetName = null;
+
+// Typing Indicator Timer
+let typingTimer = null;
+let activeTypingUsers = new Set();
+
+// Voice State
 let isVoiceRoomJoined = false;
 let isMicMuted = false;
 let localAudioStream = null;
@@ -45,7 +56,11 @@ let mediaRecorder = null;
 let recordedAudioChunks = [];
 let voiceRecTimer = null;
 let voiceRecSeconds = 0;
-let peerConnections = new Map();
+
+// Room Database Path Helper
+function roomRef(subPath) {
+  return ref(db, `rooms/${currentRoomId}/${subPath}`);
+}
 
 // Web Audio API Synthesizer
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -104,7 +119,6 @@ function showToast(msg, type = 'info') {
   setTimeout(() => toast.remove(), 3500);
 }
 
-// HTML Escaper
 function escapeHtml(str) {
   if (!str) return '';
   return str
@@ -132,7 +146,7 @@ function formatFileSize(bytes) {
 // Duplicate Name Check
 async function checkDuplicateName(nameToCheck, excludeUserId = null) {
   try {
-    const snapshot = await get(ref(db, 'active_users'));
+    const snapshot = await get(roomRef('active_users'));
     if (!snapshot.exists()) return false;
     const users = snapshot.val();
     const targetLower = nameToCheck.trim().toLowerCase();
@@ -155,9 +169,13 @@ function initApp() {
   setupTripInputListeners();
   setupJoinForm();
   setupChatControls();
+  setupRoomTabs();
+  setupStampsAndMinigames();
+  setupTopicModal();
   setupPollModal();
   setupProfileModal();
   setupEditMsgModal();
+  setupCustomRoomModal();
   setupImageModal();
   setupVoiceChatAndRec();
   renderIgnoredUsersUI();
@@ -224,6 +242,7 @@ function setupJoinForm() {
     
     const inputName = document.getElementById('join-username').value.trim();
     const inputTripKey = document.getElementById('join-tripkey').value;
+    const inputStatus = document.getElementById('join-status').value;
 
     if (!inputName) {
       errorMsg.textContent = 'ユーザー名を入力してください。';
@@ -246,10 +265,10 @@ function setupJoinForm() {
 
       myName = inputName;
       myTrip = await generateTrip(inputTripKey);
+      myStatus = inputStatus;
 
       await registerOnlineUser();
 
-      // 切り替え
       const joinModal = document.getElementById('join-modal');
       if (joinModal) {
         joinModal.classList.remove('active');
@@ -277,11 +296,12 @@ function setupJoinForm() {
 }
 
 async function registerOnlineUser() {
-  const userRef = ref(db, `active_users/${myUserId}`);
+  const userRef = roomRef(`active_users/${myUserId}`);
   await set(userRef, {
     name: myName,
     trip: myTrip,
     avatar: myAvatar,
+    status: myStatus,
     joinedAt: Date.now()
   });
   onDisconnect(userRef).remove();
@@ -291,12 +311,49 @@ function updateMyProfileUI() {
   document.getElementById('my-name-display').textContent = myName;
   document.getElementById('my-trip-display').textContent = myTrip;
   document.getElementById('my-avatar').textContent = myAvatar;
+  document.getElementById('my-status-display').textContent = myStatus;
+}
+
+// Room Switching Logic
+function setupRoomTabs() {
+  document.querySelectorAll('.room-tab[data-room]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchRoom(tab.dataset.room, tab.textContent);
+    });
+  });
+}
+
+async function switchRoom(newRoomId, roomTitle) {
+  if (currentRoomId === newRoomId) return;
+
+  // 旧ルームのオンライン離脱
+  await remove(roomRef(`active_users/${myUserId}`));
+
+  currentRoomId = newRoomId;
+  document.getElementById('current-room-title').innerHTML = escapeHtml(roomTitle);
+
+  // ルームタブのアクティブ切替
+  document.querySelectorAll('.room-tab').forEach(t => {
+    if (t.dataset.room === newRoomId) t.classList.add('active');
+    else t.classList.remove('active');
+  });
+
+  // コンテナ初期化
+  const container = document.getElementById('messages-container');
+  container.innerHTML = '';
+  allMessages.clear();
+
+  // 新ルーム登録 & 同期
+  await registerOnlineUser();
+  sendSystemMessage(`${myAvatar} ${myName} がこの部屋に入室しました`);
+  initFirebaseRealtimeSync();
+  showToast(`「${roomTitle.trim()}」に移動しました`);
 }
 
 // Realtime Listeners
 function initFirebaseRealtimeSync() {
   // 1. オンラインリスト
-  onValue(ref(db, 'active_users'), (snapshot) => {
+  onValue(roomRef('active_users'), (snapshot) => {
     const userListEl = document.getElementById('online-user-list');
     const onlineCountEl = document.getElementById('online-count');
     userListEl.innerHTML = '';
@@ -309,7 +366,7 @@ function initFirebaseRealtimeSync() {
 
       Object.entries(users).forEach(([uid, uData]) => {
         activeUsersMap.set(uid, uData);
-        if (ignoredUsersSet.has(uid)) return; // 無視ユーザーは表示しない
+        if (ignoredUsersSet.has(uid)) return;
 
         const li = document.createElement('li');
         li.className = 'user-item';
@@ -317,8 +374,9 @@ function initFirebaseRealtimeSync() {
           <div class="avatar-sm">${escapeHtml(uData.avatar || '🤖')}</div>
           <div class="user-item-info">
             <div class="user-item-name">${escapeHtml(uData.name)} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
-            <div class="user-item-trip">${escapeHtml(uData.trip || '◆(なし)')}</div>
+            <div class="user-item-status">${escapeHtml(uData.status || '💬 雑談歓迎')}</div>
           </div>
+          <button class="btn-secondary btn-sm" onclick="window.startWhisper('${uid}', '${escapeHtml(uData.name)}')" title="内緒話（DM）"><i class="fa-solid fa-lock"></i></button>
           ${uid !== myUserId ? `<button class="btn-mute-user" onclick="window.ignoreUser('${uid}', '${escapeHtml(uData.name)}')" title="無視（ブロック）"><i class="fa-solid fa-user-slash"></i></button>` : ''}
         `;
         userListEl.appendChild(li);
@@ -329,10 +387,10 @@ function initFirebaseRealtimeSync() {
   });
 
   // 2. メッセージ同期
-  const messagesRef = ref(db, 'messages');
+  const messagesQuery = query(roomRef('messages'), limitToLast(50));
   const loadingEl = document.getElementById('messages-loading');
 
-  onChildAdded(messagesRef, (snapshot) => {
+  onChildAdded(messagesQuery, (snapshot) => {
     if (loadingEl) loadingEl.style.display = 'none';
     const msgId = snapshot.key;
     const msgData = snapshot.val();
@@ -340,29 +398,78 @@ function initFirebaseRealtimeSync() {
     allMessages.set(msgId, { id: msgId, ...msgData });
     renderSingleMessage(msgId, msgData);
 
+    const container = document.getElementById('messages-container');
+    if (container && container.children.length > 60) {
+      container.removeChild(container.firstChild);
+    }
+
     if (msgData.userId !== myUserId && msgData.type !== 'system' && !ignoredUsersSet.has(msgData.userId)) {
       playSound('receive');
     }
   });
 
-  onChildChanged(messagesRef, (snapshot) => {
+  onChildChanged(roomRef('messages'), (snapshot) => {
     const msgId = snapshot.key;
     const msgData = snapshot.val();
     allMessages.set(msgId, { id: msgId, ...msgData });
     updateMessageUI(msgId, msgData);
   });
 
-  onChildRemoved(messagesRef, (snapshot) => {
+  onChildRemoved(roomRef('messages'), (snapshot) => {
     const msgId = snapshot.key;
     allMessages.delete(msgId);
     const node = document.getElementById(`msg-${msgId}`);
     if (node) node.remove();
   });
+
+  // 3. タイピング監視
+  onValue(roomRef('typing'), (snapshot) => {
+    const indicator = document.getElementById('typing-indicator');
+    const textEl = document.getElementById('typing-users-text');
+    if (!snapshot.exists()) {
+      indicator.classList.add('hidden');
+      return;
+    }
+
+    const typingUsers = snapshot.val();
+    const now = Date.now();
+    const names = [];
+
+    Object.entries(typingUsers).forEach(([uid, tData]) => {
+      if (uid !== myUserId && tData.name && (now - tData.timestamp < 3500)) {
+        names.push(tData.name);
+      }
+    });
+
+    if (names.length > 0) {
+      textEl.textContent = `${names.join('、 ')} がメッセージを入力中...`;
+      indicator.classList.remove('hidden');
+    } else {
+      indicator.classList.add('hidden');
+    }
+  });
+
+  // 4. お題・トピック監視
+  onValue(roomRef('topic'), (snapshot) => {
+    const topicEl = document.getElementById('room-topic-text');
+    if (snapshot.exists()) {
+      topicEl.textContent = snapshot.val();
+    } else {
+      topicEl.textContent = 'みんなの好きな食べ物や最近ハマっていることは？';
+    }
+  });
 }
 
 // Render Single Message
 function renderSingleMessage(msgId, msg) {
-  if (ignoredUsersSet.has(msg.userId)) return; // 無視ユーザーのメッセージはスキップ
+  if (ignoredUsersSet.has(msg.userId)) return;
+
+  // 内緒話（Whisper）フィルタ判定: 自分宛てまたは自分が送信した内緒話のみ表示
+  if (msg.whisperTo) {
+    if (msg.userId !== myUserId && msg.whisperTo !== myUserId) {
+      return; // 他人の内緒話は非表示
+    }
+  }
 
   const container = document.getElementById('messages-container');
   const isSelf = msg.userId === myUserId;
@@ -375,7 +482,6 @@ function renderSingleMessage(msgId, msg) {
   if (msg.type === 'system') {
     msgWrapper.innerHTML = `<div class="system-bubble"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(msg.text)}</div>`;
   } else {
-    // 編集・削除用操作ボタン
     const actionsMenuHtml = `
       <button class="msg-actions-menu-btn" onclick="window.toggleMsgMenu('${msgId}')">
         <i class="fa-solid fa-ellipsis-vertical"></i>
@@ -383,45 +489,54 @@ function renderSingleMessage(msgId, msg) {
       <div id="msg-menu-${msgId}" class="msg-dropdown-menu hidden animate-scale-up">
         ${isSelf && !msg.deleted ? `<button onclick="window.openEditMsgModal('${msgId}')"><i class="fa-solid fa-pen"></i> 編集</button>` : ''}
         ${isSelf && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
+        ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
       </div>
     `;
 
+    const whisperHeader = msg.whisperTo ? `<span style="color:#f472b6; font-weight:700;"><i class="fa-solid fa-lock"></i> 【内緒話】</span>` : '';
+
     const metaHtml = `
       <div class="msg-meta">
         <span class="msg-avatar-icon">${escapeHtml(msg.avatar || '🤖')}</span>
-        <span class="msg-sender-name">${escapeHtml(msg.name)} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
+        <span class="msg-sender-name">${whisperHeader} ${escapeHtml(msg.name)} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
         <span class="msg-time">${formatTime(msg.timestamp)} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
     `;
 
     let contentHtml = '';
+    const bubbleClass = `msg-bubble ${msg.whisperTo ? 'whisper' : ''}`;
+
     if (msg.deleted) {
-      contentHtml = `<div class="msg-bubble" style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</div>`;
+      contentHtml = `<div class="${bubbleClass}" style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</div>`;
+    } else if (msg.type === 'stamp') {
+      contentHtml = `<div class="${bubbleClass}"><div class="stamp-card-img">${escapeHtml(msg.text)}</div></div>`;
+    } else if (msg.type === 'game') {
+      contentHtml = `<div class="${bubbleClass}"><div class="game-card">${formatMessageText(msg.text)}</div></div>`;
     } else if (msg.type === 'image') {
       contentHtml = `
-        <div class="msg-bubble">
+        <div class="${bubbleClass}">
           ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
           <img src="${msg.fileUrl}" class="msg-image" alt="投稿画像" onclick="window.openImageModal('${msg.fileUrl}')">
         </div>
       `;
     } else if (msg.type === 'video') {
       contentHtml = `
-        <div class="msg-bubble">
+        <div class="${bubbleClass}">
           ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
           <video src="${msg.fileUrl}" controls class="msg-video"></video>
         </div>
       `;
     } else if (msg.type === 'audio' || msg.type === 'voice') {
       contentHtml = `
-        <div class="msg-bubble">
+        <div class="${bubbleClass}">
           ${msg.type === 'voice' ? '<div style="font-size:0.8rem; font-weight:600; margin-bottom:4px;"><i class="fa-solid fa-microphone text-success"></i> ボイスメッセージ</div>' : ''}
           <audio src="${msg.fileUrl}" controls class="msg-audio"></audio>
         </div>
       `;
     } else if (msg.type === 'file') {
       contentHtml = `
-        <div class="msg-bubble">
+        <div class="${bubbleClass}">
           ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
           <div class="msg-file-card">
             <i class="fa-solid fa-file-lines file-icon"></i>
@@ -438,7 +553,7 @@ function renderSingleMessage(msgId, msg) {
     } else if (msg.type === 'poll') {
       contentHtml = renderPollCardHtml(msgId, msg.poll);
     } else {
-      contentHtml = `<div class="msg-bubble">${formatMessageText(msg.text)}</div>`;
+      contentHtml = `<div class="${bubbleClass}">${formatMessageText(msg.text)}</div>`;
     }
 
     const reactionsHtml = `<div class="msg-reactions" id="reactions-${msgId}">${renderReactionsHtml(msgId, msg.reactions)}</div>`;
@@ -449,7 +564,6 @@ function renderSingleMessage(msgId, msg) {
   applyFilterAndSearchToNode(msgWrapper, msg);
   container.appendChild(msgWrapper);
 
-  // チャットを開いた時の自動一番下スクロール & 送信時スクロール
   const messagesBox = document.getElementById('chat-messages');
   if (isSelf || isScrolledToBottom) {
     messagesBox.scrollTop = messagesBox.scrollHeight;
@@ -530,7 +644,23 @@ function renderReactionsHtml(msgId, reactionsData) {
   return html;
 }
 
-// Global Message Action Callbacks
+// Global Actions & Whisper
+window.startWhisper = (targetUid, targetName) => {
+  if (targetUid === myUserId) return;
+  whisperTargetId = targetUid;
+  whisperTargetName = targetName;
+  document.getElementById('whisper-target-name').textContent = targetName;
+  document.getElementById('whisper-banner').classList.remove('hidden');
+  document.getElementById('message-text-input').focus();
+  showToast(`「${targetName}」さんへ内緒話モードを設定しました`);
+};
+
+document.getElementById('btn-cancel-whisper').addEventListener('click', () => {
+  whisperTargetId = null;
+  whisperTargetName = null;
+  document.getElementById('whisper-banner').classList.add('hidden');
+});
+
 window.toggleMsgMenu = (msgId) => {
   const menu = document.getElementById(`msg-menu-${msgId}`);
   if (!menu) return;
@@ -553,13 +683,12 @@ window.toggleMsgMenu = (msgId) => {
 window.deleteMsg = async (msgId) => {
   if (!confirm('このメッセージを削除しますか？')) return;
   try {
-    await update(ref(db, `messages/${msgId}`), {
+    await update(roomRef(`messages/${msgId}`), {
       deleted: true,
       text: '(このメッセージは削除されました)'
     });
     showToast('メッセージを削除しました');
   } catch (err) {
-    console.error("Delete error:", err);
     showToast('削除に失敗しました', 'error');
   }
 };
@@ -586,25 +715,23 @@ function setupEditMsgModal() {
     if (!newText) return;
 
     try {
-      await update(ref(db, `messages/${msgId}`), {
+      await update(roomRef(`messages/${msgId}`), {
         text: newText,
         edited: true
       });
       modal.classList.add('hidden');
       showToast('メッセージを更新しました', 'success');
     } catch (err) {
-      console.error("Edit error:", err);
       showToast('更新に失敗しました', 'error');
     }
   });
 }
 
 window.ignoreUser = (uid, name) => {
-  if (!confirm(`「${name}」を無視（ブロック）リストに追加しますか？メッセージが非表示になります。`)) return;
+  if (!confirm(`「${name}」を無視（ブロック）リストに追加しますか？`)) return;
   ignoredUsersSet.add(uid);
   localStorage.setItem('cyberchat_ignored_users', JSON.stringify(Array.from(ignoredUsersSet)));
   
-  // 該当ユーザーのメッセージを画面から削除
   allMessages.forEach((msg, mId) => {
     if (msg.userId === uid) {
       const node = document.getElementById(`msg-${mId}`);
@@ -620,7 +747,7 @@ window.unignoreUser = (uid) => {
   ignoredUsersSet.delete(uid);
   localStorage.setItem('cyberchat_ignored_users', JSON.stringify(Array.from(ignoredUsersSet)));
   renderIgnoredUsersUI();
-  showToast('無視を解除しました。ページを再読み込みするとメッセージが再表示されます');
+  showToast('無視を解除しました');
 };
 
 function renderIgnoredUsersUI() {
@@ -646,7 +773,7 @@ function renderIgnoredUsersUI() {
 
 window.votePoll = async (msgId, optionIndex) => {
   try {
-    await set(ref(db, `messages/${msgId}/poll/votes/${myUserId}`), optionIndex);
+    await set(roomRef(`messages/${msgId}/poll/votes/${myUserId}`), optionIndex);
   } catch (err) {
     showToast('投票に失敗しました', 'error');
   }
@@ -654,7 +781,7 @@ window.votePoll = async (msgId, optionIndex) => {
 
 window.toggleReaction = async (msgId, emoji) => {
   try {
-    const reactionUserRef = ref(db, `messages/${msgId}/reactions/${emoji}/${myUserId}`);
+    const reactionUserRef = roomRef(`messages/${msgId}/reactions/${emoji}/${myUserId}`);
     const snapshot = await get(reactionUserRef);
     if (snapshot.exists()) {
       await remove(reactionUserRef);
@@ -698,19 +825,11 @@ window.toggleQuickReactionMenu = (msgId) => {
 function updateMessageUI(msgId, msgData) {
   const wrapper = document.getElementById(`msg-${msgId}`);
   if (!wrapper) return;
-
-  // 再レンダリング（編集・削除反映）
-  const newWrapper = document.createElement('div');
   renderSingleMessage(msgId, msgData);
-  const updatedWrapper = document.getElementById(`msg-${msgId}`);
-  if (wrapper && updatedWrapper && wrapper !== updatedWrapper) {
-    wrapper.replaceWith(updatedWrapper);
-  }
 }
 
 function applyFilterAndSearchToNode(node, msg) {
   let visible = true;
-
   if (currentFilter === 'image' && (msg.type !== 'image' && msg.type !== 'video')) visible = false;
   if (currentFilter === 'poll' && msg.type !== 'poll') visible = false;
   if (currentFilter === 'file' && (msg.type !== 'file' && msg.type !== 'audio' && msg.type !== 'voice')) visible = false;
@@ -733,7 +852,74 @@ function filterAllMessages() {
   });
 }
 
-// Media & File Attachment Controls
+// Stamps & Minigames Setup
+function setupStampsAndMinigames() {
+  const stampBtn = document.getElementById('btn-stamp-toggle');
+  const stampPicker = document.getElementById('stamp-picker');
+
+  stampBtn.addEventListener('click', () => stampPicker.classList.toggle('hidden'));
+
+  document.querySelectorAll('.stamp-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const stampText = btn.dataset.stamp;
+      stampPicker.classList.add('hidden');
+      sendSpecialMessage('stamp', stampText);
+    });
+  });
+
+  // ミニゲーム: 🎲 ダイス
+  document.getElementById('btn-game-dice').addEventListener('click', () => {
+    const roll = Math.floor(Math.random() * 100) + 1;
+    const text = `<i class="fa-solid fa-dice"></i> さいころを振った！ <span class="game-card-val">【出目: ${roll} / 100】</span>`;
+    sendSpecialMessage('game', text);
+  });
+
+  // ミニゲーム: ⛩️ おみくじ
+  document.getElementById('btn-game-omikuji').addEventListener('click', () => {
+    const fortunes = [
+      '✨ 大吉 ✨ 願望は叶うでしょう！',
+      '🌟 中吉 🌟 良いことが起きる予感！',
+      '😊 吉 今日は穏やかな一日。',
+      '👍 小吉 コツコツ努力が実を結ぶ！',
+      '🍀 末吉 幸運のヒントはすぐそばに。'
+    ];
+    const fortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+    const text = `<i class="fa-solid fa-torii-gate text-success"></i> 今日の運勢おみくじ <span class="game-card-val">${fortune}</span>`;
+    sendSpecialMessage('game', text);
+  });
+
+  // ミニゲーム: 🪙 コイントス
+  document.getElementById('btn-game-coin').addEventListener('click', () => {
+    const isHeads = Math.random() < 0.5;
+    const text = `<i class="fa-solid fa-coins"></i> コイントス！ <span class="game-card-val">結果: 【${isHeads ? '表 (Heads)' : '裏 (Tails)'}】</span>`;
+    sendSpecialMessage('game', text);
+  });
+}
+
+async function sendSpecialMessage(msgType, text) {
+  try {
+    const newMsgRef = push(roomRef('messages'));
+    const msgObj = {
+      userId: myUserId,
+      name: myName,
+      trip: myTrip,
+      avatar: myAvatar,
+      type: msgType,
+      text: text,
+      timestamp: Date.now()
+    };
+    if (whisperTargetId) {
+      msgObj.whisperTo = whisperTargetId;
+    }
+
+    await set(newMsgRef, msgObj);
+    playSound('send');
+  } catch (err) {
+    showToast('送信に失敗しました', 'error');
+  }
+}
+
+// Media & Input Controls
 function setupChatControls() {
   const textInput = document.getElementById('message-text-input');
   const btnSend = document.getElementById('btn-send-message');
@@ -749,6 +935,9 @@ function setupChatControls() {
   textInput.addEventListener('input', () => {
     textInput.style.height = 'auto';
     textInput.style.height = Math.min(textInput.scrollHeight, 120) + 'px';
+
+    // タイピング状態同期
+    sendTypingStatus();
   });
 
   textInput.addEventListener('keydown', (e) => {
@@ -760,14 +949,12 @@ function setupChatControls() {
 
   btnSend.addEventListener('click', sendMessageHandler);
 
-  // Universal File Upload Handler (Images, Videos, Documents, Audio)
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // サイズ上限チェック (8MB)
-    if (file.size > 8 * 1024 * 1024) {
-      showToast('ファイルサイズは8MB以下にしてください', 'error');
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('ファイルサイズは2MB以下にしてください', 'error');
       fileInput.value = '';
       return;
     }
@@ -779,13 +966,12 @@ function setupChatControls() {
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (evt) => {
-        // Canvas リサイズ (最大800px)
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxDim = 800;
+          const maxDim = 450;
           if (width > maxDim || height > maxDim) {
             if (width > height) {
               height = Math.round((height * maxDim) / width);
@@ -800,7 +986,7 @@ function setupChatControls() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          selectedFileObject.dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          selectedFileObject.dataUrl = canvas.toDataURL('image/jpeg', 0.5);
           selectedFileObject.msgType = 'image';
 
           previewImg.src = selectedFileObject.dataUrl;
@@ -812,7 +998,6 @@ function setupChatControls() {
       };
       reader.readAsDataURL(file);
     } else {
-      // 動画 / 音声 / 一般ファイル
       const reader = new FileReader();
       reader.onload = (evt) => {
         selectedFileObject.dataUrl = evt.target.result;
@@ -839,7 +1024,7 @@ function setupChatControls() {
     if (!text && !selectedFileObject) return;
 
     try {
-      const newMsgRef = push(ref(db, 'messages'));
+      const newMsgRef = push(roomRef('messages'));
       const msgObj = {
         userId: myUserId,
         name: myName,
@@ -849,6 +1034,10 @@ function setupChatControls() {
         text: text,
         timestamp: Date.now()
       };
+
+      if (whisperTargetId) {
+        msgObj.whisperTo = whisperTargetId;
+      }
 
       if (selectedFileObject) {
         msgObj.fileUrl = selectedFileObject.dataUrl;
@@ -936,6 +1125,18 @@ function setupChatControls() {
   });
 }
 
+function sendTypingStatus() {
+  set(roomRef(`typing/${myUserId}`), {
+    name: myName,
+    timestamp: Date.now()
+  });
+
+  if (typingTimer) clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => {
+    remove(roomRef(`typing/${myUserId}`));
+  }, 3000);
+}
+
 function updateScrollBottomButton() {
   const btn = document.getElementById('btn-scroll-bottom');
   const badge = document.getElementById('unread-count');
@@ -954,7 +1155,7 @@ function updateScrollBottomButton() {
 
 async function sendSystemMessage(text) {
   try {
-    const sysRef = push(ref(db, 'messages'));
+    const sysRef = push(roomRef('messages'));
     await set(sysRef, {
       userId: 'system',
       type: 'system',
@@ -966,7 +1167,62 @@ async function sendSystemMessage(text) {
   }
 }
 
-// Voice Chat (WebRTC P2P) & Voice Message Recording Logic
+// Topic Modal Setup
+function setupTopicModal() {
+  const modal = document.getElementById('topic-modal');
+  const openBtn = document.getElementById('btn-edit-topic');
+  const saveBtn = document.getElementById('btn-save-topic');
+  const input = document.getElementById('topic-input');
+
+  openBtn.addEventListener('click', () => {
+    input.value = document.getElementById('room-topic-text').textContent;
+    modal.classList.remove('hidden');
+  });
+
+  document.querySelectorAll('#topic-modal .modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newTopic = input.value.trim();
+    if (!newTopic) return;
+
+    try {
+      await set(roomRef('topic'), newTopic);
+      modal.classList.add('hidden');
+      showToast('ルームのお題を更新しました', 'success');
+    } catch (e) {
+      showToast('お題の更新に失敗しました', 'error');
+    }
+  });
+}
+
+// Custom Room Modal Setup
+function setupCustomRoomModal() {
+  const modal = document.getElementById('custom-room-modal');
+  const openBtn = document.getElementById('btn-custom-room');
+  const joinBtn = document.getElementById('btn-join-custom-room');
+  const roomInput = document.getElementById('custom-room-name');
+
+  openBtn.addEventListener('click', () => {
+    roomInput.value = '';
+    modal.classList.remove('hidden');
+  });
+
+  document.querySelectorAll('#custom-room-modal .modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  joinBtn.addEventListener('click', () => {
+    const keyword = roomInput.value.trim();
+    if (!keyword) return;
+    const roomId = 'custom_' + keyword.replace(/[^a-zA-Z0-9_-]/g, '_');
+    modal.classList.add('hidden');
+    switchRoom(roomId, `🔒 部屋: ${keyword}`);
+  });
+}
+
+// Voice Chat
 function setupVoiceChatAndRec() {
   const recBtn = document.getElementById('btn-record-voice');
   const recBar = document.getElementById('voice-rec-preview');
@@ -974,7 +1230,6 @@ function setupVoiceChatAndRec() {
   const btnCancelRec = document.getElementById('btn-cancel-voice');
   const btnSendRec = document.getElementById('btn-send-voice');
 
-  // Voice Message Recording
   recBtn.addEventListener('click', async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -998,18 +1253,12 @@ function setupVoiceChatAndRec() {
       }, 1000);
 
     } catch (err) {
-      console.error("Mic access error:", err);
       showToast('マイクの使用許可が必要です', 'error');
     }
   });
 
-  btnCancelRec.addEventListener('click', () => {
-    stopRecording(false);
-  });
-
-  btnSendRec.addEventListener('click', () => {
-    stopRecording(true);
-  });
+  btnCancelRec.addEventListener('click', () => stopRecording(false));
+  btnSendRec.addEventListener('click', () => stopRecording(true));
 
   function stopRecording(send = false) {
     if (voiceRecTimer) clearInterval(voiceRecTimer);
@@ -1022,8 +1271,8 @@ function setupVoiceChatAndRec() {
           const reader = new FileReader();
           reader.onload = async (evt) => {
             const dataUrl = evt.target.result;
-            const newMsgRef = push(ref(db, 'messages'));
-            await set(newMsgRef, {
+            const newMsgRef = push(roomRef('messages'));
+            const msgObj = {
               userId: myUserId,
               name: myName,
               trip: myTrip,
@@ -1031,25 +1280,25 @@ function setupVoiceChatAndRec() {
               type: 'voice',
               fileUrl: dataUrl,
               timestamp: Date.now()
-            });
+            };
+            if (whisperTargetId) msgObj.whisperTo = whisperTargetId;
+
+            await set(newMsgRef, msgObj);
             playSound('send');
           };
           reader.readAsDataURL(audioBlob);
         }
-        // マイクストリーム停止
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
       };
       mediaRecorder.stop();
     }
   }
 
-  // WebRTC Voice Room Toggle
   const btnVcToggle = document.getElementById('btn-toggle-vc');
   const btnMicToggle = document.getElementById('btn-toggle-mic');
 
   btnVcToggle.addEventListener('click', async () => {
     if (!isVoiceRoomJoined) {
-      // 参加
       try {
         localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         isVoiceRoomJoined = true;
@@ -1060,8 +1309,7 @@ function setupVoiceChatAndRec() {
         btnMicToggle.classList.remove('hidden');
         document.getElementById('vc-section').classList.remove('hidden');
 
-        // 参加情報登録
-        const vcUserRef = ref(db, `voice_room/${myUserId}`);
+        const vcUserRef = roomRef(`voice_room/${myUserId}`);
         await set(vcUserRef, {
           name: myName,
           avatar: myAvatar,
@@ -1072,11 +1320,9 @@ function setupVoiceChatAndRec() {
 
         showToast('ボイスチャットに参加しました', 'success');
       } catch (err) {
-        console.error("Voice room join error:", err);
         showToast('マイクへのアクセスに失敗しました', 'error');
       }
     } else {
-      // 退出
       isVoiceRoomJoined = false;
       if (localAudioStream) {
         localAudioStream.getTracks().forEach(track => track.stop());
@@ -1088,7 +1334,7 @@ function setupVoiceChatAndRec() {
       btnMicToggle.classList.add('hidden');
       document.getElementById('vc-section').classList.add('hidden');
 
-      await remove(ref(db, `voice_room/${myUserId}`));
+      await remove(roomRef(`voice_room/${myUserId}`));
       showToast('ボイスチャットから退出しました');
     }
   });
@@ -1099,12 +1345,11 @@ function setupVoiceChatAndRec() {
     localAudioStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
     btnMicToggle.innerHTML = isMicMuted ? '<i class="fa-solid fa-microphone-slash" style="color:var(--danger-color)"></i>' : '<i class="fa-solid fa-microphone"></i>';
     
-    await update(ref(db, `voice_room/${myUserId}`), { muted: isMicMuted });
+    await update(roomRef(`voice_room/${myUserId}`), { muted: isMicMuted });
     showToast(`マイクを ${isMicMuted ? 'ミュート' : '解除'} にしました`);
   });
 
-  // ボイスチャットメンバーリスト監視
-  onValue(ref(db, 'voice_room'), (snapshot) => {
+  onValue(roomRef('voice_room'), (snapshot) => {
     const vcListEl = document.getElementById('vc-user-list');
     const vcCountEl = document.getElementById('vc-count');
     if (!vcListEl) return;
@@ -1131,7 +1376,6 @@ function setupVoiceChatAndRec() {
   });
 }
 
-// Poll & Profile Modals
 function setupPollModal() {
   const modal = document.getElementById('poll-modal');
   const openBtn = document.getElementById('btn-open-create-poll');
@@ -1141,7 +1385,6 @@ function setupPollModal() {
   const errorMsg = document.getElementById('poll-error-msg');
 
   openBtn.addEventListener('click', () => modal.classList.remove('hidden'));
-
   document.querySelectorAll('#poll-modal .modal-close').forEach(btn => {
     btn.addEventListener('click', () => modal.classList.add('hidden'));
   });
@@ -1172,8 +1415,8 @@ function setupPollModal() {
 
     submitBtn.disabled = true;
     try {
-      const newMsgRef = push(ref(db, 'messages'));
-      await set(newMsgRef, {
+      const newMsgRef = push(roomRef('messages'));
+      const msgObj = {
         userId: myUserId,
         name: myName,
         trip: myTrip,
@@ -1181,8 +1424,10 @@ function setupPollModal() {
         type: 'poll',
         poll: { question: question, options: options, votes: {} },
         timestamp: Date.now()
-      });
+      };
+      if (whisperTargetId) msgObj.whisperTo = whisperTargetId;
 
+      await set(newMsgRef, msgObj);
       modal.classList.add('hidden');
       showToast('アンケートを投稿しました', 'success');
       playSound('send');
@@ -1200,11 +1445,13 @@ function setupProfileModal() {
   const openBtn = document.getElementById('btn-open-edit-profile');
   const saveBtn = document.getElementById('btn-save-profile');
   const usernameInput = document.getElementById('edit-username');
+  const statusInput = document.getElementById('edit-status');
   const tripkeyInput = document.getElementById('edit-tripkey');
   const errorMsg = document.getElementById('edit-profile-error');
 
   openBtn.addEventListener('click', () => {
     usernameInput.value = myName;
+    statusInput.value = myStatus;
     tripkeyInput.value = '';
     document.getElementById('edit-trip-preview-code').textContent = myTrip;
     errorMsg.classList.add('hidden');
@@ -1218,6 +1465,7 @@ function setupProfileModal() {
   saveBtn.addEventListener('click', async () => {
     errorMsg.classList.add('hidden');
     const newName = usernameInput.value.trim();
+    const newStatus = statusInput.value;
     const newTripKey = tripkeyInput.value;
 
     if (!newName) {
@@ -1240,6 +1488,7 @@ function setupProfileModal() {
 
       const oldName = myName;
       myName = newName;
+      myStatus = newStatus;
       if (newTripKey) myTrip = await generateTrip(newTripKey);
 
       await registerOnlineUser();
