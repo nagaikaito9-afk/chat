@@ -39,16 +39,23 @@ let searchKeyword = '';
 let allMessages = new Map();
 let activeUsersMap = new Map();
 let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored_users') || '[]'));
+let starredMsgSet = new Set(JSON.parse(localStorage.getItem('cyberchat_starred_msgs') || '[]'));
 
-// Sending Locks (連打・重複送信防止)
+// Screen Sharing State
+let isScreenSharing = false;
+let screenStream = null;
+
+// Sending Locks (二重送信防止)
 let isSending = false;
 let isSendingSpecial = false;
 
-// Firebase Listener Unsubscribe Handles
+// Firebase Listener Handles
 let unsubscribeActiveUsers = null;
 let unsubscribeMessages = null;
 let unsubscribeTyping = null;
 let unsubscribeTopic = null;
+let unsubscribeSignals = null;
+let unsubscribeScreen = null;
 
 // Whisper (DM) State
 let whisperTargetId = null;
@@ -56,9 +63,8 @@ let whisperTargetName = null;
 
 // Typing Indicator Timer
 let typingTimer = null;
-let activeTypingUsers = new Set();
 
-// Voice State
+// Voice Chat & WebRTC Peer Connections
 let isVoiceRoomJoined = false;
 let isMicMuted = false;
 let localAudioStream = null;
@@ -66,26 +72,31 @@ let mediaRecorder = null;
 let recordedAudioChunks = [];
 let voiceRecTimer = null;
 let voiceRecSeconds = 0;
+let peerConnections = new Map();
 
-// Room Database Path Helper
+// Ambient BGM State
+let bgmAudioCtx = null;
+let bgmOsc = null;
+let bgmGain = null;
+let isBgmPlaying = false;
+
+// Database Path Helper
 function roomRef(subPath) {
   return ref(db, `rooms/${currentRoomId}/${subPath}`);
 }
 
-// Web Audio API Synthesizer
+// Web Audio API Synthesizer (SE & Soundboard)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function playSound(type) {
   if (!soundEnabled) return;
   try {
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-
     const now = audioCtx.currentTime;
+
     if (type === 'send') {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(440, now);
@@ -107,6 +118,87 @@ function playSound(type) {
     console.warn("Audio error:", e);
   }
 }
+
+// Soundboard Effects (効果音ポン出し)
+window.playSfx = (sfxType) => {
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const now = audioCtx.currentTime;
+
+    if (sfxType === 'applause' || sfxType === 'laugh') {
+      const bufferSize = audioCtx.sampleRate * 0.8;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = sfxType === 'applause' ? 1000 : 500;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start(now);
+    } else if (sfxType === 'fanfare') {
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, now + i * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.4);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + i * 0.1);
+        osc.stop(now + i * 0.1 + 0.4);
+      });
+    } else if (sfxType === 'chime') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(987.77, now);
+      osc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.3);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.6);
+    } else if (sfxType === 'boom') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.5);
+    } else if (sfxType === 'horn') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(300, now);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    }
+
+    sendSpecialMessage('game', `📢 効果音【${sfxType}】を再生しました！`);
+  } catch (e) {
+    console.warn("SFX error:", e);
+  }
+};
 
 // SHA-256 Trip Generator
 async function generateTrip(tripKey) {
@@ -188,6 +280,8 @@ function initApp() {
   setupCustomRoomModal();
   setupImageModal();
   setupVoiceChatAndRec();
+  setupBgmPlayer();
+  setupScreenShare();
   renderIgnoredUsersUI();
 }
 
@@ -336,24 +430,20 @@ function setupRoomTabs() {
 async function switchRoom(newRoomId, roomTitle) {
   if (currentRoomId === newRoomId) return;
 
-  // 旧ルームのオンライン離脱
   await remove(roomRef(`active_users/${myUserId}`));
 
   currentRoomId = newRoomId;
   document.getElementById('current-room-title').innerHTML = escapeHtml(roomTitle);
 
-  // ルームタブのアクティブ切替
   document.querySelectorAll('.room-tab').forEach(t => {
     if (t.dataset.room === newRoomId) t.classList.add('active');
     else t.classList.remove('active');
   });
 
-  // コンテナ初期化
   const container = document.getElementById('messages-container');
   container.innerHTML = '';
   allMessages.clear();
 
-  // 新ルーム登録 & 同期
   await registerOnlineUser();
   sendSystemMessage(`${myAvatar} ${myName} がこの部屋に入室しました`);
   initFirebaseRealtimeSync();
@@ -362,11 +452,11 @@ async function switchRoom(newRoomId, roomTitle) {
 
 // Realtime Listeners
 function initFirebaseRealtimeSync() {
-  // 重複購読・二重描画を防止するため、既存リスナーを全て解除
   if (unsubscribeActiveUsers) unsubscribeActiveUsers();
   if (unsubscribeMessages) unsubscribeMessages();
   if (unsubscribeTyping) unsubscribeTyping();
   if (unsubscribeTopic) unsubscribeTopic();
+  if (unsubscribeScreen) unsubscribeScreen();
 
   // 1. オンラインリスト
   unsubscribeActiveUsers = onValue(roomRef('active_users'), (snapshot) => {
@@ -402,7 +492,7 @@ function initFirebaseRealtimeSync() {
     }
   });
 
-  // 2. メッセージ同期 (直近50件制限 ＆ 二重描画ガード)
+  // 2. メッセージ同期
   const messagesQuery = query(roomRef('messages'), limitToLast(50));
   const loadingEl = document.getElementById('messages-loading');
 
@@ -411,7 +501,6 @@ function initFirebaseRealtimeSync() {
     const msgId = snapshot.key;
     const msgData = snapshot.val();
     
-    // すでにレンダリング済みのメッセージIDならスキップ（連投・重複防止）
     if (allMessages.has(msgId)) return;
 
     allMessages.set(msgId, { id: msgId, ...msgData });
@@ -477,21 +566,36 @@ function initFirebaseRealtimeSync() {
       topicEl.textContent = 'みんなの好きな食べ物や最近ハマっていることは？';
     }
   });
+
+  // 5. 画面共有状態の同期
+  unsubscribeScreen = onValue(roomRef('screen_share'), (snapshot) => {
+    const box = document.getElementById('screen-share-overlay');
+    const sharerNameEl = document.getElementById('screen-sharer-name');
+    if (snapshot.exists() && snapshot.val().active) {
+      const data = snapshot.val();
+      sharerNameEl.textContent = data.userId === myUserId ? 'あなた' : data.name;
+      if (data.userId !== myUserId) {
+        showToast(`🖥️ 「${data.name}」が画面共有を開始しました`);
+      }
+    } else {
+      if (!isScreenSharing) box.classList.add('hidden');
+    }
+  });
 }
 
 // Render Single Message
 function renderSingleMessage(msgId, msg) {
   if (ignoredUsersSet.has(msg.userId)) return;
 
-  // 内緒話（Whisper）フィルタ判定: 自分宛てまたは自分が送信した内緒話のみ表示
   if (msg.whisperTo) {
     if (msg.userId !== myUserId && msg.whisperTo !== myUserId) {
-      return; // 他人の内緒話は非表示
+      return;
     }
   }
 
   const container = document.getElementById('messages-container');
   const isSelf = msg.userId === myUserId;
+  const isStarred = starredMsgSet.has(msgId);
 
   const msgWrapper = document.createElement('div');
   msgWrapper.className = `msg-wrapper ${isSelf ? 'self' : ''} ${msg.type === 'system' ? 'system-msg' : ''}`;
@@ -506,6 +610,7 @@ function renderSingleMessage(msgId, msg) {
         <i class="fa-solid fa-ellipsis-vertical"></i>
       </button>
       <div id="msg-menu-${msgId}" class="msg-dropdown-menu hidden animate-scale-up">
+        <button onclick="window.toggleStarMsg('${msgId}')"><i class="fa-solid fa-star ${isStarred ? 'text-warning' : ''}"></i> ${isStarred ? 'しおり解除' : 'しおり保存'}</button>
         ${isSelf && !msg.deleted ? `<button onclick="window.openEditMsgModal('${msgId}')"><i class="fa-solid fa-pen"></i> 編集</button>` : ''}
         ${isSelf && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
@@ -514,11 +619,12 @@ function renderSingleMessage(msgId, msg) {
     `;
 
     const whisperHeader = msg.whisperTo ? `<span style="color:#f472b6; font-weight:700;"><i class="fa-solid fa-lock"></i> 【内緒話】</span>` : '';
+    const starBadge = isStarred ? `<i class="fa-solid fa-star text-warning" title="お気に入り"></i> ` : '';
 
     const metaHtml = `
       <div class="msg-meta">
         <span class="msg-avatar-icon">${escapeHtml(msg.avatar || '🤖')}</span>
-        <span class="msg-sender-name">${whisperHeader} ${escapeHtml(msg.name)} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
+        <span class="msg-sender-name">${starBadge}${whisperHeader} ${escapeHtml(msg.name)} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
         <span class="msg-time">${formatTime(msg.timestamp)} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
     `;
@@ -592,11 +698,18 @@ function renderSingleMessage(msgId, msg) {
   }
 }
 
+// Markdown Formatting
 function formatMessageText(text) {
   if (!text) return '';
   let escaped = escapeHtml(text);
+  
+  escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  escaped = escaped.replace(/`(.*?)`/g, '<code style="background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px; font-family:monospace; color:#00f0ff;">$1</code>');
+  escaped = escaped.replace(/~(.*?)~/g, '<del>$1</del>');
+
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   escaped = escaped.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-primary); text-decoration:underline;">${url}</a>`);
+
   return escaped.replace(/\n/g, '<br>');
 }
 
@@ -663,7 +776,42 @@ function renderReactionsHtml(msgId, reactionsData) {
   return html;
 }
 
-// Global Actions & Whisper
+// 修正済み: リアクションクリック時にノードを追加せずインナーHTMLのみ部分更新
+function updateMessageUI(msgId, msgData) {
+  const reactionsContainer = document.getElementById(`reactions-${msgId}`);
+  if (reactionsContainer) {
+    reactionsContainer.innerHTML = renderReactionsHtml(msgId, msgData.reactions);
+  }
+
+  const wrapper = document.getElementById(`msg-${msgId}`);
+  if (!wrapper) return;
+
+  if (msgData.type === 'poll') {
+    const bubble = wrapper.querySelector('.msg-bubble');
+    if (bubble) bubble.outerHTML = renderPollCardHtml(msgId, msgData.poll);
+  }
+
+  if (msgData.deleted) {
+    const bubble = wrapper.querySelector('.msg-bubble');
+    if (bubble) bubble.innerHTML = '<span style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</span>';
+  }
+}
+
+// Global Actions & Bookmark
+window.toggleStarMsg = (msgId) => {
+  if (starredMsgSet.has(msgId)) {
+    starredMsgSet.delete(msgId);
+    showToast('しおりを解除しました');
+  } else {
+    starredMsgSet.add(msgId);
+    showToast('お気に入りメッセージに保存しました', 'success');
+  }
+  localStorage.setItem('cyberchat_starred_msgs', JSON.stringify(Array.from(starredMsgSet)));
+  
+  const msgData = allMessages.get(msgId);
+  if (msgData) updateMessageUI(msgId, msgData);
+};
+
 window.startWhisper = (targetUid, targetName) => {
   if (targetUid === myUserId) return;
   whisperTargetId = targetUid;
@@ -841,14 +989,9 @@ window.toggleQuickReactionMenu = (msgId) => {
   }, 50);
 };
 
-function updateMessageUI(msgId, msgData) {
-  const wrapper = document.getElementById(`msg-${msgId}`);
-  if (!wrapper) return;
-  renderSingleMessage(msgId, msgData);
-}
-
 function applyFilterAndSearchToNode(node, msg) {
   let visible = true;
+  if (currentFilter === 'star' && !starredMsgSet.has(msg.id)) visible = false;
   if (currentFilter === 'image' && (msg.type !== 'image' && msg.type !== 'video')) visible = false;
   if (currentFilter === 'poll' && msg.type !== 'poll') visible = false;
   if (currentFilter === 'file' && (msg.type !== 'file' && msg.type !== 'audio' && msg.type !== 'voice')) visible = false;
@@ -871,14 +1014,114 @@ function filterAllMessages() {
   });
 }
 
-// Stamps & Minigames Setup
+// Screen Sharing Logic
+function setupScreenShare() {
+  const btnToggle = document.getElementById('btn-toggle-screen');
+  const box = document.getElementById('screen-share-overlay');
+  const videoEl = document.getElementById('screen-share-video');
+  const btnSnap = document.getElementById('btn-snap-screen');
+  const btnStop = document.getElementById('btn-stop-screen');
+
+  btnToggle.addEventListener('click', async () => {
+    if (!isScreenSharing) {
+      try {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { cursor: "always" },
+          audio: false
+        });
+
+        isScreenSharing = true;
+        btnToggle.classList.add('sharing');
+        btnToggle.innerHTML = '<i class="fa-solid fa-desktop text-danger"></i> <span>共有停止</span>';
+
+        videoEl.srcObject = screenStream;
+        box.classList.remove('hidden');
+
+        await set(roomRef('screen_share'), {
+          active: true,
+          userId: myUserId,
+          name: myName,
+          timestamp: Date.now()
+        });
+
+        sendSystemMessage(`🖥️ ${myName} が画面共有を開始しました`);
+        showToast('画面共有を開始しました！', 'success');
+
+        screenStream.getVideoTracks()[0].onended = () => {
+          stopScreenShare();
+        };
+
+      } catch (err) {
+        console.warn("Screen share cancel or error:", err);
+        showToast('画面共有がキャンセルされました');
+      }
+    } else {
+      stopScreenShare();
+    }
+  });
+
+  btnStop.addEventListener('click', stopScreenShare);
+
+  btnSnap.addEventListener('click', () => {
+    if (!videoEl || videoEl.videoWidth === 0) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = videoEl.videoWidth;
+    canvas.height = videoEl.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+    const snapDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+    const newMsgRef = push(roomRef('messages'));
+    set(newMsgRef, {
+      userId: myUserId,
+      name: myName,
+      trip: myTrip,
+      avatar: myAvatar,
+      type: 'image',
+      text: '📸 共有画面のスナップショット',
+      fileUrl: snapDataUrl,
+      timestamp: Date.now()
+    });
+
+    playSound('send');
+    showToast('共有画面のスナップショットを投稿しました！', 'success');
+  });
+
+  function stopScreenShare() {
+    isScreenSharing = false;
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      screenStream = null;
+    }
+    btnToggle.classList.remove('sharing');
+    btnToggle.innerHTML = '<i class="fa-solid fa-desktop"></i> <span>画面共有</span>';
+    box.classList.add('hidden');
+
+    remove(roomRef('screen_share'));
+    sendSystemMessage(`🖥️ ${myName} が画面共有を終了しました`);
+    showToast('画面共有を終了しました');
+  }
+}
+
+// Stamps & Minigames & Soundboard
 function setupStampsAndMinigames() {
   const stampBtn = document.getElementById('btn-stamp-toggle');
   const stampPicker = document.getElementById('stamp-picker');
+  const soundboardBtn = document.getElementById('btn-soundboard-toggle');
+  const soundboardPicker = document.getElementById('soundboard-picker');
 
-  stampBtn.addEventListener('click', () => stampPicker.classList.toggle('hidden'));
+  stampBtn.addEventListener('click', () => {
+    soundboardPicker.classList.add('hidden');
+    stampPicker.classList.toggle('hidden');
+  });
 
-  document.querySelectorAll('.stamp-btn').forEach(btn => {
+  soundboardBtn.addEventListener('click', () => {
+    stampPicker.classList.add('hidden');
+    soundboardPicker.classList.toggle('hidden');
+  });
+
+  document.querySelectorAll('.stamp-btn[data-stamp]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const stampText = btn.dataset.stamp;
       stampPicker.classList.add('hidden');
@@ -886,14 +1129,11 @@ function setupStampsAndMinigames() {
     });
   });
 
-  // ミニゲーム: 🎲 ダイス
   document.getElementById('btn-game-dice').addEventListener('click', () => {
     const roll = Math.floor(Math.random() * 100) + 1;
-    const text = `<i class="fa-solid fa-dice"></i> さいころを振った！ <span class="game-card-val">【出目: ${roll} / 100】</span>`;
-    sendSpecialMessage('game', text);
+    sendSpecialMessage('game', `<i class="fa-solid fa-dice"></i> さいころを振った！ <span class="game-card-val">【出目: ${roll} / 100】</span>`);
   });
 
-  // ミニゲーム: ⛩️ おみくじ
   document.getElementById('btn-game-omikuji').addEventListener('click', () => {
     const fortunes = [
       '✨ 大吉 ✨ 願望は叶うでしょう！',
@@ -903,15 +1143,12 @@ function setupStampsAndMinigames() {
       '🍀 末吉 幸運のヒントはすぐそばに。'
     ];
     const fortune = fortunes[Math.floor(Math.random() * fortunes.length)];
-    const text = `<i class="fa-solid fa-torii-gate text-success"></i> 今日の運勢おみくじ <span class="game-card-val">${fortune}</span>`;
-    sendSpecialMessage('game', text);
+    sendSpecialMessage('game', `<i class="fa-solid fa-torii-gate text-success"></i> 今日の運勢おみくじ <span class="game-card-val">${fortune}</span>`);
   });
 
-  // ミニゲーム: 🪙 コイントス
   document.getElementById('btn-game-coin').addEventListener('click', () => {
     const isHeads = Math.random() < 0.5;
-    const text = `<i class="fa-solid fa-coins"></i> コイントス！ <span class="game-card-val">結果: 【${isHeads ? '表 (Heads)' : '裏 (Tails)'}】</span>`;
-    sendSpecialMessage('game', text);
+    sendSpecialMessage('game', `<i class="fa-solid fa-coins"></i> コイントス！ <span class="game-card-val">結果: 【${isHeads ? '表 (Heads)' : '裏 (Tails)'}】</span>`);
   });
 }
 
@@ -929,9 +1166,7 @@ async function sendSpecialMessage(msgType, text) {
       text: text,
       timestamp: Date.now()
     };
-    if (whisperTargetId) {
-      msgObj.whisperTo = whisperTargetId;
-    }
+    if (whisperTargetId) msgObj.whisperTo = whisperTargetId;
 
     await set(newMsgRef, msgObj);
     playSound('send');
@@ -958,8 +1193,6 @@ function setupChatControls() {
   textInput.addEventListener('input', () => {
     textInput.style.height = 'auto';
     textInput.style.height = Math.min(textInput.scrollHeight, 120) + 'px';
-
-    // タイピング状態同期
     sendTypingStatus();
   });
 
@@ -1194,62 +1427,53 @@ async function sendSystemMessage(text) {
   }
 }
 
-// Topic Modal Setup
-function setupTopicModal() {
-  const modal = document.getElementById('topic-modal');
-  const openBtn = document.getElementById('btn-edit-topic');
-  const saveBtn = document.getElementById('btn-save-topic');
-  const input = document.getElementById('topic-input');
+// Ambient BGM Synthesizer
+function setupBgmPlayer() {
+  const bgmBtn = document.getElementById('btn-toggle-bgm');
+  bgmBtn.addEventListener('click', () => {
+    isBgmPlaying = !isBgmPlaying;
+    bgmBtn.classList.toggle('active', isBgmPlaying);
 
-  openBtn.addEventListener('click', () => {
-    input.value = document.getElementById('room-topic-text').textContent;
-    modal.classList.remove('hidden');
-  });
-
-  document.querySelectorAll('#topic-modal .modal-close').forEach(b => {
-    b.addEventListener('click', () => modal.classList.add('hidden'));
-  });
-
-  saveBtn.addEventListener('click', async () => {
-    const newTopic = input.value.trim();
-    if (!newTopic) return;
-
-    try {
-      await set(roomRef('topic'), newTopic);
-      modal.classList.add('hidden');
-      showToast('ルームのお題を更新しました', 'success');
-    } catch (e) {
-      showToast('お題の更新に失敗しました', 'error');
+    if (isBgmPlaying) {
+      startBgm();
+      showToast('作業用BGMを再生開始しました 🎵');
+    } else {
+      stopBgm();
+      showToast('作業用BGMを停止しました');
     }
   });
 }
 
-// Custom Room Modal Setup
-function setupCustomRoomModal() {
-  const modal = document.getElementById('custom-room-modal');
-  const openBtn = document.getElementById('btn-custom-room');
-  const joinBtn = document.getElementById('btn-join-custom-room');
-  const roomInput = document.getElementById('custom-room-name');
+function startBgm() {
+  try {
+    bgmAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    bgmOsc = bgmAudioCtx.createOscillator();
+    bgmGain = bgmAudioCtx.createGain();
 
-  openBtn.addEventListener('click', () => {
-    roomInput.value = '';
-    modal.classList.remove('hidden');
-  });
+    bgmOsc.type = 'sine';
+    bgmOsc.frequency.setValueAtTime(220, bgmAudioCtx.currentTime);
+    bgmGain.gain.setValueAtTime(0.04, bgmAudioCtx.currentTime);
 
-  document.querySelectorAll('#custom-room-modal .modal-close').forEach(b => {
-    b.addEventListener('click', () => modal.classList.add('hidden'));
-  });
-
-  joinBtn.addEventListener('click', () => {
-    const keyword = roomInput.value.trim();
-    if (!keyword) return;
-    const roomId = 'custom_' + keyword.replace(/[^a-zA-Z0-9_-]/g, '_');
-    modal.classList.add('hidden');
-    switchRoom(roomId, `🔒 部屋: ${keyword}`);
-  });
+    bgmOsc.connect(bgmGain);
+    bgmGain.connect(bgmAudioCtx.destination);
+    bgmOsc.start();
+  } catch (e) {
+    console.warn("BGM start error:", e);
+  }
 }
 
-// Voice Chat
+function stopBgm() {
+  if (bgmOsc) {
+    try { bgmOsc.stop(); } catch (e) {}
+    bgmOsc = null;
+  }
+  if (bgmAudioCtx) {
+    try { bgmAudioCtx.close(); } catch (e) {}
+    bgmAudioCtx = null;
+  }
+}
+
+// WebRTC Voice Chat Implementation
 function setupVoiceChatAndRec() {
   const recBtn = document.getElementById('btn-record-voice');
   const recBar = document.getElementById('voice-rec-preview');
@@ -1345,24 +1569,13 @@ function setupVoiceChatAndRec() {
         });
         onDisconnect(vcUserRef).remove();
 
-        showToast('ボイスチャットに参加しました', 'success');
+        initWebRtcSignaling();
+        showToast('ボイスチャットに参加しました！', 'success');
       } catch (err) {
-        showToast('マイクへのアクセスに失敗しました', 'error');
+        showToast('マイクアクセスの許可が必要です', 'error');
       }
     } else {
-      isVoiceRoomJoined = false;
-      if (localAudioStream) {
-        localAudioStream.getTracks().forEach(track => track.stop());
-        localAudioStream = null;
-      }
-
-      btnVcToggle.classList.remove('joined');
-      btnVcToggle.innerHTML = '<i class="fa-solid fa-microphone"></i> <span>ボイスチャット</span>';
-      btnMicToggle.classList.add('hidden');
-      document.getElementById('vc-section').classList.add('hidden');
-
-      await remove(roomRef(`voice_room/${myUserId}`));
-      showToast('ボイスチャットから退出しました');
+      leaveVoiceRoom();
     }
   });
 
@@ -1400,6 +1613,177 @@ function setupVoiceChatAndRec() {
     } else {
       vcCountEl.textContent = '0人';
     }
+  });
+}
+
+function leaveVoiceRoom() {
+  isVoiceRoomJoined = false;
+  if (localAudioStream) {
+    localAudioStream.getTracks().forEach(track => track.stop());
+    localAudioStream = null;
+  }
+
+  peerConnections.forEach(pc => pc.close());
+  peerConnections.clear();
+
+  const container = document.getElementById('remote-audio-container');
+  if (container) container.innerHTML = '';
+
+  const btnVcToggle = document.getElementById('btn-toggle-vc');
+  const btnMicToggle = document.getElementById('btn-toggle-mic');
+
+  btnVcToggle.classList.remove('joined');
+  btnVcToggle.innerHTML = '<i class="fa-solid fa-microphone"></i> <span>ボイスチャット</span>';
+  btnMicToggle.classList.add('hidden');
+  document.getElementById('vc-section').classList.add('hidden');
+
+  remove(roomRef(`voice_room/${myUserId}`));
+  if (unsubscribeSignals) unsubscribeSignals();
+  showToast('ボイスチャットから退出しました');
+}
+
+// WebRTC Signaling Handler
+function initWebRtcSignaling() {
+  const rtcConfig = {
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  };
+
+  unsubscribeSignals = onValue(roomRef('voice_signals'), (snapshot) => {
+    if (!snapshot.exists() || !isVoiceRoomJoined) return;
+    const signals = snapshot.val();
+
+    Object.entries(signals).forEach(async ([pairKey, signalData]) => {
+      const [fromUid, toUid] = pairKey.split('_');
+      if (toUid !== myUserId) return;
+
+      if (signalData.type === 'offer') {
+        const pc = createPeerConnection(fromUid, rtcConfig);
+        await pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        await set(roomRef(`voice_signals/${myUserId}_${fromUid}`), {
+          type: 'answer',
+          sdp: answer
+        });
+      } else if (signalData.type === 'answer') {
+        const pc = peerConnections.get(fromUid);
+        if (pc) {
+          await pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp));
+        }
+      } else if (signalData.candidate) {
+        const pc = peerConnections.get(fromUid);
+        if (pc) {
+          await pc.addIceCandidate(new RTCIceCandidate(signalData.candidate));
+        }
+      }
+    });
+  });
+
+  get(roomRef('voice_room')).then((snapshot) => {
+    if (!snapshot.exists()) return;
+    const users = snapshot.val();
+    Object.keys(users).forEach(async (targetUid) => {
+      if (targetUid === myUserId) return;
+
+      const pc = createPeerConnection(targetUid, rtcConfig);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      await set(roomRef(`voice_signals/${myUserId}_${targetUid}`), {
+        type: 'offer',
+        sdp: offer
+      });
+    });
+  });
+}
+
+function createPeerConnection(targetUid, rtcConfig) {
+  if (peerConnections.has(targetUid)) {
+    return peerConnections.get(targetUid);
+  }
+
+  const pc = new RTCPeerConnection(rtcConfig);
+  peerConnections.set(targetUid, pc);
+
+  if (localAudioStream) {
+    localAudioStream.getTracks().forEach(track => pc.addTrack(track, localAudioStream));
+  }
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      set(roomRef(`voice_signals/${myUserId}_${targetUid}_ice`), {
+        candidate: e.candidate.toJSON()
+      });
+    }
+  };
+
+  pc.ontrack = (e) => {
+    const container = document.getElementById('remote-audio-container');
+    let audioEl = document.getElementById(`audio-${targetUid}`);
+    if (!audioEl) {
+      audioEl = document.createElement('audio');
+      audioEl.id = `audio-${targetUid}`;
+      audioEl.autoplay = true;
+      container.appendChild(audioEl);
+    }
+    audioEl.srcObject = e.streams[0];
+  };
+
+  return pc;
+}
+
+// Modals Setup
+function setupTopicModal() {
+  const modal = document.getElementById('topic-modal');
+  const openBtn = document.getElementById('btn-edit-topic');
+  const saveBtn = document.getElementById('btn-save-topic');
+  const input = document.getElementById('topic-input');
+
+  openBtn.addEventListener('click', () => {
+    input.value = document.getElementById('room-topic-text').textContent;
+    modal.classList.remove('hidden');
+  });
+
+  document.querySelectorAll('#topic-modal .modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newTopic = input.value.trim();
+    if (!newTopic) return;
+
+    try {
+      await set(roomRef('topic'), newTopic);
+      modal.classList.add('hidden');
+      showToast('ルームのお題を更新しました', 'success');
+    } catch (e) {
+      showToast('お題の更新に失敗しました', 'error');
+    }
+  });
+}
+
+function setupCustomRoomModal() {
+  const modal = document.getElementById('custom-room-modal');
+  const openBtn = document.getElementById('btn-custom-room');
+  const joinBtn = document.getElementById('btn-join-custom-room');
+  const roomInput = document.getElementById('custom-room-name');
+
+  openBtn.addEventListener('click', () => {
+    roomInput.value = '';
+    modal.classList.remove('hidden');
+  });
+
+  document.querySelectorAll('#custom-room-modal .modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  joinBtn.addEventListener('click', () => {
+    const keyword = roomInput.value.trim();
+    if (!keyword) return;
+    const roomId = 'custom_' + keyword.replace(/[^a-zA-Z0-9_-]/g, '_');
+    modal.classList.add('hidden');
+    switchRoom(roomId, `🔒 部屋: ${keyword}`);
   });
 }
 

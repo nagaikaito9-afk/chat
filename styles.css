@@ -231,6 +231,66 @@ html, body {
   color: #ffffff;
 }
 
+.btn-screen {
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--accent-primary);
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition-fast);
+}
+
+.btn-screen:hover {
+  background: rgba(0, 240, 255, 0.25);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.btn-screen.sharing {
+  background: var(--danger-color);
+  border-color: var(--danger-color);
+  color: #ffffff;
+}
+
+/* Screen Share Viewport Container */
+.screen-share-box {
+  margin: 12px 20px 0;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--accent-primary);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+}
+
+.screen-share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.88rem;
+}
+
+.screen-share-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#screen-share-video {
+  width: 100%;
+  max-height: 420px;
+  border-radius: var(--radius-sm);
+  background: #000;
+  object-fit: contain;
+}
+
 .btn-block {
   width: 100%;
 }

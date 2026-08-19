@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberChat - リアルタイム自由チャット (チャベリ超え版)</title>
+  <title>CyberChat - リアルタイム自由チャット (画面共有対応版)</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,6 +23,9 @@
   <!-- 背景グローエフェクト -->
   <div class="bg-glow bg-glow-1"></div>
   <div class="bg-glow bg-glow-2"></div>
+
+  <!-- リモート音声・画面共有用格納要素 -->
+  <div id="remote-audio-container" class="hidden"></div>
 
   <!-- 入室・初期設定モーダル (全画面オーバーレイ) -->
   <div id="join-modal" class="overlay-screen active">
@@ -123,6 +126,7 @@
 
       <div class="filter-pills">
         <button class="pill-btn active" data-filter="all">すべて</button>
+        <button class="pill-btn" data-filter="star"><i class="fa-solid fa-star text-warning"></i> ブックマーク</button>
         <button class="pill-btn" data-filter="image"><i class="fa-regular fa-image"></i> メディア</button>
         <button class="pill-btn" data-filter="poll"><i class="fa-solid fa-chart-simple"></i> アンケート</button>
         <button class="pill-btn" data-filter="file"><i class="fa-solid fa-paperclip"></i> ファイル</button>
@@ -177,6 +181,17 @@
         </div>
 
         <div class="header-actions">
+          <!-- 画面共有ボタン -->
+          <button id="btn-toggle-screen" class="btn-screen" title="画面共有">
+            <i class="fa-solid fa-desktop"></i>
+            <span>画面共有</span>
+          </button>
+
+          <!-- BGM プレイヤー -->
+          <button id="btn-toggle-bgm" class="btn-icon" title="作業用BGM ON/OFF">
+            <i class="fa-solid fa-music"></i>
+          </button>
+
           <!-- ボイスチャット参加ボタン -->
           <button id="btn-toggle-vc" class="btn-vc" title="ボイスチャットに参加/退出">
             <i class="fa-solid fa-microphone"></i>
@@ -210,6 +225,18 @@
         <span class="topic-label">本日のお題:</span>
         <span id="room-topic-text" class="topic-text">みんなの好きな食べ物や最近ハマっていることは？</span>
         <button id="btn-edit-topic" class="btn-edit-topic-icon" title="お題を変更"><i class="fa-solid fa-pen"></i></button>
+      </div>
+
+      <!-- 画面共有ライブ表示ビューポート -->
+      <div id="screen-share-overlay" class="screen-share-box glass-panel hidden">
+        <div class="screen-share-header">
+          <span><i class="fa-solid fa-desktop text-success pulse"></i> <strong id="screen-sharer-name">あなた</strong> の画面を配信中</span>
+          <div class="screen-share-actions">
+            <button id="btn-snap-screen" class="btn-secondary btn-sm"><i class="fa-solid fa-camera"></i> スナップショット投稿</button>
+            <button id="btn-stop-screen" class="btn-secondary btn-sm danger"><i class="fa-solid fa-xmark"></i> 共有停止</button>
+          </div>
+        </div>
+        <video id="screen-share-video" autoplay playsinline muted></video>
       </div>
 
       <!-- メッセージ表示エリア -->
@@ -289,6 +316,18 @@
           </div>
         </div>
 
+        <!-- 効果音ポン出しパレット -->
+        <div id="soundboard-picker" class="stamp-picker-popup hidden">
+          <div class="stamp-grid">
+            <button class="stamp-btn" onclick="window.playSfx('applause')">👏 拍手</button>
+            <button class="stamp-btn" onclick="window.playSfx('fanfare')">🎉 ファンファーレ</button>
+            <button class="stamp-btn" onclick="window.playSfx('chime')">🔔 チャイム</button>
+            <button class="stamp-btn" onclick="window.playSfx('laugh')">😂 笑い声</button>
+            <button class="stamp-btn" onclick="window.playSfx('boom')">💥 爆発音</button>
+            <button class="stamp-btn" onclick="window.playSfx('horn')">🎺 パフッ</button>
+          </div>
+        </div>
+
         <div class="chat-input-row">
           <div class="tool-buttons">
             <button type="button" id="btn-emoji-toggle" class="btn-icon-tool" title="絵文字">
@@ -297,6 +336,10 @@
 
             <button type="button" id="btn-stamp-toggle" class="btn-icon-tool" title="BIGスタンプ">
               <i class="fa-solid fa-icons"></i>
+            </button>
+
+            <button type="button" id="btn-soundboard-toggle" class="btn-icon-tool" title="効果音ポン出し">
+              <i class="fa-solid fa-bullhorn"></i>
             </button>
 
             <label for="media-file-input" class="btn-icon-tool" title="画像・動画・ファイルを共有">
