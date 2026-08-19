@@ -158,12 +158,49 @@ html, body {
 
 .text-success { color: var(--success-color); }
 .text-warning { color: var(--warning-color); }
+.text-primary { color: var(--accent-primary); }
 .pulse { animation: pulseAnim 2s infinite; }
 
 @keyframes pulseAnim {
   0% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.9); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+/* Device Mode Selector (PC / Mobile) */
+.device-mode-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.device-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.device-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.device-btn.active {
+  background: var(--accent-gradient);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 /* Button Styles */
@@ -356,12 +393,12 @@ html, body {
 
 .btn-google {
   width: 100%;
-  padding: 12px;
+  padding: 10px 14px;
   background: #ffffff;
   color: #374151;
   border: 1px solid #d1d5db;
   border-radius: var(--radius-md);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -370,7 +407,7 @@ html, body {
   gap: 10px;
   transition: var(--transition-normal);
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 
 .btn-google:hover {
@@ -380,17 +417,17 @@ html, body {
 }
 
 .google-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .google-auth-divider {
   display: flex;
   align-items: center;
   text-align: center;
-  margin: 16px 0 18px;
+  margin: 10px 0 12px;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 
 .google-auth-divider::before, .google-auth-divider::after {
@@ -436,13 +473,13 @@ html, body {
 .avatar-picker-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 10px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .avatar-opt {
-  font-size: 1.6rem;
-  padding: 8px;
+  font-size: 1.4rem;
+  padding: 6px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
@@ -465,12 +502,12 @@ html, body {
 
 .status-select {
   width: 100%;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   outline: none;
 }
 
@@ -479,17 +516,19 @@ html, body {
   color: var(--text-primary);
 }
 
-/* 入室モーダル Overlay */
+/* 入室モーダル Overlay (スクロール・全端末フィット修正) */
 .overlay-screen {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(10, 13, 20, 0.85);
+  background: rgba(10, 13, 20, 0.88);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: none;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 16px;
+  overflow-y: auto;
 }
 
 .overlay-screen.active {
@@ -499,24 +538,27 @@ html, body {
 .join-card {
   width: 100%;
   max-width: 440px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   border-radius: var(--radius-lg);
-  padding: 36px 30px;
+  padding: 24px 20px;
   box-shadow: var(--shadow-md);
+  margin: auto;
 }
 
 .join-header {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
 }
 
 .app-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  font-size: 1.8rem;
+  gap: 10px;
+  font-size: 1.6rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .brand-icon {
@@ -527,31 +569,31 @@ html, body {
 
 .join-subtitle {
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 /* Forms & Inputs */
 .input-group {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .input-group label {
   display: block;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .input-group input[type="text"],
 .input-group input[type="password"] {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   outline: none;
   transition: var(--transition-normal);
 }
@@ -568,9 +610,9 @@ html, body {
 
 .input-hint {
   display: block;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .trip-input-wrapper {
@@ -595,8 +637,8 @@ html, body {
 }
 
 .trip-preview {
-  margin-top: 8px;
-  font-size: 0.85rem;
+  margin-top: 6px;
+  font-size: 0.8rem;
   color: var(--text-secondary);
 }
 
@@ -607,7 +649,7 @@ html, body {
   padding: 10px 14px;
   border-radius: var(--radius-md);
   font-size: 0.85rem;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1078,6 +1120,76 @@ html, body {
   border-bottom-left-radius: 4px;
 }
 
+/* 引用・返信カード (Quote Card) */
+.msg-quote-card {
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.msg-quote-card:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.quote-sender {
+  font-weight: 700;
+  color: var(--accent-primary);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quote-text {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes highlightGlow {
+  0% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); }
+  50% { box-shadow: 0 0 20px 4px var(--accent-primary); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); }
+}
+
+.msg-highlight-glow {
+  animation: highlightGlow 1.5s ease-out;
+}
+
+/* 返信バナー (Reply Banner) */
+.reply-banner-bar {
+  padding: 8px 20px;
+  background: rgba(0, 240, 255, 0.1);
+  border-top: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reply-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.reply-text-preview {
+  color: var(--text-secondary);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
 /* サムネイル画像サイズ */
 .msg-image {
   max-width: 220px;
@@ -1309,10 +1421,14 @@ html, body {
 .btn-cancel-whisper {
   background: transparent;
   border: none;
-  color: #f472b6;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 0.8rem;
   padding: 2px 8px;
+}
+
+.btn-cancel-whisper:hover {
+  color: var(--text-primary);
 }
 
 /* Chat Input Footer */
@@ -1734,17 +1850,84 @@ html, body {
   to { opacity: 1; transform: scale(1); }
 }
 
-/* Responsive Rules */
-.mobile-only {
+/* スマホ表示モード (body.device-mobile または .device-mobile) 強制適用スタイル */
+body.device-mobile .sidebar {
+  position: absolute;
+  top: 0;
+  left: -320px;
+  bottom: 0;
+  background: var(--bg-base);
+  z-index: 999;
+}
+
+body.device-mobile .sidebar.open {
+  left: 0;
+  box-shadow: var(--shadow-md);
+}
+
+body.device-mobile .nav-drawer-btn {
+  display: inline-flex !important;
+}
+
+body.device-mobile .sidebar-close-btn {
+  display: inline-flex !important;
+}
+
+body.device-mobile .msg-wrapper {
+  max-width: 92%;
+}
+
+body.device-mobile .chat-header {
+  padding: 0 12px;
+}
+
+body.device-mobile .chat-room-info h1 {
+  font-size: 0.95rem;
+}
+
+body.device-mobile .btn-screen span,
+body.device-mobile .btn-vc span {
+  display: none;
+}
+
+body.device-mobile .btn-screen,
+body.device-mobile .btn-vc {
+  padding: 8px 10px;
+}
+
+body.device-mobile .screen-share-box {
+  left: 10px;
+  bottom: 10px;
+  width: 220px;
+}
+
+/* PC表示モード (body.device-pc) のスタイル確定 */
+body.device-pc .sidebar {
+  position: relative;
+  left: 0;
+  display: flex !important;
+}
+
+body.device-pc .nav-drawer-btn {
   display: none !important;
 }
 
+body.device-pc .sidebar-close-btn {
+  display: none !important;
+}
+
+/* Responsive Auto Rules (Screen size fallback) */
+.nav-drawer-btn, .sidebar-close-btn {
+  display: none;
+}
+
 @media (max-width: 768px) {
-  .mobile-only {
+  body:not(.device-pc) .nav-drawer-btn,
+  body:not(.device-pc) .sidebar-close-btn {
     display: inline-flex !important;
   }
 
-  .sidebar {
+  body:not(.device-pc) .sidebar {
     position: absolute;
     top: 0;
     left: -320px;
@@ -1752,43 +1935,43 @@ html, body {
     background: var(--bg-base);
   }
 
-  .sidebar.open {
+  body:not(.device-pc) .sidebar.open {
     left: 0;
     box-shadow: var(--shadow-md);
   }
 
-  .msg-wrapper {
+  body:not(.device-pc) .msg-wrapper {
     max-width: 88%;
   }
 
-  .chat-header {
+  body:not(.device-pc) .chat-header {
     padding: 0 16px;
   }
 
-  .chat-messages {
+  body:not(.device-pc) .chat-messages {
     padding: 16px;
   }
 
-  .chat-footer {
+  body:not(.device-pc) .chat-footer {
     padding: 12px 16px;
   }
 
-  .screen-share-box {
+  body:not(.device-pc) .screen-share-box {
     left: 12px;
     bottom: 12px;
     width: 240px;
   }
 
-  .app-container.screen-share-expanded {
+  body:not(.device-pc) .app-container.screen-share-expanded {
     grid-template-columns: 1fr;
     grid-template-rows: 45vh 1fr;
   }
 
-  .app-container.screen-share-expanded .screen-share-box {
+  body:not(.device-pc) .app-container.screen-share-expanded .screen-share-box {
     height: 45vh;
   }
 
-  .app-container.screen-share-expanded .chat-main {
+  body:not(.device-pc) .app-container.screen-share-expanded .chat-main {
     width: 100%;
     height: 55vh;
   }

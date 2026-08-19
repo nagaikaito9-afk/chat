@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberChat - リアルタイム自由チャット (Googleログイン対応版)</title>
+  <title>CyberChat - リアルタイム自由チャット (スマホ/PC切替 & メッセージ返信対応)</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -53,7 +53,22 @@
           <i class="fa-solid fa-comments brand-icon"></i>
           <h2>CyberChat</h2>
         </div>
-        <p class="join-subtitle">名前、アイコン、気分を設定して自由に話そう</p>
+        <p class="join-subtitle">端末モード、名前、アイコンを設定してチャットに参加</p>
+      </div>
+
+      <!-- 画面表示モード切り替え（スマホ / PC） -->
+      <div class="input-group">
+        <label><i class="fa-solid fa-display"></i> 表示モードを選択 <span class="required">*</span></label>
+        <div class="device-mode-selector">
+          <button type="button" class="device-btn active" data-mode="pc">
+            <i class="fa-solid fa-desktop"></i>
+            <span>💻 PC表示</span>
+          </button>
+          <button type="button" class="device-btn" data-mode="mobile">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            <span>📱 スマホ表示</span>
+          </button>
+        </div>
       </div>
 
       <!-- Google ログインボタン -->
@@ -130,7 +145,7 @@
           <i class="fa-solid fa-comments brand-icon"></i>
           <span>CyberChat</span>
         </div>
-        <button id="btn-close-sidebar" class="btn-icon mobile-only"><i class="fa-solid fa-xmark"></i></button>
+        <button id="btn-close-sidebar" class="btn-icon sidebar-close-btn"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <!-- 自分のプロフィールカード -->
@@ -199,7 +214,7 @@
       <!-- ヘッダー -->
       <header class="chat-header glass-panel">
         <div class="header-left">
-          <button id="btn-toggle-sidebar" class="btn-icon mobile-only">
+          <button id="btn-toggle-sidebar" class="btn-icon nav-drawer-btn">
             <i class="fa-solid fa-bars"></i>
           </button>
           <div class="chat-room-info">
@@ -209,6 +224,11 @@
         </div>
 
         <div class="header-actions">
+          <!-- 表示モード（スマホ/PC）即時切替ボタン -->
+          <button id="btn-toggle-device-mode" class="btn-icon" title="スマホ/PC 表示モード切り替え">
+            <i class="fa-solid fa-desktop"></i>
+          </button>
+
           <!-- 画面共有ボタン -->
           <button id="btn-toggle-screen" class="btn-screen" title="画面共有">
             <i class="fa-solid fa-desktop"></i>
@@ -272,6 +292,16 @@
       <!-- タイピング表示インジケーター -->
       <div id="typing-indicator" class="typing-indicator-bar hidden">
         <i class="fa-solid fa-pen-nib fa-bounce"></i> <span id="typing-users-text">誰かがメッセージを入力中...</span>
+      </div>
+
+      <!-- 返信（引用）ターゲット表示バー -->
+      <div id="reply-banner" class="reply-banner-bar hidden">
+        <div class="reply-info">
+          <i class="fa-solid fa-reply text-primary"></i>
+          <span class="reply-label">返信先: <strong id="reply-target-name">〇〇</strong></span>
+          <span class="reply-text-preview" id="reply-target-text">"メッセージのプレビュー..."</span>
+        </div>
+        <button id="btn-cancel-reply" class="btn-cancel-whisper" title="返信キャンセル"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <!-- 内緒話（DM）ターゲット表示バー -->
