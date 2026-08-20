@@ -29,6 +29,8 @@ let myTrip = '◆(なし)';
 let myAvatar = '🤖';
 let myStatus = '💬 雑談歓迎';
 let currentRoomId = 'public_main';
+const unlockedRoomsSet = new Set(['public_main']);
+let pendingPassRoom = null;
 
 let friendsMap = new Map();
 let friendRequestsMap = new Map();
@@ -291,11 +293,11 @@ const AVATAR_PRESETS_50 = [
 ];
 
 function renderAvatarHTML(avatar, customClass = '') {
-  if (!avatar) return `<span class="${customClass}">🤖</span>`;
-  if (avatar.startsWith('data:image/') || avatar.startsWith('http://') || avatar.startsWith('https://')) {
-    return `<img src="${escapeHtml(avatar)}" class="avatar-img-obj ${customClass}" alt="avatar">`;
+  if (!avatar) return `<span class="avatar-fallback-text ${customClass}">🤖</span>`;
+  if (typeof avatar === 'string' && (avatar.startsWith('data:image/') || avatar.startsWith('http://') || avatar.startsWith('https://'))) {
+    return `<img src="${escapeHtml(avatar)}" class="avatar-img-obj ${customClass}" alt="avatar" onerror="this.onerror=null; this.outerHTML='<span class=\\'avatar-fallback-text ${customClass}\\'>🤖</span>';">`;
   }
-  return `<span class="${customClass}">${escapeHtml(avatar)}</span>`;
+  return `<span class="avatar-fallback-text ${customClass}">${escapeHtml(avatar)}</span>`;
 }
 
 function formatTime(timestamp) {
@@ -432,12 +434,14 @@ function initApp() {
   setupAuthForms();
   setupChatControls();
   setupRoomTabs();
+  setupCreateRoomModal();
+  setupRoomPassModal();
+  initRoomsRealtimeSync();
   setupStampsAndMinigames();
   setupTopicModal();
   setupPollModal();
   setupProfileModal();
   setupEditMsgModal();
-  setupCustomRoomModal();
   setupImageModal();
   setupVoiceChatAndRec();
   setupBgmPlayer();
@@ -1154,27 +1158,25 @@ function processCustomAvatarFile(file, previewElemId) {
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      const maxSize = 128;
-      let w = img.width;
-      let h = img.height;
-      if (w > h) {
-        if (w > maxSize) {
-          h = Math.round((h * maxSize) / w);
-          w = maxSize;
-        }
-      } else {
-        if (h > maxSize) {
-          w = Math.round((w * maxSize) / h);
-          h = maxSize;
-        }
+      const targetSize = 64; // Square pixelated dot-art avatar size
+      canvas.width = targetSize;
+      canvas.height = targetSize;
+
+      let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
+      if (img.width > img.height) {
+        srcW = img.height;
+        srcX = (img.width - img.height) / 2;
+      } else if (img.height > img.width) {
+        srcH = img.width;
+        srcY = (img.height - img.width) / 2;
       }
-      canvas.width = w;
-      canvas.height = h;
-      ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/png', 0.85);
+
+      ctx.imageSmoothingEnabled = false; // Crisp pixelated dot-art rendering
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, targetSize, targetSize);
+      const dataUrl = canvas.toDataURL('image/png');
       myAvatar = dataUrl;
       updateMyProfileUI();
-      showToast('画像アイコンを設定しました！', 'success');
+      showToast('ドット絵風画像アイコンを設定しました！', 'success');
     };
     img.src = e.target.result;
   };
@@ -1308,20 +1310,43 @@ function updateMyProfileUI() {
 
 // Room Switching Logic
 function setupRoomTabs() {
-  document.querySelectorAll('.room-tab[data-room]').forEach(tab => {
-    tab.addEventListener('click', () => {
-      switchRoom(tab.dataset.room, tab.textContent);
+  const tabsListEl = document.getElementById('room-tabs-list');
+  if (tabsListEl) {
+    tabsListEl.querySelectorAll('.room-tab[data-room]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const name = tab.dataset.name || tab.textContent;
+        const pr = tab.dataset.pr || '';
+        switchRoom(tab.dataset.room, name, pr);
+      });
     });
-  });
+  }
 }
 
-async function switchRoom(newRoomId, roomTitle) {
+async function switchRoom(newRoomId, roomTitle, roomPR = '') {
   if (currentRoomId === newRoomId) return;
 
   await remove(roomRef(`active_users/${myUserId}`));
 
   currentRoomId = newRoomId;
-  document.getElementById('current-room-title').innerHTML = escapeHtml(roomTitle);
+
+  const titleEl = document.getElementById('current-room-title');
+  if (titleEl) {
+    if (roomTitle.includes('<i')) {
+      titleEl.innerHTML = roomTitle;
+    } else {
+      titleEl.innerHTML = `<i class="fa-solid fa-comments"></i> ${escapeHtml(roomTitle)}`;
+    }
+  }
+
+  const prEl = document.getElementById('current-room-pr');
+  if (prEl) {
+    if (roomPR) {
+      prEl.innerHTML = `<i class="fa-solid fa-bullhorn text-primary"></i> ${escapeHtml(roomPR)}`;
+      prEl.classList.remove('hidden');
+    } else {
+      prEl.classList.add('hidden');
+    }
+  }
 
   document.querySelectorAll('.room-tab').forEach(t => {
     if (t.dataset.room === newRoomId) t.classList.add('active');
@@ -1329,11 +1354,11 @@ async function switchRoom(newRoomId, roomTitle) {
   });
 
   const container = document.getElementById('messages-container');
-  container.innerHTML = '';
+  if (container) container.innerHTML = '';
   allMessages.clear();
 
   await registerOnlineUser();
-  sendSystemMessage(`${myAvatar} ${myName} がこの部屋に入室しました`);
+  sendSystemMessage(`${renderAvatarHTML(myAvatar)} ${myName} がこの部屋に入室しました`);
   initFirebaseRealtimeSync();
   showToast(`「${roomTitle.trim()}」に移動しました`);
 }
@@ -2136,7 +2161,7 @@ function renderIgnoredUsersUI() {
     const li = document.createElement('li');
     li.className = 'user-item';
     li.innerHTML = `
-      <div class="avatar-sm">${escapeHtml(uData.avatar)}</div>
+      <div class="avatar-sm">${renderAvatarHTML(uData.avatar || '👤')}</div>
       <div class="user-item-info">
         <div class="user-item-name">${escapeHtml(uData.name)}</div>
       </div>
@@ -3003,7 +3028,7 @@ function setupVoiceChatAndRec() {
         const li = document.createElement('li');
         li.className = 'user-item';
         li.innerHTML = `
-          <div class="avatar-sm">${escapeHtml(uData.avatar || '🤖')}</div>
+          <div class="avatar-sm">${renderAvatarHTML(uData.avatar || '🤖')}</div>
           <div class="user-item-info">
             <div class="user-item-name">${escapeHtml(uData.name)}</div>
           </div>
@@ -3164,28 +3189,193 @@ function setupTopicModal() {
   });
 }
 
-function setupCustomRoomModal() {
-  const modal = document.getElementById('custom-room-modal');
-  const openBtn = document.getElementById('btn-custom-room');
-  const joinBtn = document.getElementById('btn-join-custom-room');
-  const roomInput = document.getElementById('custom-room-name');
+function initRoomsRealtimeSync() {
+  const roomsRef = ref(db, 'rooms_meta');
+  onValue(roomsRef, (snapshot) => {
+    const tabsListEl = document.getElementById('room-tabs-list');
+    if (!tabsListEl) return;
+
+    const rooms = snapshot.exists() ? snapshot.val() : {};
+
+    let html = `
+      <button class="room-tab ${currentRoomId === 'public_main' ? 'active' : ''}" data-room="public_main" data-name="💬 雑談部屋" data-pr="誰でも自由に雑談できるメインの部屋です">
+        <i class="fa-solid fa-comments"></i> 💬 雑談部屋
+      </button>
+    `;
+
+    Object.entries(rooms).forEach(([roomId, rData]) => {
+      if (!rData || !rData.name) return;
+      const isActive = currentRoomId === roomId;
+      const icon = rData.icon || '💬';
+      const lockIcon = rData.isPrivate ? '<i class="fa-solid fa-lock text-warning" style="font-size:0.75rem;"></i> ' : '';
+
+      html += `
+        <button class="room-tab ${isActive ? 'active' : ''}" data-room="${roomId}" data-name="${escapeHtml(rData.name)}" data-pr="${escapeHtml(rData.pr || '')}" data-private="${rData.isPrivate ? 'true' : 'false'}">
+          ${lockIcon}${icon} ${escapeHtml(rData.name)}
+        </button>
+      `;
+    });
+
+    tabsListEl.innerHTML = html;
+
+    // Attach click listeners to room tabs
+    tabsListEl.querySelectorAll('.room-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const roomId = tab.dataset.room;
+        const name = tab.dataset.name;
+        const pr = tab.dataset.pr;
+        const isPrivate = tab.dataset.private === 'true';
+
+        if (roomId === 'public_main') {
+          switchRoom('public_main', '💬 雑談部屋', '誰でも自由に雑談できるメインの部屋です');
+          return;
+        }
+
+        if (isPrivate && !unlockedRoomsSet.has(roomId)) {
+          if (rooms[roomId]) {
+            pendingPassRoom = rooms[roomId];
+            const nameEl = document.getElementById('room-pass-target-name');
+            if (nameEl) nameEl.textContent = `「${rooms[roomId].icon || '💬'} ${rooms[roomId].name}」への入室`;
+            const passInput = document.getElementById('room-pass-input');
+            if (passInput) passInput.value = '';
+            const errBanner = document.getElementById('room-pass-error');
+            if (errBanner) errBanner.classList.add('hidden');
+            const passModal = document.getElementById('room-pass-modal');
+            if (passModal) passModal.classList.remove('hidden');
+          }
+        } else {
+          switchRoom(roomId, name, pr);
+        }
+      });
+    });
+  });
+}
+
+function setupCreateRoomModal() {
+  const modal = document.getElementById('create-room-modal');
+  const openBtn = document.getElementById('btn-open-create-room');
+  const submitBtn = document.getElementById('btn-submit-create-room');
+  const nameInput = document.getElementById('new-room-name');
+  const prInput = document.getElementById('new-room-pr');
+  const passGroup = document.getElementById('new-room-password-group');
+  const passInput = document.getElementById('new-room-password');
+  let selectedIcon = '💬';
+
+  if (!modal || !openBtn) return;
 
   openBtn.addEventListener('click', () => {
-    roomInput.value = '';
+    if (nameInput) nameInput.value = '';
+    if (prInput) prInput.value = '';
+    if (passInput) passInput.value = '';
+    if (passGroup) passGroup.classList.add('hidden');
+    const defaultRadio = modal.querySelector('input[name="new-room-access"][value="public"]');
+    if (defaultRadio) defaultRadio.checked = true;
+    modal.querySelectorAll('.room-icon-opt').forEach((o, i) => o.classList.toggle('active', i === 0));
+    selectedIcon = '💬';
     modal.classList.remove('hidden');
   });
 
-  document.querySelectorAll('#custom-room-modal .modal-close').forEach(b => {
+  modal.querySelectorAll('.modal-close').forEach(b => {
     b.addEventListener('click', () => modal.classList.add('hidden'));
   });
 
-  joinBtn.addEventListener('click', () => {
-    const keyword = roomInput.value.trim();
-    if (!keyword) return;
-    const roomId = 'custom_' + keyword.replace(/[^a-zA-Z0-9_-]/g, '_');
-    modal.classList.add('hidden');
-    switchRoom(roomId, `🔒 部屋: ${keyword}`);
+  modal.querySelectorAll('input[name="new-room-access"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (e.target.value === 'private') {
+        if (passGroup) passGroup.classList.remove('hidden');
+      } else {
+        if (passGroup) passGroup.classList.add('hidden');
+      }
+    });
   });
+
+  modal.querySelectorAll('.room-icon-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      modal.querySelectorAll('.room-icon-opt').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      selectedIcon = opt.dataset.icon || '💬';
+    });
+  });
+
+  if (submitBtn) {
+    submitBtn.addEventListener('click', async () => {
+      const roomName = nameInput ? nameInput.value.trim() : '';
+      const roomPR = prInput ? prInput.value.trim() : '';
+      const accessType = modal.querySelector('input[name="new-room-access"]:checked')?.value || 'public';
+      const isPrivate = accessType === 'private';
+      const password = passInput ? passInput.value.trim() : '';
+
+      if (!roomName) {
+        showToast('部屋の名前を入力してください', 'error');
+        return;
+      }
+
+      if (isPrivate && !password) {
+        showToast('パスワード制にする場合はパスワードを入力してください', 'error');
+        return;
+      }
+
+      const roomId = 'room_' + Date.now();
+      const newRoomData = {
+        id: roomId,
+        name: roomName,
+        pr: roomPR || 'みんなで楽しく雑談する部屋です！',
+        icon: selectedIcon,
+        isPrivate: isPrivate,
+        password: password,
+        createdBy: myUserId,
+        createdByName: myName,
+        createdAt: Date.now()
+      };
+
+      try {
+        await set(ref(db, `rooms_meta/${roomId}`), newRoomData);
+        unlockedRoomsSet.add(roomId);
+        modal.classList.add('hidden');
+        switchRoom(roomId, `${selectedIcon} ${roomName}`, newRoomData.pr);
+        showToast(`「${selectedIcon} ${roomName}」を作成して移動しました！`, 'success');
+      } catch (err) {
+        console.error("Room creation error:", err);
+        showToast('部屋の作成に失敗しました', 'error');
+      }
+    });
+  }
+}
+
+function setupRoomPassModal() {
+  const modal = document.getElementById('room-pass-modal');
+  const submitBtn = document.getElementById('btn-submit-room-pass');
+  const passInput = document.getElementById('room-pass-input');
+  const errorBanner = document.getElementById('room-pass-error');
+
+  if (!modal || !submitBtn) return;
+
+  modal.querySelectorAll('.modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  const handlePassSubmit = () => {
+    if (!pendingPassRoom) return;
+    const inputVal = passInput ? passInput.value.trim() : '';
+    if (inputVal === pendingPassRoom.password) {
+      unlockedRoomsSet.add(pendingPassRoom.id);
+      modal.classList.add('hidden');
+      switchRoom(pendingPassRoom.id, `${pendingPassRoom.icon || '🔒'} ${pendingPassRoom.name}`, pendingPassRoom.pr || '');
+      showToast(`「${pendingPassRoom.name}」に入室しました！`, 'success');
+    } else {
+      if (errorBanner) {
+        errorBanner.textContent = 'パスワードが間違っています。再入力してください。';
+        errorBanner.classList.remove('hidden');
+      }
+    }
+  };
+
+  submitBtn.addEventListener('click', handlePassSubmit);
+  if (passInput) {
+    passInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handlePassSubmit();
+    });
+  }
 }
 
 function setupPollModal() {
@@ -3950,7 +4140,7 @@ function renderFriendRequestsUI() {
         <div class="friend-item-name">${escapeHtml(reqData.fromName)}</div>
         <div class="friend-item-status">フレンド申請が届いています</div>
       </div>
-      <button class="btn-primary btn-sm" onclick="window.acceptFriendRequest('${fromUid}', '${escapeHtml(reqData.fromName)}', '${escapeHtml(reqData.fromAvatar)}')">承認</button>
+      <button class="btn-primary btn-sm" onclick="window.acceptFriendRequest('${fromUid}')">承認</button>
       <button class="btn-secondary btn-sm danger" onclick="window.declineFriendRequest('${fromUid}')">拒否</button>
     `;
     reqUl.appendChild(li);
@@ -4032,12 +4222,15 @@ window.sendFriendRequest = async (targetUid, targetName) => {
   }
 };
 
-window.acceptFriendRequest = async (fromUid, fromName, fromAvatar) => {
+window.acceptFriendRequest = async (fromUid, fromName = '', fromAvatar = '') => {
+  const reqData = friendRequestsMap.get(fromUid) || {};
+  const targetName = fromName || reqData.fromName || 'ユーザー';
+  const targetAvatar = fromAvatar || reqData.fromAvatar || '🤖';
   try {
     await set(globalRef(`friends/${myUserId}/${fromUid}`), {
       friendUserId: fromUid,
-      friendName: fromName,
-      friendAvatar: fromAvatar,
+      friendName: targetName,
+      friendAvatar: targetAvatar,
       addedAt: Date.now()
     });
 

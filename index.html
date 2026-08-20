@@ -274,7 +274,8 @@
             <i class="fa-solid fa-bars"></i>
           </button>
           <div class="chat-room-info">
-            <h1 id="current-room-title"><i class="fa-solid fa-comments"></i> 💬 メイン雑談</h1>
+            <h1 id="current-room-title"><i class="fa-solid fa-comments"></i> 💬 雑談部屋</h1>
+            <span id="current-room-pr" class="room-pr-badge"><i class="fa-solid fa-bullhorn text-primary"></i> 誰でも自由に雑談できるメインの部屋です</span>
             <span class="room-status"><i class="fa-solid fa-bolt"></i> リアルタイム同期中</span>
           </div>
         </div>
@@ -336,11 +337,15 @@
 
       <!-- ルーム切り替えタブバー -->
       <div class="room-tabs-bar glass-panel">
-        <button class="room-tab active" data-room="public_main"><i class="fa-solid fa-comments"></i> 💬 メイン雑談</button>
-        <button class="room-tab" data-room="public_game"><i class="fa-solid fa-gamepad"></i> 🎮 ゲーム</button>
-        <button class="room-tab" data-room="public_music"><i class="fa-solid fa-music"></i> 🎵 音楽・アニメ</button>
-        <button class="room-tab" data-room="public_help"><i class="fa-solid fa-handshake-angle"></i> ❓ 相談・質問</button>
-        <button id="btn-custom-room" class="room-tab btn-custom-tab"><i class="fa-solid fa-key"></i> 🔒 部屋を作成/合言葉入室</button>
+        <div id="room-tabs-list" class="room-tabs-list">
+          <button class="room-tab active" data-room="public_main" data-name="💬 雑談部屋" data-pr="誰でも自由に雑談できるメインの部屋です">
+            <i class="fa-solid fa-comments"></i> 💬 雑談部屋
+          </button>
+          <!-- 作成された部屋タブが動的に表示されます -->
+        </div>
+        <button id="btn-open-create-room" class="btn-create-room" title="新しい部屋を作成">
+          <i class="fa-solid fa-plus"></i> 新しい部屋を作成
+        </button>
       </div>
 
       <!-- お題・トピックピン留めバー -->
@@ -695,23 +700,92 @@
     </div>
   </div>
 
-  <!-- カスタムルーム作成/入室モーダル -->
-  <div id="custom-room-modal" class="modal-overlay hidden">
+  <!-- 🏠 新しい部屋を作成モーダル -->
+  <div id="create-room-modal" class="modal-overlay hidden">
     <div class="modal-card glass-panel animate-scale-up">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-key"></i> 秘密の部屋（合言葉ルーム）を作成・入室</h3>
+        <h3><i class="fa-solid fa-plus-circle text-primary"></i> 新しい部屋を作成</h3>
         <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
         <div class="input-group">
-          <label for="custom-room-name">部屋の合言葉 / ID <span class="required">*</span></label>
-          <input type="text" id="custom-room-name" placeholder="例: secret123" maxlength="30">
-          <span class="input-hint">※同じ合言葉を入力した人同士で秘密のチャットができます</span>
+          <label for="new-room-name"><i class="fa-solid fa-door-open"></i> 部屋の名前 <span class="required">*</span></label>
+          <input type="text" id="new-room-name" placeholder="例: ゲーム部屋、イラスト雑談" maxlength="25" required>
+        </div>
+
+        <div class="input-group">
+          <label for="new-room-pr"><i class="fa-solid fa-bullhorn"></i> 部屋のPR / 説明</label>
+          <input type="text" id="new-room-pr" placeholder="例: みんなでワイワイゲームについて話す部屋です！" maxlength="60">
+        </div>
+
+        <div class="input-group">
+          <label><i class="fa-solid fa-icons"></i> 部屋アイコン</label>
+          <div class="room-icon-picker">
+            <button type="button" class="room-icon-opt active" data-icon="💬">💬 雑談</button>
+            <button type="button" class="room-icon-opt" data-icon="🎮">🎮 ゲーム</button>
+            <button type="button" class="room-icon-opt" data-icon="🎵">🎵 音楽</button>
+            <button type="button" class="room-icon-opt" data-icon="📚">📚 読書</button>
+            <button type="button" class="room-icon-opt" data-icon="🎨">🎨 イラスト</button>
+            <button type="button" class="room-icon-opt" data-icon="🔒">🔒 秘密</button>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label><i class="fa-solid fa-shield-halved"></i> アクセス制限設定</label>
+          <div class="room-access-type-selector">
+            <label class="access-type-option">
+              <input type="radio" name="new-room-access" value="public" checked>
+              <div class="access-type-card">
+                <i class="fa-solid fa-globe text-success"></i>
+                <div>
+                  <strong>誰でも入れる (公開)</strong>
+                  <span class="sub-desc">パスワード不要で誰でも参加できます</span>
+                </div>
+              </div>
+            </label>
+            <label class="access-type-option">
+              <input type="radio" name="new-room-access" value="private">
+              <div class="access-type-card">
+                <i class="fa-solid fa-lock text-warning"></i>
+                <div>
+                  <strong>パスワード制 (鍵付き)</strong>
+                  <span class="sub-desc">合言葉・パスワードを知っている人のみ参加できます</span>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="new-room-password-group" class="input-group hidden">
+          <label for="new-room-password"><i class="fa-solid fa-key"></i> 部屋のパスワード <span class="required">*</span></label>
+          <input type="password" id="new-room-password" placeholder="合言葉を入力" maxlength="20">
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary modal-close">キャンセル</button>
-        <button id="btn-join-custom-room" class="btn-primary"><i class="fa-solid fa-right-to-bracket"></i> 部屋に入る</button>
+        <button id="btn-submit-create-room" class="btn-primary"><i class="fa-solid fa-check"></i> 部屋を作成して入室</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔒 パスワード付き部屋の入力モーダル -->
+  <div id="room-pass-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width:380px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-lock text-warning"></i> パスワード付き部屋への入室</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p id="room-pass-target-name" style="font-weight:600; margin-bottom:10px; color:var(--text-primary);"></p>
+        <div class="input-group">
+          <label for="room-pass-input">合言葉 / パスワード <span class="required">*</span></label>
+          <input type="password" id="room-pass-input" placeholder="パスワードを入力" required>
+        </div>
+        <div id="room-pass-error" class="error-banner hidden">パスワードが間違っています</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">キャンセル</button>
+        <button id="btn-submit-room-pass" class="btn-primary"><i class="fa-solid fa-key"></i> 入室する</button>
       </div>
     </div>
   </div>
