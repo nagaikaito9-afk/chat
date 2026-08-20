@@ -1177,6 +1177,40 @@
         <button class="btn-secondary modal-close">閉じる</button>
       </div>
     </div>
+  <!-- 💬 フレンド個別チャット (DM) モーダル -->
+  <div id="friend-chat-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up friend-chat-card">
+      <div class="modal-header friend-chat-header">
+        <div class="friend-chat-target-info">
+          <div id="fc-target-avatar" class="avatar-sm">🤖</div>
+          <div>
+            <div id="fc-target-name" class="fc-target-name">フレンド名</div>
+            <div id="fc-target-status" class="fc-target-status">🟢 オンライン</div>
+          </div>
+        </div>
+        <div class="fc-header-actions">
+          <button id="fc-btn-jump-room" class="btn-secondary btn-sm hidden" title="相手のいる部屋に移動">
+            <i class="fa-solid fa-right-to-bracket"></i> 部屋へ移動
+          </button>
+          <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div class="modal-body fc-messages-body">
+        <div id="fc-messages-container" class="fc-messages-container">
+          <!-- JS動的メッセージ生成 -->
+        </div>
+      </div>
+
+      <div class="modal-footer fc-input-footer">
+        <form id="fc-chat-form" class="fc-chat-form">
+          <input type="text" id="fc-message-input" placeholder="フレンドにメッセージを送信..." autocomplete="off" required>
+          <button type="submit" class="btn-primary fc-send-btn">
+            <i class="fa-solid fa-paper-plane"></i> 送信
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- トースト通知 -->

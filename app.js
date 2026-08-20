@@ -26,7 +26,7 @@ localStorage.setItem('cyberchat_user_id', myUserId);
 
 let myName = '';
 let myTrip = '◆(なし)';
-let myAvatar = '🤖';
+let myAvatar = localStorage.getItem('cyberchat_user_avatar') || '🤖';
 let myStatus = '💬 雑談歓迎';
 let currentRoomId = 'public_main';
 const unlockedRoomsSet = new Set(['public_main']);
@@ -40,7 +40,11 @@ let unsubscribeFriends = null;
 let deviceMode = localStorage.getItem('cyberchat_device_mode') || 'pc';
 let currentTheme = localStorage.getItem('cyberchat_theme') || 'cyber';
 let isAdminMode = false;
-const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371";
+const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371-ta-da-no-cat-like-create";
+
+let globalOnlineUsersMap = new Map();
+let currentFriendChatUid = null;
+let unsubscribeFriendChat = null;
 
 let soundEnabled = true;
 let isScrolledToBottom = true;
@@ -452,9 +456,12 @@ function initApp() {
   setupAiBotControls();
   setupWerewolfGameControls();
   setupFriendModalControls();
+  setupFriendChatModal();
   setupMobileNavigation();
   renderIgnoredUsersUI();
   initBanCheckListener();
+  initGlobalOnlineUsersListener();
+  initGlobalFriendDmListener();
   setupPresenceConnectionHeartbeat();
 }
 
@@ -477,12 +484,14 @@ function setupPresenceConnectionHeartbeat() {
   heartbeatTimer = setInterval(() => {
     if (myName && myUserId) {
       update(roomRef(`active_users/${myUserId}`), { lastSeen: Date.now() });
+      update(ref(db, `global_online_users/${myUserId}`), { lastSeen: Date.now() });
     }
   }, 8000);
 
   const cleanUpPresence = () => {
     if (myUserId) {
       remove(roomRef(`active_users/${myUserId}`));
+      remove(ref(db, `global_online_users/${myUserId}`));
     }
   };
 
@@ -1065,15 +1074,16 @@ function setupAvatarPickers() {
   const populateGrid = (gridEl, pickerType) => {
     if (!gridEl) return;
     gridEl.innerHTML = '';
-    AVATAR_PRESETS_50.forEach((item, idx) => {
+    AVATAR_PRESETS_50.forEach((item) => {
       const opt = document.createElement('span');
-      opt.className = `avatar-opt ${idx === 0 ? 'active' : ''}`;
+      const isCurrent = (item.icon === myAvatar);
+      opt.className = `avatar-opt ${isCurrent ? 'active' : ''}`;
       opt.dataset.avatar = item.icon;
       opt.dataset.cat = item.cat;
       opt.textContent = item.icon;
 
       opt.addEventListener('click', () => {
-        gridEl.querySelectorAll('.avatar-opt').forEach(o => o.classList.remove('active'));
+        document.querySelectorAll('.avatar-opt').forEach(o => o.classList.remove('active'));
         opt.classList.add('active');
         myAvatar = item.icon;
         updateMyProfileUI();
@@ -1286,26 +1296,57 @@ function setupJoinForm() {
 async function registerOnlineUser() {
   const userRef = roomRef(`active_users/${myUserId}`);
   onDisconnect(userRef).remove();
-  await set(userRef, {
+  const roomTitleEl = document.getElementById('current-room-title');
+  const roomNameText = roomTitleEl ? roomTitleEl.textContent.trim() : '雑談部屋';
+
+  const userData = {
+    userId: myUserId,
     name: myName,
     trip: myTrip,
     avatar: myAvatar,
     status: myStatus,
+    currentRoomId: currentRoomId,
+    currentRoomName: roomNameText,
     joinedAt: Date.now(),
     lastSeen: Date.now()
-  });
+  };
+
+  await set(userRef, userData);
+
+  const globalUserRef = ref(db, `global_online_users/${myUserId}`);
+  onDisconnect(globalUserRef).remove();
+  await set(globalUserRef, userData);
 }
 
 function updateMyProfileUI() {
-  document.getElementById('my-name-display').textContent = myName;
-  document.getElementById('my-trip-display').textContent = myTrip;
-  document.getElementById('my-avatar').innerHTML = renderAvatarHTML(myAvatar);
-  document.getElementById('my-status-display').textContent = myStatus;
+  if (myAvatar) {
+    localStorage.setItem('cyberchat_user_avatar', myAvatar);
+  }
+
+  const nameDisp = document.getElementById('my-name-display');
+  if (nameDisp) nameDisp.textContent = myName;
+
+  const tripDisp = document.getElementById('my-trip-display');
+  if (tripDisp) tripDisp.textContent = myTrip;
+
+  const avatarDisp = document.getElementById('my-avatar');
+  if (avatarDisp) avatarDisp.innerHTML = renderAvatarHTML(myAvatar);
+
+  const statusDisp = document.getElementById('my-status-display');
+  if (statusDisp) statusDisp.textContent = myStatus;
 
   const joinPrev = document.getElementById('join-avatar-preview');
   if (joinPrev) joinPrev.innerHTML = renderAvatarHTML(myAvatar);
+
+  const regPrev = document.getElementById('reg-avatar-preview');
+  if (regPrev) regPrev.innerHTML = renderAvatarHTML(myAvatar);
+
   const editPrev = document.getElementById('edit-avatar-preview');
   if (editPrev) editPrev.innerHTML = renderAvatarHTML(myAvatar);
+
+  document.querySelectorAll('.avatar-opt').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.avatar === myAvatar);
+  });
 }
 
 // Room Switching Logic
@@ -3196,31 +3237,57 @@ function initRoomsRealtimeSync() {
     if (!tabsListEl) return;
 
     const rooms = snapshot.exists() ? snapshot.val() : {};
+    const now = Date.now();
+    const INACTIVE_LIMIT = 30 * 60 * 1000;
+
+    const roomUserCounts = {};
+    globalOnlineUsersMap.forEach(u => {
+      const rId = u.currentRoomId || 'public_main';
+      roomUserCounts[rId] = (roomUserCounts[rId] || 0) + 1;
+    });
+
+    const publicCount = roomUserCounts['public_main'] || 0;
+    const publicCountBadge = publicCount > 0 ? `<span class="room-user-count-badge">👤 ${publicCount}</span>` : '';
 
     let html = `
       <button class="room-tab ${currentRoomId === 'public_main' ? 'active' : ''}" data-room="public_main" data-name="💬 雑談部屋" data-pr="誰でも自由に雑談できるメインの部屋です">
-        <i class="fa-solid fa-comments"></i> 💬 雑談部屋
+        <i class="fa-solid fa-comments"></i> 💬 雑談部屋${publicCountBadge}
       </button>
     `;
 
     Object.entries(rooms).forEach(([roomId, rData]) => {
       if (!rData || !rData.name) return;
+
+      const lastActive = rData.lastActivity || rData.createdAt || 0;
+      if (roomId !== 'public_main' && (now - lastActive > INACTIVE_LIMIT)) {
+        remove(ref(db, `rooms_meta/${roomId}`));
+        remove(ref(db, `rooms/${roomId}`));
+        if (currentRoomId === roomId) {
+          showToast(`部屋「${rData.name}」は30分間発言がなかったため自動削除されました。「雑談部屋」に移動します。`, 'warning');
+          switchRoom('public_main', '💬 雑談部屋', '誰でも自由に雑談できるメインの部屋です');
+        }
+        return;
+      }
+
       const isActive = currentRoomId === roomId;
       const icon = rData.icon || '💬';
       const lockIcon = rData.isPrivate ? '<i class="fa-solid fa-lock text-warning" style="font-size:0.75rem;"></i> ' : '';
+      const uCount = roomUserCounts[roomId] || 0;
+      const countBadge = uCount > 0 ? `<span class="room-user-count-badge">👤 ${uCount}</span>` : '';
+      const adminDelBtn = isAdminMode ? `<button class="btn-admin-del-room" onclick="window.adminDeleteRoom('${roomId}', '${escapeHtml(rData.name)}', event)" title="運営権限で部屋を削除"><i class="fa-solid fa-trash"></i></button>` : '';
 
       html += `
         <button class="room-tab ${isActive ? 'active' : ''}" data-room="${roomId}" data-name="${escapeHtml(rData.name)}" data-pr="${escapeHtml(rData.pr || '')}" data-private="${rData.isPrivate ? 'true' : 'false'}">
-          ${lockIcon}${icon} ${escapeHtml(rData.name)}
+          ${lockIcon}${icon} ${escapeHtml(rData.name)}${countBadge}${adminDelBtn}
         </button>
       `;
     });
 
     tabsListEl.innerHTML = html;
 
-    // Attach click listeners to room tabs
     tabsListEl.querySelectorAll('.room-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
+      tab.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-admin-del-room')) return;
         const roomId = tab.dataset.room;
         const name = tab.dataset.name;
         const pr = tab.dataset.pr;
@@ -3500,6 +3567,19 @@ function setupProfileModal() {
       myName = newName;
       myStatus = newStatus;
       if (newTripKey) myTrip = await generateTrip(newTripKey);
+
+      const accKey = localStorage.getItem('cyberchat_account_key');
+      if (accKey) {
+        try {
+          await update(globalRef(`accounts/${accKey}`), {
+            username: myName,
+            avatar: myAvatar,
+            status: myStatus
+          });
+        } catch (e) {
+          console.warn("Account update error:", e);
+        }
+      }
 
       await registerOnlineUser();
       updateMyProfileUI();
@@ -4167,7 +4247,17 @@ function renderFriendsListUI() {
   }
 
   friendsMap.forEach((fData, fUid) => {
-    const isOnline = activeUsersMap.has(fUid);
+    const onlineData = globalOnlineUsersMap.get(fUid);
+    const isOnline = !!onlineData;
+    const friendRoomName = onlineData ? (onlineData.currentRoomName || '雑談部屋') : '';
+    const friendRoomId = onlineData ? (onlineData.currentRoomId || 'public_main') : 'public_main';
+
+    const locationText = isOnline ? ` (📍 ${escapeHtml(friendRoomName)})` : '';
+    const statusTextHtml = isOnline ? `🟢 オンライン<span class="friend-location-tag">${locationText}</span>` : '⚪ オフライン';
+
+    const jumpBtnHtml = isOnline ? `
+      <button class="btn-secondary btn-sm" onclick="window.jumpToRoom('${friendRoomId}', '${escapeHtml(friendRoomName)}')" title="部屋に移動"><i class="fa-solid fa-right-to-bracket text-primary"></i> 移動</button>
+    ` : '';
 
     if (sidebarUl) {
       const li = document.createElement('li');
@@ -4176,9 +4266,10 @@ function renderFriendsListUI() {
         <div class="avatar-sm">${renderAvatarHTML(fData.friendAvatar)}</div>
         <div class="user-item-info">
           <div class="user-item-name"><span class="friend-online-dot ${isOnline ? 'online' : 'offline'}"></span>${escapeHtml(fData.friendName)}</div>
-          <div class="user-item-status">${isOnline ? '🟢 オンライン' : '⚪ オフライン'}</div>
+          <div class="user-item-status">${statusTextHtml}</div>
         </div>
-        <button class="btn-secondary btn-sm" onclick="window.startWhisper('${fUid}', '${escapeHtml(fData.friendName)}')" title="会話する"><i class="fa-solid fa-comments text-primary"></i></button>
+        ${jumpBtnHtml}
+        <button class="btn-secondary btn-sm" onclick="window.openFriendChat('${fUid}', '${escapeHtml(fData.friendName)}', '${escapeHtml(fData.friendAvatar)}')" title="個別チャット（DM）"><i class="fa-solid fa-comments text-primary"></i></button>
       `;
       sidebarUl.appendChild(li);
     }
@@ -4190,9 +4281,10 @@ function renderFriendsListUI() {
         <div class="avatar-sm">${renderAvatarHTML(fData.friendAvatar)}</div>
         <div class="friend-item-info">
           <div class="friend-item-name"><span class="friend-online-dot ${isOnline ? 'online' : 'offline'}"></span>${escapeHtml(fData.friendName)}</div>
-          <div class="friend-item-status">${isOnline ? '🟢 オンライン' : '⚪ オフライン'}</div>
+          <div class="friend-item-status">${statusTextHtml}</div>
         </div>
-        <button class="btn-primary btn-sm" onclick="window.startWhisper('${fUid}', '${escapeHtml(fData.friendName)}'); document.getElementById('friend-modal').classList.add('hidden');"><i class="fa-solid fa-comments"></i> 会話する</button>
+        ${jumpBtnHtml}
+        <button class="btn-primary btn-sm" onclick="window.openFriendChat('${fUid}', '${escapeHtml(fData.friendName)}', '${escapeHtml(fData.friendAvatar)}'); document.getElementById('friend-modal').classList.add('hidden');"><i class="fa-solid fa-comments"></i> チャット</button>
       `;
       modalUl.appendChild(mLi);
     }
@@ -4338,4 +4430,206 @@ function setupMobileNavigation() {
   if (toggleBtn) toggleBtn.addEventListener('click', openDrawer);
   if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
   if (overlay) overlay.addEventListener('click', closeDrawer);
+}
+
+/* ==========================================================================
+   🤝 Room Jump, Admin Room Deletion & Friend DM Chat System
+   ========================================================================== */
+window.jumpToRoom = (targetRoomId, targetRoomName) => {
+  if (currentRoomId === targetRoomId) {
+    showToast(`既に「${targetRoomName}」にいます`, 'info');
+    return;
+  }
+  const passModal = document.getElementById('room-pass-modal');
+  const targetTab = document.querySelector(`.room-tab[data-room="${targetRoomId}"]`);
+  if (targetTab && targetTab.dataset.private === 'true' && !unlockedRoomsSet.has(targetRoomId)) {
+    const nameEl = document.getElementById('room-pass-target-name');
+    if (nameEl) nameEl.textContent = `「${targetRoomName}」への入室`;
+    const passInput = document.getElementById('room-pass-input');
+    if (passInput) passInput.value = '';
+    const errBanner = document.getElementById('room-pass-error');
+    if (errBanner) errBanner.classList.add('hidden');
+    if (passModal) passModal.classList.remove('hidden');
+  } else {
+    switchRoom(targetRoomId, targetRoomName);
+  }
+};
+
+window.adminDeleteRoom = async (roomId, roomName, event) => {
+  if (event) event.stopPropagation();
+  if (roomId === 'public_main') {
+    showToast('「雑談部屋」は削除できません', 'error');
+    return;
+  }
+  if (!confirm(`【運営操作】部屋「${roomName}」を完全に削除しますか？`)) return;
+
+  try {
+    await remove(ref(db, `rooms_meta/${roomId}`));
+    await remove(ref(db, `rooms/${roomId}`));
+    showToast(`運営権限で部屋「${roomName}」を削除しました`, 'success');
+    if (currentRoomId === roomId) {
+      switchRoom('public_main', '💬 雑談部屋', '誰でも自由に雑談できるメインの部屋です');
+    }
+  } catch (err) {
+    showToast('部屋の削除に失敗しました: ' + err.message, 'error');
+  }
+};
+
+window.openFriendChat = (friendUid, friendName, friendAvatar) => {
+  currentFriendChatUid = friendUid;
+  const modal = document.getElementById('friend-chat-modal');
+  if (!modal) return;
+
+  const targetNameEl = document.getElementById('fc-target-name');
+  const targetAvatarEl = document.getElementById('fc-target-avatar');
+  const targetStatusEl = document.getElementById('fc-target-status');
+  const jumpBtn = document.getElementById('fc-btn-jump-room');
+
+  if (targetNameEl) targetNameEl.textContent = friendName;
+  if (targetAvatarEl) targetAvatarEl.innerHTML = renderAvatarHTML(friendAvatar);
+
+  const onlineData = globalOnlineUsersMap.get(friendUid);
+  if (onlineData) {
+    const friendRoomName = onlineData.currentRoomName || '雑談部屋';
+    const friendRoomId = onlineData.currentRoomId || 'public_main';
+    if (targetStatusEl) targetStatusEl.innerHTML = `<span style="color:#00ff88;">🟢 オンライン</span> <span class="friend-location-tag">(📍 ${escapeHtml(friendRoomName)})</span>`;
+    if (jumpBtn) {
+      jumpBtn.classList.remove('hidden');
+      jumpBtn.onclick = () => {
+        modal.classList.add('hidden');
+        window.jumpToRoom(friendRoomId, friendRoomName);
+      };
+    }
+  } else {
+    if (targetStatusEl) targetStatusEl.innerHTML = `<span style="color:var(--text-muted);">⚪ オフライン</span>`;
+    if (jumpBtn) jumpBtn.classList.add('hidden');
+  }
+
+  const friendModal = document.getElementById('friend-modal');
+  if (friendModal) friendModal.classList.add('hidden');
+
+  modal.classList.remove('hidden');
+  loadFriendDmMessages(friendUid);
+};
+
+function loadFriendDmMessages(friendUid) {
+  if (unsubscribeFriendChat) unsubscribeFriendChat();
+
+  const dmChannelId = [myUserId, friendUid].sort().join('_');
+  const messagesRef = ref(db, `friend_chats/${dmChannelId}/messages`);
+
+  unsubscribeFriendChat = onValue(messagesRef, (snapshot) => {
+    const container = document.getElementById('fc-messages-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!snapshot.exists()) {
+      container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:30px 10px; font-size:0.85rem;">まだメッセージはありません。挨拶を送ってみましょう！💬</div>';
+      return;
+    }
+
+    const messages = snapshot.val();
+    Object.values(messages).forEach(msg => {
+      const isSelf = msg.senderId === myUserId;
+      const bubble = document.createElement('div');
+      bubble.className = `fc-msg-bubble ${isSelf ? 'self' : 'other'}`;
+      bubble.innerHTML = `
+        <div>${formatMessageText(msg.text || '')}</div>
+        <div class="fc-msg-time">${formatTime(msg.timestamp)}</div>
+      `;
+      container.appendChild(bubble);
+    });
+
+    const body = document.querySelector('.fc-messages-body');
+    if (body) body.scrollTop = body.scrollHeight;
+  });
+}
+
+function setupFriendChatModal() {
+  const modal = document.getElementById('friend-chat-modal');
+  const form = document.getElementById('fc-chat-form');
+  const input = document.getElementById('fc-message-input');
+
+  if (!modal) return;
+
+  modal.querySelectorAll('.modal-close').forEach(b => {
+    b.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      currentFriendChatUid = null;
+      if (unsubscribeFriendChat) unsubscribeFriendChat();
+    });
+  });
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentFriendChatUid || !input) return;
+      const text = input.value.trim();
+      if (!text) return;
+
+      const dmChannelId = [myUserId, currentFriendChatUid].sort().join('_');
+      const messagesRef = ref(db, `friend_chats/${dmChannelId}/messages`);
+      const newMsgRef = push(messagesRef);
+
+      try {
+        await set(newMsgRef, {
+          senderId: myUserId,
+          senderName: myName,
+          senderAvatar: myAvatar,
+          text: text,
+          timestamp: Date.now()
+        });
+
+        await set(ref(db, `user_dms/${currentFriendChatUid}/latest`), {
+          fromUserId: myUserId,
+          fromName: myName,
+          text: text,
+          timestamp: Date.now()
+        });
+
+        input.value = '';
+      } catch (err) {
+        showToast('送信に失敗しました', 'error');
+      }
+    });
+  }
+}
+
+function initGlobalOnlineUsersListener() {
+  const globalUsersRef = ref(db, 'global_online_users');
+  onValue(globalUsersRef, (snapshot) => {
+    globalOnlineUsersMap.clear();
+    if (snapshot.exists()) {
+      const users = snapshot.val();
+      const now = Date.now();
+      Object.entries(users).forEach(([uid, uData]) => {
+        if (uData && (!uData.lastSeen || (now - uData.lastSeen <= 30000))) {
+          globalOnlineUsersMap.set(uid, uData);
+        }
+      });
+    }
+    renderFriendsListUI();
+  });
+}
+
+function initGlobalFriendDmListener() {
+  if (!myUserId) return;
+  const dmNotifRef = ref(db, `user_dms/${myUserId}/latest`);
+  let isFirstLoad = true;
+
+  onValue(dmNotifRef, (snapshot) => {
+    if (isFirstLoad) {
+      isFirstLoad = false;
+      return;
+    }
+    if (snapshot.exists()) {
+      const notif = snapshot.val();
+      if (notif.fromUserId !== myUserId) {
+        if (currentFriendChatUid !== notif.fromUserId) {
+          playSound('whisper');
+          showToast(`💬 ${escapeHtml(notif.fromName)} さんから個別メッセージ: "${escapeHtml(notif.text)}"`, 'info');
+        }
+      }
+    }
+  });
 }
