@@ -40,7 +40,7 @@ let unsubscribeFriends = null;
 let deviceMode = localStorage.getItem('cyberchat_device_mode') || 'pc';
 let currentTheme = localStorage.getItem('cyberchat_theme') || 'cyber';
 let isAdminMode = false;
-const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371-ta-da-no-cat-like-create";
+const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei";
 
 let globalOnlineUsersMap = new Map();
 let currentFriendChatUid = null;
@@ -2361,7 +2361,7 @@ function setupPaintModal() {
   canvas.addEventListener('touchend', stopDraw);
 
   submitBtn.addEventListener('click', () => {
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+    const dataUrl = canvas.toDataURL('image/png');
     modal.classList.add('hidden');
     
     sendSpecialMessageWithMedia('image', '🎨 手書きイラスト', dataUrl);
@@ -2504,9 +2504,11 @@ function setupScreenShare() {
     canvas.width = videoEl.videoWidth;
     canvas.height = videoEl.videoHeight;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
 
-    const snapDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+    const snapDataUrl = canvas.toDataURL('image/jpeg', 0.92);
     sendSpecialMessageWithMedia('image', '📸 共有画面のスナップショット', snapDataUrl);
     showToast('共有画面のスナップショットを投稿しました！', 'success');
   });
@@ -2687,7 +2689,7 @@ function setupChatControls() {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxDim = 450;
+          const maxDim = 1920;
           if (width > maxDim || height > maxDim) {
             if (width > height) {
               height = Math.round((height * maxDim) / width);
@@ -2700,9 +2702,12 @@ function setupChatControls() {
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
 
-          selectedFileObject.dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+          const format = (file.type === 'image/png' || file.type === 'image/gif') ? 'image/png' : 'image/jpeg';
+          selectedFileObject.dataUrl = canvas.toDataURL(format, 0.92);
           selectedFileObject.msgType = 'image';
 
           previewImg.src = selectedFileObject.dataUrl;
