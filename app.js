@@ -5432,9 +5432,18 @@ window.openCreatorEffectsModal = (selectedUid = null) => {
   const modal = document.getElementById('creator-effects-modal');
   if (modal) {
     modal.classList.remove('hidden');
+    modal.style.display = 'flex';
     renderCreatorEffectsListUI(selectedUid);
   } else {
     console.error("creator-effects-modal element not found!");
+  }
+};
+
+window.closeCreatorEffectsModal = () => {
+  const modal = document.getElementById('creator-effects-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
   }
 };
 

@@ -220,7 +220,7 @@
           </div>
           <span id="my-exp-text" class="exp-text-val">0 / 50 EXP (0%)</span>
         </div>
-        <button id="btn-sidebar-creator-effects" class="btn-secondary btn-sm creator-only-btn" style="width:100%; margin-top:8px; background: linear-gradient(135deg, rgba(255, 0, 128, 0.2), rgba(112, 0, 255, 0.2)); border: 1px solid rgba(255, 0, 128, 0.5); color: #ff79c6; font-weight:700;">
+        <button id="btn-sidebar-creator-effects" class="btn-secondary btn-sm creator-only-btn" onclick="window.openCreatorEffectsModal()" style="width:100%; margin-top:8px; background: linear-gradient(135deg, rgba(255, 0, 128, 0.2), rgba(112, 0, 255, 0.2)); border: 1px solid rgba(255, 0, 128, 0.5); color: #ff79c6; font-weight:700;">
           <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ エフェクトリスト
         </button>
       </div>
@@ -309,7 +309,7 @@
 
         <div class="header-actions">
           <!-- ✨ エフェクトリストボタン -->
-          <button id="btn-open-creator-effects" class="btn-creator-effect" title="✨ エフェクトリスト (ただのネコ好き専用)">
+          <button id="btn-open-creator-effects" class="btn-creator-effect" onclick="window.openCreatorEffectsModal()" title="✨ エフェクトリスト (ただのネコ好き専用)">
             <i class="fa-solid fa-wand-magic-sparkles"></i>
             <span>エフェクト</span>
           </button>
@@ -1396,7 +1396,7 @@
             ユーザーに特別エフェクトを付与・解除できます。相手画面にも即時反映され永久に維持されます。
           </div>
         </div>
-        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+        <button class="btn-icon modal-close" onclick="window.closeCreatorEffectsModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body" style="padding: 16px;">
         <!-- 検索バー -->
