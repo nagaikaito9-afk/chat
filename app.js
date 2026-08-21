@@ -5478,48 +5478,12 @@ function renderCreatorEffectsListUI(highlightUid = null) {
   }).join('');
 }
 
-function setupCreatorEffectsControls() {
-  const btnHeader = document.getElementById('btn-open-creator-effects');
-  if (btnHeader) {
-    btnHeader.addEventListener('click', () => window.openCreatorEffectsModal());
-  }
-
-  const btnSidebar = document.getElementById('btn-sidebar-creator-effects');
-  if (btnSidebar) {
-    btnSidebar.addEventListener('click', () => window.openCreatorEffectsModal());
-  }
-
-  const modal = document.getElementById('creator-effects-modal');
-  if (modal) {
-    modal.querySelectorAll('.modal-close').forEach(b => {
-      b.addEventListener('click', () => modal.classList.add('hidden'));
-    });
-
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.classList.add('hidden');
-    });
-
-    const searchInput = document.getElementById('effect-user-search-input');
-    if (searchInput) {
-      searchInput.addEventListener('input', () => renderCreatorEffectsListUI());
-    }
-
-    const filterBtns = modal.querySelectorAll('.effect-filter-btn');
-    filterBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentEffectFilter = btn.dataset.effectFilter || 'all';
-        renderCreatorEffectsListUI();
-      });
-    });
-  document.addEventListener('DOMContentLoaded', () => {
-    setupSidebarCategoryTabs();
-    setupChatMessageSearch();
-    setupTranslationControls();
-    renderUnifiedSidebarUserList();
-  });
-}
+document.addEventListener('DOMContentLoaded', () => {
+  setupSidebarCategoryTabs();
+  setupChatMessageSearch();
+  setupTranslationControls();
+  renderUnifiedSidebarUserList();
+});
 
 /* ==========================================================================
    5 Categorized Sidebar Lists & User Search
