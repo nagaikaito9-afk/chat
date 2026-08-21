@@ -1320,17 +1320,48 @@ html, body {
 .user-item-status {
   font-size: 0.7rem;
   color: var(--accent-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-user-action {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  font-size: 0.8rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+}
+
+.btn-user-action:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-mute-user {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 4px;
-  font-size: 0.85rem;
-  opacity: 0;
-  transition: opacity 0.2s;
+  opacity: 0.6;
+  transition: all 0.2s;
 }
 
 .user-item:hover .btn-mute-user {
@@ -1339,6 +1370,8 @@ html, body {
 
 .btn-mute-user:hover {
   color: var(--danger-color);
+  background: rgba(255, 51, 102, 0.15);
+  border-color: rgba(255, 51, 102, 0.3);
 }
 
 /* Chat Main Section */

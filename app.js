@@ -1500,7 +1500,7 @@ function initFirebaseRealtimeSync() {
         const nameClass = getUserNameClass(uid, uData.name);
 
         const trustBtnHtml = isCreatorName(myName) && uid !== myUserId ? `
-          <button class="btn-secondary btn-sm" onclick="window.toggleTrustUser('${uid}', '${escapeHtml(uData.name)}')" title="信用ステータスを付与/解除">
+          <button class="btn-user-action" onclick="window.toggleTrustUser('${uid}', '${escapeHtml(uData.name)}')" title="信用ステータスを付与/解除">
             <i class="fa-solid fa-gem ${trustedUsersSet.has(uid) ? 'text-info' : ''}"></i>
           </button>
         ` : '';
@@ -1513,10 +1513,12 @@ function initFirebaseRealtimeSync() {
             <div class="${nameClass}">${escapeHtml(uData.name)}${roleBadgesHtml} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
             <div class="user-item-status">${escapeHtml(uData.status || '💬 雑談歓迎')}</div>
           </div>
-          <button class="btn-secondary btn-sm" onclick="window.startWhisper('${uid}', '${escapeHtml(uData.name)}')" title="内緒話（DM）"><i class="fa-solid fa-lock"></i></button>
-          ${uid !== myUserId ? `<button class="btn-secondary btn-sm" onclick="window.sendFriendRequest('${uid}', '${escapeHtml(uData.name)}')" title="フレンド申請"><i class="fa-solid fa-user-plus text-primary"></i></button>` : ''}
-          ${trustBtnHtml}
-          ${uid !== myUserId ? `<button class="btn-mute-user" onclick="window.ignoreUser('${uid}', '${escapeHtml(uData.name)}')" title="無視（ブロック）"><i class="fa-solid fa-user-slash"></i></button>` : ''}
+          <div class="user-item-actions">
+            <button class="btn-user-action" onclick="window.startWhisper('${uid}', '${escapeHtml(uData.name)}')" title="内緒話（DM）"><i class="fa-solid fa-lock"></i></button>
+            ${uid !== myUserId ? `<button class="btn-user-action" onclick="window.sendFriendRequest('${uid}', '${escapeHtml(uData.name)}')" title="フレンド申請"><i class="fa-solid fa-user-plus text-primary"></i></button>` : ''}
+            ${trustBtnHtml}
+            ${uid !== myUserId ? `<button class="btn-user-action btn-mute-user" onclick="window.ignoreUser('${uid}', '${escapeHtml(uData.name)}')" title="無視（ブロック）"><i class="fa-solid fa-user-slash"></i></button>` : ''}
+          </div>
         `;
         userListEl.appendChild(li);
       });
@@ -4440,7 +4442,7 @@ function renderFriendsListUI() {
     const statusTextHtml = isOnline ? `🟢 オンライン<span class="friend-location-tag">${locationText}</span>` : '⚪ オフライン';
 
     const jumpBtnHtml = isOnline ? `
-      <button class="btn-secondary btn-sm" onclick="window.jumpToRoom('${friendRoomId}', '${escapeHtml(friendRoomName)}')" title="部屋に移動"><i class="fa-solid fa-right-to-bracket text-primary"></i> 移動</button>
+      <button class="btn-user-action" onclick="window.jumpToRoom('${friendRoomId}', '${escapeHtml(friendRoomName)}')" title="部屋に移動"><i class="fa-solid fa-right-to-bracket text-primary"></i></button>
     ` : '';
 
     if (sidebarUl) {
@@ -4452,8 +4454,10 @@ function renderFriendsListUI() {
           <div class="user-item-name"><span class="friend-online-dot ${isOnline ? 'online' : 'offline'}"></span>${escapeHtml(fData.friendName)}</div>
           <div class="user-item-status">${statusTextHtml}</div>
         </div>
-        ${jumpBtnHtml}
-        <button class="btn-secondary btn-sm" onclick="window.openFriendChat('${fUid}', '${escapeHtml(fData.friendName)}', '${escapeHtml(fData.friendAvatar)}')" title="個別チャット（DM）"><i class="fa-solid fa-comments text-primary"></i></button>
+        <div class="user-item-actions">
+          ${jumpBtnHtml}
+          <button class="btn-user-action" onclick="window.openFriendChat('${fUid}', '${escapeHtml(fData.friendName)}', '${escapeHtml(fData.friendAvatar)}')" title="個別チャット（DM）"><i class="fa-solid fa-comments text-primary"></i></button>
+        </div>
       `;
       sidebarUl.appendChild(li);
     }
