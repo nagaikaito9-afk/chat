@@ -194,28 +194,31 @@
 
       <!-- 自分のプロフィールカード -->
       <div class="my-profile-card">
-        <div class="avatar-circle" id="my-avatar">🤖</div>
-        <div class="profile-info">
-          <div class="profile-name-row" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-            <span class="profile-name" id="my-name-display">ゲスト</span>
-            <span class="level-badge-pill" id="my-level-display">Lv.1</span>
-          </div>
-          <div class="profile-status-badge" id="my-status-display">💬 雑談歓迎</div>
-          <div class="profile-trip" id="my-trip-display">◆------</div>
-          <div class="exp-bar-box" title="発言・フレンド追加・ログインでEXP獲得！Lv.10ですべての機能が解放されます">
-            <div class="exp-bar-track">
-              <div id="my-exp-bar-fill" class="exp-bar-fill" style="width: 0%;"></div>
+        <div class="profile-card-top-row">
+          <div class="avatar-circle" id="my-avatar">🤖</div>
+          <div class="profile-info">
+            <div class="profile-name-row">
+              <span class="profile-name" id="my-name-display">ゲスト</span>
+              <span class="level-badge-pill" id="my-level-display">Lv.1</span>
             </div>
-            <span id="my-exp-text" class="exp-text-val">0 / 50 EXP</span>
+            <div class="profile-status-badge" id="my-status-display">💬 雑談歓迎</div>
+            <div class="profile-trip" id="my-trip-display">◆------</div>
+          </div>
+          <div class="profile-card-actions">
+            <button id="btn-open-edit-profile" class="btn-icon" title="プロフィール変更">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button id="btn-logout-account" class="btn-icon danger" title="ログアウト">
+              <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
           </div>
         </div>
-        <div class="profile-card-actions">
-          <button id="btn-open-edit-profile" class="btn-icon" title="プロフィール変更">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button id="btn-logout-account" class="btn-icon danger" title="ログアウト">
-            <i class="fa-solid fa-right-from-bracket"></i>
-          </button>
+
+        <div class="exp-bar-box" title="発言・フレンド追加・ログインでEXP獲得！Lv.10ですべての機能が解放されます">
+          <div class="exp-bar-track">
+            <div id="my-exp-bar-fill" class="exp-bar-fill" style="width: 0%;"></div>
+          </div>
+          <span id="my-exp-text" class="exp-text-val">0 / 50 EXP (0%)</span>
         </div>
       </div>
 
@@ -341,6 +344,11 @@
           <button id="btn-toggle-sound" class="btn-icon active" title="通知音 ON/OFF">
             <i class="fa-solid fa-volume-high"></i>
           </button>
+
+          <!-- 🌐 50か国語自動翻訳切り替えボタン -->
+          <button id="btn-lang-picker-toggle" class="btn-icon" title="🌐 50か国語リアルタイム翻訳">
+            <i class="fa-solid fa-language text-primary"></i>
+          </button>
         </div>
       </header>
 
@@ -359,6 +367,64 @@
           <button class="theme-opt-btn" data-theme-name="velvet">🔮 Midnight Velvet</button>
           <button class="theme-opt-btn" data-theme-name="pastel">🍭 Pastel Candy</button>
         </div>
+      </div>
+
+      <!-- 🌐 50か国語翻訳ポップアップ -->
+      <div id="lang-picker-popup" class="theme-picker-popup hidden animate-scale-up" style="max-width:340px;">
+        <div class="theme-picker-title"><i class="fa-solid fa-language text-primary"></i> 🌐 50か国語リアルタイム翻訳</div>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">チャット翻訳ターゲット言語 (全50言語)</div>
+        <select id="chat-lang-select" class="status-select" style="width:100%; font-size:0.85rem; padding:6px 10px;">
+          <option value="ja">🇯🇵 日本語 (Japanese)</option>
+          <option value="en">🇺🇸 English (英語)</option>
+          <option value="zh-CN">🇨🇳 中文 简体 (Chinese)</option>
+          <option value="zh-TW">🇹🇼 繁體中文 (Taiwan)</option>
+          <option value="ko">🇰🇷 한국어 (Korean)</option>
+          <option value="es">🇪🇸 Español (Spanish)</option>
+          <option value="fr">🇫🇷 Français (French)</option>
+          <option value="de">🇩🇪 Deutsch (German)</option>
+          <option value="it">🇮🇹 Italiano (Italian)</option>
+          <option value="pt">🇵🇹 Português (Portuguese)</option>
+          <option value="ru">🇷🇺 Русский (Russian)</option>
+          <option value="ar">🇸🇦 العربية (Arabic)</option>
+          <option value="hi">🇮🇳 हिन्दी (Hindi)</option>
+          <option value="bn">🇧🇩 বাংলা (Bengali)</option>
+          <option value="tr">🇹🇷 Türkçe (Turkish)</option>
+          <option value="vi">🇻🇳 Tiếng Việt (Vietnamese)</option>
+          <option value="id">🇮🇩 Bahasa Indonesia (Indonesian)</option>
+          <option value="tl">🇵🇭 Tagalog / Filipino</option>
+          <option value="pl">🇵🇱 Polski (Polish)</option>
+          <option value="nl">🇳🇱 Nederlands (Dutch)</option>
+          <option value="th">🇹🇭 ไทย (Thai)</option>
+          <option value="uk">🇺🇦 Українська (Ukrainian)</option>
+          <option value="el">🇬🇷 Ελληνικά (Greek)</option>
+          <option value="cs">🇨🇿 Čeština (Czech)</option>
+          <option value="ro">🇷🇴 Română (Romanian)</option>
+          <option value="hu">🇭🇺 Magyar (Hungarian)</option>
+          <option value="sv">🇸🇪 Svenska (Swedish)</option>
+          <option value="fi">🇫🇮 Suomi (Finnish)</option>
+          <option value="no">🇳🇴 Norsk (Norwegian)</option>
+          <option value="da">🇩🇰 Dansk (Danish)</option>
+          <option value="he">🇮🇱 עברית (Hebrew)</option>
+          <option value="fa">🇮🇷 فارسی (Persian)</option>
+          <option value="ms">🇲🇾 Bahasa Melayu (Malay)</option>
+          <option value="sk">🇸🇰 Slovenčina (Slovak)</option>
+          <option value="bg">🇧🇬 Български (Bulgarian)</option>
+          <option value="hr">🇭🇷 Hrvatski (Croatian)</option>
+          <option value="sr">🇸🇷 Српски (Serbian)</option>
+          <option value="sl">🇸🇮 Slovenščina (Slovenian)</option>
+          <option value="et">🇪🇪 Eesti (Estonian)</option>
+          <option value="lv">🇱🇻 Latviešu (Latvian)</option>
+          <option value="lt">🇱🇹 Lietuvių (Lithuanian)</option>
+          <option value="is">🇮🇸 Íslenska (Icelandic)</option>
+          <option value="ga">🇮🇪 Gaeilge (Irish)</option>
+          <option value="mt">🇲🇹 Malti (Maltese)</option>
+          <option value="sq">🇦🇱 Shqip (Albanian)</option>
+          <option value="mk">🇲🇰 Македонски (Macedonian)</option>
+          <option value="hy">🇦🇲 Հայերեն (Armenian)</option>
+          <option value="ka">🇬🇪 ქართული (Georgian)</option>
+          <option value="mn">🇲🇳 Монгол (Mongolian)</option>
+          <option value="km">🇰🇭 ភាសាខ្មែរ (Khmer)</option>
+        </select>
       </div>
 
       <!-- ルーム切り替えタブバー -->

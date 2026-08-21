@@ -1126,23 +1126,30 @@ html, body {
 }
 
 .my-profile-card {
-  margin: 16px 16px 10px;
-  padding: 14px;
+  margin: 12px 14px 10px;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-card-top-row {
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
 }
 
 .avatar-circle {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: var(--accent-gradient);
   color: #ffffff;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1152,26 +1159,44 @@ html, body {
 .profile-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 
 .profile-name {
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: 700;
+  font-size: 0.92rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 110px;
 }
 
 .profile-status-badge {
   font-size: 0.75rem;
   color: var(--accent-primary);
   margin: 1px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .profile-trip {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--text-secondary);
   font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 🌟 レベル＆EXP成長システム スタイリング */
@@ -1198,7 +1223,8 @@ html, body {
 }
 
 .exp-bar-box {
-  margin-top: 4px;
+  width: 100%;
+  margin-top: 2px;
 }
 
 .exp-bar-track {
@@ -1224,6 +1250,9 @@ html, body {
   margin-top: 2px;
   text-align: right;
   font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 👑 レベル最大 (Lv.50) レインボーエフェクト */
@@ -1269,8 +1298,32 @@ html, body {
 }
 
 .veteran-avatar-glow {
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.7), 0 0 20px rgba(217, 119, 6, 0.4) !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.85), 0 0 22px rgba(217, 119, 6, 0.5) !important;
   border: 2px solid #f59e0b !important;
+}
+
+/* 🌟 多重エフェクト組み合わせ発光 (Dynamic Combined Aura Effects) */
+.creator-avatar-glow.veteran-avatar-glow {
+  box-shadow: 0 0 16px #ffb800, 0 0 28px #f59e0b, 0 0 38px #ff007f !important;
+  border: 2px solid #ffd700 !important;
+  animation: creatorVeteranGlowPulse 2.5s ease-in-out infinite !important;
+}
+
+.trusted-avatar-glow.veteran-avatar-glow {
+  box-shadow: 0 0 16px #00f0ff, 0 0 28px #f59e0b, 0 0 38px #7000ff !important;
+  border: 2px solid #00f0ff !important;
+}
+
+.creator-avatar-glow.veteran-avatar-glow.trusted-avatar-glow {
+  box-shadow: 0 0 18px #ffd700, 0 0 30px #00f0ff, 0 0 42px #ff007f !important;
+  border: 2px solid #ffffff !important;
+  animation: rainbowGlowPulse 2s linear infinite !important;
+}
+
+@keyframes creatorVeteranGlowPulse {
+  0% { box-shadow: 0 0 14px #ffb800, 0 0 24px #f59e0b, 0 0 34px #ff007f; }
+  50% { box-shadow: 0 0 22px #ff007f, 0 0 32px #ffb800, 0 0 44px #00f0ff; }
+  100% { box-shadow: 0 0 14px #ffb800, 0 0 24px #f59e0b, 0 0 34px #ff007f; }
 }
 
 /* ロック中ツールのスタイリング */

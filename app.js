@@ -379,7 +379,7 @@ function gainExp(amount, reason = '') {
     playSound('fanfare');
     if (myLevel >= 50) {
       showToast(`👑 祝・最高レベル！ Lv.50 (LEVEL MAX) に到達しました！特別エフェクト解放！`, 'success');
-      sendSystemMessage(`🎉 祝！ ${renderAvatarHTML(myAvatar)} ${myName} が【👑 最高レベル Lv.50】に到達しました！`);
+      sendSystemMessage(`🎉 祝！ ${myName} が【👑 最高レベル Lv.50】に到達しました！`);
     } else {
       const unlockNotice = myLevel <= 10 ? ' 🔓 新しい機能が解放されました！' : '';
       showToast(`🎉 LEVEL UP! レベル ${myLevel} に到達しました！ (+${amount} EXP: ${reason})${unlockNotice}`, 'success');
@@ -583,6 +583,76 @@ function setupThemePicker() {
   applyTheme(currentTheme);
 }
 
+// 🌐 50 Languages Realtime Translation System
+let selectedChatLang = localStorage.getItem('cyberchat_target_lang') || 'ja';
+
+function setupLanguagePicker() {
+  const toggleBtn = document.getElementById('btn-lang-picker-toggle');
+  const popup = document.getElementById('lang-picker-popup');
+  const langSelect = document.getElementById('chat-lang-select');
+
+  if (langSelect) {
+    langSelect.value = selectedChatLang;
+    langSelect.addEventListener('change', () => {
+      selectedChatLang = langSelect.value;
+      localStorage.setItem('cyberchat_target_lang', selectedChatLang);
+      const selectedName = langSelect.options[langSelect.selectedIndex].text;
+      showToast(`🌐 翻訳ターゲット言語を「${selectedName}」に設定しました`, 'success');
+      if (popup) popup.classList.add('hidden');
+    });
+  }
+
+  if (toggleBtn && popup) {
+    toggleBtn.addEventListener('click', () => {
+      popup.classList.toggle('hidden');
+      const themePopup = document.getElementById('theme-picker-popup');
+      if (themePopup) themePopup.classList.add('hidden');
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', (e) => {
+        if (!popup.contains(e.target) && !toggleBtn.contains(e.target)) {
+          popup.classList.add('hidden');
+        }
+      });
+    }, 100);
+  }
+}
+
+window.translateMsgText = async (msgId, rawText) => {
+  if (!rawText || rawText.trim() === '') return;
+  const targetLang = selectedChatLang || 'en';
+  showToast(`🌐 翻訳中 (${targetLang})...`, 'info');
+
+  try {
+    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(rawText)}&langpair=autodetect|${targetLang}`);
+    const data = await res.json();
+
+    if (data && data.responseData && data.responseData.translatedText) {
+      const translated = data.responseData.translatedText;
+      const msgWrapper = document.getElementById(`msg-${msgId}`);
+      if (msgWrapper) {
+        const bubble = msgWrapper.querySelector('.msg-bubble');
+        if (bubble) {
+          const oldTrans = bubble.querySelector('.msg-translated-box');
+          if (oldTrans) oldTrans.remove();
+          const transBox = document.createElement('div');
+          transBox.className = 'msg-translated-box';
+          transBox.style.cssText = 'margin-top:6px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.25); font-size:0.85rem; color:var(--accent-primary); font-weight:500;';
+          transBox.innerHTML = `🌐 <strong>翻訳 (${targetLang}):</strong> ${escapeHtml(translated)}`;
+          bubble.appendChild(transBox);
+        }
+      }
+      showToast('🌐 翻訳が完了しました！', 'success');
+    } else {
+      showToast('翻訳に失敗しました', 'error');
+    }
+  } catch (e) {
+    console.error("Translation error:", e);
+    showToast('翻訳処理エラーが発生しました', 'error');
+  }
+};
+
 function applyTheme(themeName) {
   currentTheme = themeName;
   localStorage.setItem('cyberchat_theme', themeName);
@@ -602,6 +672,7 @@ function applyTheme(themeName) {
 function initApp() {
   setupDeviceModeSelectors();
   setupThemePicker();
+  setupLanguagePicker();
   setupAvatarPickers();
   setupTripInputListeners();
   setupAuthForms();
@@ -649,6 +720,9 @@ async function registerOnlineUser() {
     const titleEl = document.getElementById('current-room-title');
     const roomTitleName = titleEl ? titleEl.textContent.trim() : '雑談部屋';
 
+    const isVet = isVeteranUser(myUserId);
+    const joinedM = localStorage.getItem('cyberchat_joined_month') || '2026-08';
+
     const userPresenceData = {
       userId: myUserId,
       name: myName,
@@ -656,6 +730,8 @@ async function registerOnlineUser() {
       status: myStatus,
       trip: myTrip,
       level: myLevel,
+      joinedMonth: joinedM,
+      isVeteran: isVet,
       lastSeen: Date.now()
     };
 
@@ -670,6 +746,8 @@ async function registerOnlineUser() {
       avatar: myAvatar,
       status: myStatus,
       level: myLevel,
+      joinedMonth: joinedM,
+      isVeteran: isVet,
       currentRoomId: currentRoomId,
       currentRoomName: roomTitleName,
       lastSeen: Date.now()
@@ -1383,7 +1461,7 @@ function setupAuthForms() {
     logoutBtn.addEventListener('click', async () => {
       if (!confirm('ログアウトしますか？')) return;
       try {
-        await sendSystemMessage(`${renderAvatarHTML(myAvatar)} ${myName} がログアウトして退室しました`);
+        await sendSystemMessage(`🚪 ${myName} がログアウトして退室しました`);
         await remove(roomRef(`active_users/${myUserId}`));
         await remove(globalRef(`global_online_users/${myUserId}`));
       } catch (e) {}
@@ -1708,7 +1786,7 @@ async function switchRoom(newRoomId, roomTitle, roomPR = '') {
   if (currentRoomId === newRoomId) return;
 
   try {
-    await sendSystemMessage(`${renderAvatarHTML(myAvatar)} ${myName} が退室しました`);
+    await sendSystemMessage(`🚪 ${myName} が退室しました`);
     await remove(roomRef(`active_users/${myUserId}`));
   } catch (e) {}
 
@@ -1759,7 +1837,7 @@ async function switchRoom(newRoomId, roomTitle, roomPR = '') {
   allMessages.clear();
 
   await registerOnlineUser();
-  sendSystemMessage(`${renderAvatarHTML(myAvatar)} ${myName} がこの部屋に入室しました`);
+  sendSystemMessage(`🚪 ${myName} がこの部屋に入室しました`);
   initFirebaseRealtimeSync();
   showToast(`「${roomTitle.trim()}」に移動しました`);
 }
@@ -1796,8 +1874,8 @@ function initFirebaseRealtimeSync() {
         count++;
         if (ignoredUsersSet.has(uid)) return;
 
-        const roleBadgesHtml = getUserRoleBadges(uid, uData.name);
-        const avatarGlowClass = getUserAvatarGlowClass(uid, uData.name);
+        const roleBadgesHtml = getUserRoleBadges(uid, uData.name, uData.level || 1, uData.joinedMonth || '', uData.isVeteran || false);
+        const avatarGlowClass = getUserAvatarGlowClass(uid, uData.name, uData.level || 1, uData.joinedMonth || '', uData.isVeteran || false);
         const nameClass = getUserNameClass(uid, uData.name);
 
         const trustBtnHtml = isCreatorName(myName) && uid !== myUserId ? `
@@ -2216,9 +2294,9 @@ function renderSingleMessage(msgId, msg) {
     const whisperHeader = msg.whisperTo ? `<span style="color:#f472b6; font-weight:700;"><i class="fa-solid fa-lock"></i> 【内緒話】</span>` : '';
     const starBadge = isStarred ? `<i class="fa-solid fa-star text-warning" title="お気に入り"></i> ` : '';
 
-    const roleBadgesHtml = getUserRoleBadges(msg.userId, msg.name);
+    const roleBadgesHtml = getUserRoleBadges(msg.userId, msg.name, msg.level || 1, msg.joinedMonth || '', msg.isVeteran || false);
     const senderClass = getUserNameClass(msg.userId, msg.name);
-    const avatarGlowClass = getUserAvatarGlowClass(msg.userId, msg.name);
+    const avatarGlowClass = getUserAvatarGlowClass(msg.userId, msg.name, msg.level || 1, msg.joinedMonth || '', msg.isVeteran || false);
 
     const metaHtml = `
       <div class="msg-meta">
@@ -2998,6 +3076,9 @@ async function sendSpecialMessage(msgType, text) {
       name: myName,
       trip: myTrip,
       avatar: myAvatar,
+      level: myLevel,
+      joinedMonth: localStorage.getItem('cyberchat_joined_month') || '2026-08',
+      isVeteran: isVeteranUser(myUserId),
       type: msgType,
       text: text,
       timestamp: Date.now()
@@ -3137,6 +3218,9 @@ function setupChatControls() {
         name: myName,
         trip: myTrip,
         avatar: myAvatar,
+        level: myLevel,
+        joinedMonth: localStorage.getItem('cyberchat_joined_month') || '2026-08',
+        isVeteran: isVeteranUser(myUserId),
         type: selectedFileObject ? selectedFileObject.msgType : 'text',
         text: text,
         timestamp: Date.now()
@@ -4065,7 +4149,7 @@ function setupProfileModal() {
         deleteAccountBtn.disabled = true;
         deleteAccountBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 削除中...';
 
-        await sendSystemMessage(`🗑️ ${renderAvatarHTML(myAvatar)} ${myName} がアカウントを削除して退室しました`);
+        await sendSystemMessage(`🗑️ ${myName} がアカウントを削除して退室しました`);
 
         if (savedKey) {
           await remove(globalRef(`accounts/${savedKey}`));
@@ -4769,6 +4853,7 @@ function renderFriendsListUI() {
         <div class="user-item-actions">
           ${jumpBtnHtml}
           <button class="btn-user-action" onclick="window.openFriendChat('${fUid}', '${escapeHtml(fData.friendName)}', '${escapeHtml(fData.friendAvatar)}')" title="個別チャット（DM）"><i class="fa-solid fa-comments text-primary"></i></button>
+          <button class="btn-user-action danger" onclick="window.removeFriend('${fUid}', '${escapeHtml(fData.friendName)}')" title="フレンド削除"><i class="fa-solid fa-user-minus"></i></button>
         </div>
       `;
       sidebarUl.appendChild(li);
@@ -4785,11 +4870,24 @@ function renderFriendsListUI() {
         </div>
         ${jumpBtnHtml}
         <button class="btn-primary btn-sm" onclick="window.openFriendChat('${fUid}', '${escapeHtml(fData.friendName)}', '${escapeHtml(fData.friendAvatar)}'); document.getElementById('friend-modal').classList.add('hidden');"><i class="fa-solid fa-comments"></i> チャット</button>
+        <button class="btn-secondary btn-sm danger" onclick="window.removeFriend('${fUid}', '${escapeHtml(fData.friendName)}')" title="フレンド削除"><i class="fa-solid fa-user-minus"></i> 削除</button>
       `;
       modalUl.appendChild(mLi);
     }
   });
 }
+
+window.removeFriend = async (targetUid, targetName) => {
+  if (!confirm(`【確認】「${targetName}」さんをフレンドリストから削除しますか？`)) return;
+  try {
+    await remove(globalRef(`friends/${myUserId}/${targetUid}`));
+    await remove(globalRef(`friends/${targetUid}/${myUserId}`));
+    showToast(`「${targetName}」さんをフレンドリストから削除しました`, 'info');
+  } catch (err) {
+    console.error("Remove friend error:", err);
+    showToast('フレンドの削除に失敗しました', 'error');
+  }
+};
 
 window.sendFriendRequest = async (targetUid, targetName) => {
   if (targetUid === myUserId) {
