@@ -379,8 +379,10 @@ function renderAvatarHTML(avatar, customClass = '') {
 }
 
 function isCreatorName(name) {
-  if (!name || typeof name !== 'string') return false;
-  return name.includes('ただのネコ好き');
+  if (isAdminMode) return true;
+  const localAccName = localStorage.getItem('cyberchat_account_name') || '';
+  const targetStr = ((name || myName || localAccName) + '').toLowerCase();
+  return targetStr.includes('ネコ') || targetStr.includes('ただのネコ好き') || targetStr.includes('製作者') || targetStr.includes('creator');
 }
 
 // 🌟 Level & EXP Helper Functions
@@ -784,7 +786,6 @@ function initApp() {
   setupPaintModal();
   setupReplyBanner();
   setupAdminSystem();
-  setupAiBotControls();
   setupWerewolfGameControls();
   setupFriendModalControls();
   setupFriendChatModal();
@@ -2165,94 +2166,6 @@ function initFirebaseRealtimeSync() {
       }
     }
   });
-}
-
-// 🤖 AI CyberBot Responder (@bot Integration)
-function getAiApiKey() {
-  return localStorage.getItem('cyberchat_ai_key') || '';
-}
-
-function setupAiBotControls() {
-  const callBotBtn = document.getElementById('btn-call-ai-bot');
-  if (callBotBtn) {
-    callBotBtn.addEventListener('click', () => {
-      insertSnippet('🤖 @bot ');
-    });
-  }
-}
-
-async function fetchAiBotResponse(prompt, senderName) {
-  return `🤖 🚧 **【CyberBot】** こんにちは、${senderName} さん！\n現在 AI Bot 機能は**開発中（次回アップデート調整中）**です。機能実装をお楽しみに！✨`;
-}
-
-function checkAiBotTrigger(msgData) {
-  if (!msgData.text || msgData.userId === 'cyberbot_ai' || msgData.type === 'system' || msgData.whisperTo) return;
-
-  const text = msgData.text.trim();
-  if (text.startsWith('@bot') || text.startsWith('@CyberBot') || text.includes('@bot')) {
-    const prompt = text.replace(/@bot|@CyberBot/g, '').trim();
-
-    setTimeout(async () => {
-      try {
-        const botResponse = await fetchAiBotResponse(prompt, msgData.name);
-        const botRef = push(roomRef('messages'));
-        await set(botRef, {
-          userId: 'cyberbot_ai',
-          name: '🤖 CyberBot [🚧 開発中]',
-          trip: '◆AI_BOT_DEV',
-          avatar: '🤖',
-          type: 'text',
-          text: botResponse,
-          replyTo: {
-            msgId: msgData.id,
-            senderName: msgData.name,
-            text: msgData.text
-          },
-          timestamp: Date.now()
-        });
-        playSound('receive');
-      } catch (e) {
-        console.warn("AI Bot response error:", e);
-      }
-    }, 600);
-  }
-}
-
-function generateLocalAiResponse(prompt, senderName) {
-  if (!prompt) {
-    return `こんにちは！${senderName}さん！🤖 何か聞きたいことや、計算・占い・雑談の相手なら任せてください！`;
-  }
-
-  const p = prompt.toLowerCase();
-  
-  if (p.includes('運勢') || p.includes('占い') || p.includes('おみくじ')) {
-    const fortunes = ['✨ 超大吉 (最高の一日！)', '🌟 大吉 (願い事が叶うかも)', '😊 中吉 (良い感じ！)', '👍 吉 (穏やか)', '🍀 小吉 (ラッキーアイテムはコーヒー)'];
-    return `${senderName}さんの今日の運勢は... ${fortunes[Math.floor(Math.random() * fortunes.length)]} です！🎉`;
-  }
-
-  if (p.includes('冗談') || p.includes('ジョーク') || p.includes('笑わせて')) {
-    const jokes = [
-      '【AIジョーク】プログラマーがスーパーに買い物に行きました。「牛乳を1つ買ってきて。もし卵があったら6個買ってきて」と言われたプログラマーは、牛乳を6つ買って帰りました。',
-      '【AIダジャレ】アルミ缶の上にあるミカン！🍊',
-      '【AI雑学】ペンギンの膝は実は曲がっていて、常に空気椅子状態なんですよ！🐧'
-    ];
-    return jokes[Math.floor(Math.random() * jokes.length)];
-  }
-
-  const mathMatch = prompt.match(/(\d+)\s*([\+\-\*\/x×÷])\s*(\d+)/);
-  if (mathMatch) {
-    const num1 = parseFloat(mathMatch[1]);
-    const op = mathMatch[2];
-    const num2 = parseFloat(mathMatch[3]);
-    let result = 0;
-    if (op === '+') result = num1 + num2;
-    else if (op === '-') result = num1 - num2;
-    else if (op === '*' || op === 'x' || op === '×') result = num1 * num2;
-    else if (op === '/' || op === '÷') result = num2 !== 0 ? (num1 / num2) : '0で割ることはできません';
-    return `計算結果: ${num1} ${op} ${num2} = ${result} です！🧮`;
-  }
-
-  return `「${prompt}」についてのお問い合わせですね！${senderName}さん、AIとしてお答えします！何か他にお手伝いできることはありますか？🤖`;
 }
 
 // 🧠 数学スピードクイズ機能
@@ -5521,14 +5434,17 @@ window.toggleUserEffect = async (targetUid, targetName, effectType) => {
 };
 
 window.openCreatorEffectsModal = (selectedUid = null) => {
-  if (!isCreatorName(myName)) {
-    showToast('⚠️ 製作者（ただのネコ好き）のみ利用できる専用メニューです', 'error');
+  const isCreator = isCreatorName(myName) || isAdminMode;
+  if (!isCreator) {
+    showToast('⚠️ エフェクトリストは製作者（ただのネコ好き）専用メニューです', 'error');
     return;
   }
   const modal = document.getElementById('creator-effects-modal');
   if (modal) {
     modal.classList.remove('hidden');
     renderCreatorEffectsListUI(selectedUid);
+  } else {
+    console.error("creator-effects-modal element not found!");
   }
 };
 

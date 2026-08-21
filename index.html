@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NoRestrictionsChat - リアルタイム自由チャット (AI & ゲーム拡張版)</title>
+  <title>CyberChat - リアルタイム自由チャット (AI & ゲーム拡張版)</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,7 +51,7 @@
       <div class="join-header">
         <div class="app-brand">
           <i class="fa-solid fa-comments brand-icon"></i>
-          <h2>NoRestrictionsChat</h2>
+          <h2>CyberChat</h2>
         </div>
         <p class="join-subtitle">アカウント登録・ログインしてチャットを開始</p>
         <div class="auth-author-tag">
@@ -187,7 +187,7 @@
       <div class="sidebar-header">
         <div class="app-brand-sm">
           <i class="fa-solid fa-comments brand-icon"></i>
-          <span>NoRestrictionsChat</span>
+          <span>CyberChat</span>
         </div>
         <button id="btn-close-sidebar" class="btn-icon sidebar-close-btn"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -525,7 +525,6 @@
       <!-- Quick Snippets ショートカットバー -->
       <div class="snippets-bar">
         <span class="snippet-tag snippet-werewolf" onclick="window.openWerewolfModal()">🐺 人狼ゲーム</span>
-        <span class="snippet-tag" onclick="window.insertSnippet('🤖 @bot ')">🤖 @bot <span class="dev-badge">🚧 開発中</span></span>
         <span class="snippet-tag" onclick="window.startMathQuizGame()">🧠 数学クイズ</span>
         <span class="snippet-tag" onclick="window.startRpsBattle()">✌️ じゃんけん勝負</span>
         <span class="snippet-tag" onclick="window.insertSnippet('草ww')">草ww</span>
@@ -581,11 +580,6 @@
               <i class="fa-solid fa-moon text-warning"></i>
             </button>
 
-            <!-- 🤖 AI CyberBot ボタン -->
-            <button type="button" id="btn-call-ai-bot" class="btn-icon-tool" title="AI CyberBotを呼ぶ (@bot) [🚧 開発中]">
-              <i class="fa-solid fa-robot text-primary"></i>
-            </button>
-
             <!-- 🧠 数学対戦クイズ ボタン -->
             <button type="button" onclick="window.startMathQuizGame()" class="btn-icon-tool" title="数学スピードクイズ対戦を出題">
               <i class="fa-solid fa-brain text-warning"></i>
@@ -637,7 +631,7 @@
             </button>
           </div>
 
-          <textarea id="message-text-input" placeholder="メッセージを入力... (Shift+Enterで改行、@bot でAI返信 [🚧 開発中])" rows="1"></textarea>
+          <textarea id="message-text-input" placeholder="メッセージを入力... (Shift+Enterで改行)" rows="1"></textarea>
 
           <button id="btn-send-message" class="btn-send">
             <i class="fa-solid fa-paper-plane"></i>
@@ -675,7 +669,7 @@
   <div id="admin-panel-modal" class="modal-overlay hidden">
     <div class="modal-card glass-panel animate-scale-up" style="max-width: 650px;">
       <div class="modal-header" style="background: rgba(255, 51, 102, 0.15);">
-        <h3 class="text-danger"><i class="fa-solid fa-user-gear"></i> NoRestrictionsChat 運営専用コントロールパネル</h3>
+        <h3 class="text-danger"><i class="fa-solid fa-user-gear"></i> CyberChat 運営専用コントロールパネル</h3>
         <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
