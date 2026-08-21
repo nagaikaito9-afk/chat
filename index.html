@@ -109,10 +109,10 @@
         </div>
 
         <div class="input-group">
-          <label><i class="fa-solid fa-face-smile"></i> アイコンを選択 (全50種 & 画像対応)</label>
+          <label><i class="fa-solid fa-face-smile"></i> アイコンを選択 (全50種・GIF・5秒以内動画対応)</label>
           <div class="avatar-picker-tabs">
             <button type="button" class="avatar-tab-btn active" data-target="reg-tab-preset">アイコン50種</button>
-            <button type="button" class="avatar-tab-btn" data-target="reg-tab-custom">📷 画像アイコン</button>
+            <button type="button" class="avatar-tab-btn" data-target="reg-tab-custom">🎬 画像・GIF・動画</button>
           </div>
 
           <div id="reg-tab-preset" class="avatar-tab-content active">
@@ -132,11 +132,11 @@
           <div id="reg-tab-custom" class="avatar-tab-content hidden">
             <div class="custom-avatar-uploader">
               <label class="btn-secondary btn-sm file-upload-btn">
-                <i class="fa-solid fa-upload"></i> 画像ファイルをアップロード
-                <input type="file" id="reg-avatar-file-input" accept="image/*" class="hidden-file-input">
+                <i class="fa-solid fa-upload"></i> 画像 / GIF / 動画 (5秒以内) をアップロード
+                <input type="file" id="reg-avatar-file-input" accept="image/*,image/gif,video/*" class="hidden-file-input">
               </label>
               <div class="url-input-row" style="margin-top:8px; display:flex; gap:6px;">
-                <input type="url" id="reg-avatar-url-input" placeholder="画像URL (https://...)" class="input-sm" style="flex:1;">
+                <input type="url" id="reg-avatar-url-input" placeholder="画像・GIF・動画URL (https://...)" class="input-sm" style="flex:1;">
                 <button type="button" id="btn-reg-apply-url" class="btn-primary btn-sm">適用</button>
               </div>
               <div class="custom-preview-wrapper" style="margin-top:10px; display:flex; align-items:center; gap:10px;">
@@ -878,10 +878,10 @@
         </div>
 
         <div class="input-group">
-          <label><i class="fa-solid fa-face-smile"></i> アイコンを変更 (全50種 & 画像対応)</label>
+          <label><i class="fa-solid fa-face-smile"></i> アイコンを変更 (全50種・GIF・5秒以内動画対応)</label>
           <div class="avatar-picker-tabs">
             <button type="button" class="avatar-tab-btn active" data-target="edit-tab-preset">アイコン50種</button>
-            <button type="button" class="avatar-tab-btn" data-target="edit-tab-custom">📷 画像アイコン</button>
+            <button type="button" class="avatar-tab-btn" data-target="edit-tab-custom">🎬 画像・GIF・動画</button>
           </div>
 
           <div id="edit-tab-preset" class="avatar-tab-content active">
@@ -901,11 +901,11 @@
           <div id="edit-tab-custom" class="avatar-tab-content hidden">
             <div class="custom-avatar-uploader">
               <label class="btn-secondary btn-sm file-upload-btn">
-                <i class="fa-solid fa-upload"></i> 画像ファイルをアップロード
-                <input type="file" id="edit-avatar-file-input" accept="image/*" class="hidden-file-input">
+                <i class="fa-solid fa-upload"></i> 画像 / GIF / 動画 (5秒以内) をアップロード
+                <input type="file" id="edit-avatar-file-input" accept="image/*,image/gif,video/*" class="hidden-file-input">
               </label>
               <div class="url-input-row" style="margin-top:8px; display:flex; gap:6px;">
-                <input type="url" id="edit-avatar-url-input" placeholder="画像URL (https://...)" class="input-sm" style="flex:1;">
+                <input type="url" id="edit-avatar-url-input" placeholder="画像・GIF・動画URL (https://...)" class="input-sm" style="flex:1;">
                 <button type="button" id="btn-edit-apply-url" class="btn-primary btn-sm">適用</button>
               </div>
               <div class="custom-preview-wrapper" style="margin-top:10px; display:flex; align-items:center; gap:10px;">

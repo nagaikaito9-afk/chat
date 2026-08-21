@@ -298,10 +298,22 @@ const AVATAR_PRESETS_50 = [
   { icon: '🌈', cat: 'hobby' }
 ];
 
+function isVideoAvatar(avatar) {
+  if (typeof avatar !== 'string') return false;
+  if (avatar.startsWith('data:video/')) return true;
+  const lower = avatar.toLowerCase();
+  return lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.mov') || lower.endsWith('.ogv');
+}
+
 function renderAvatarHTML(avatar, customClass = '') {
   if (!avatar) return `<span class="avatar-fallback-text ${customClass}">🤖</span>`;
-  if (typeof avatar === 'string' && (avatar.startsWith('data:image/') || avatar.startsWith('http://') || avatar.startsWith('https://'))) {
-    return `<img src="${escapeHtml(avatar)}" class="avatar-img-obj ${customClass}" alt="avatar" onerror="this.onerror=null; this.outerHTML='<span class=\\'avatar-fallback-text ${customClass}\\'>🤖</span>';">`;
+  if (typeof avatar === 'string') {
+    if (isVideoAvatar(avatar)) {
+      return `<video src="${escapeHtml(avatar)}" autoplay loop muted playsinline class="avatar-video-obj ${customClass}" onerror="this.onerror=null; this.outerHTML='<span class=\\'avatar-fallback-text ${customClass}\\'>🤖</span>';"></video>`;
+    }
+    if (avatar.startsWith('data:image/') || avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return `<img src="${escapeHtml(avatar)}" class="avatar-img-obj ${customClass}" alt="avatar" onerror="this.onerror=null; this.outerHTML='<span class=\\'avatar-fallback-text ${customClass}\\'>🤖</span>';">`;
+    }
   }
   return `<span class="avatar-fallback-text ${customClass}">${escapeHtml(avatar)}</span>`;
 }
@@ -1168,45 +1180,74 @@ function setupAvatarPickers() {
 }
 
 function processCustomAvatarFile(file, previewElemId) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const targetSize = 64; // Square pixelated dot-art avatar size
-      canvas.width = targetSize;
-      canvas.height = targetSize;
+  if (!file) return;
 
-      let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
-      if (img.width > img.height) {
-        srcW = img.height;
-        srcX = (img.width - img.height) / 2;
-      } else if (img.height > img.width) {
-        srcH = img.width;
-        srcY = (img.height - img.width) / 2;
+  const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
+  const isVideo = file.type.startsWith('video/') || 
+                  ['.mp4', '.webm', '.mov', '.ogv'].some(ext => file.name.toLowerCase().endsWith(ext));
+
+  // 🎥 5秒以内の動画チェック＆処理
+  if (isVideo) {
+    const tempVideo = document.createElement('video');
+    tempVideo.preload = 'metadata';
+
+    const objectUrl = URL.createObjectURL(file);
+    tempVideo.onloadedmetadata = () => {
+      URL.revokeObjectURL(objectUrl);
+      const duration = tempVideo.duration;
+
+      if (duration > 5.05) {
+        showToast(`⚠️ 動画アイコンは5秒以内である必要があります（選択された動画: ${duration.toFixed(1)}秒）`, 'error');
+        return;
       }
 
-      ctx.imageSmoothingEnabled = false; // Crisp pixelated dot-art rendering
-      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, targetSize, targetSize);
-      const dataUrl = canvas.toDataURL('image/png');
-      myAvatar = dataUrl;
-      updateMyProfileUI();
-      showToast('ドット絵風画像アイコンを設定しました！', 'success');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        myAvatar = e.target.result;
+        updateMyProfileUI();
+        showToast(`📹 5秒アニメーション動画アイコンを設定しました！ (${duration.toFixed(1)}秒)`, 'success');
+      };
+      reader.readAsDataURL(file);
     };
-    img.src = e.target.result;
+
+    tempVideo.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      showToast('動画ファイルの読み込みに失敗しました。', 'error');
+    };
+
+    tempVideo.src = objectUrl;
+    return;
+  }
+
+  // 🎨 アニメーションGIF or 一般画像処理
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    myAvatar = dataUrl;
+    updateMyProfileUI();
+    if (isGif) {
+      showToast('🎨 アニメーションGIFアイコンを設定しました！', 'success');
+    } else {
+      showToast('🖼️ カスタム画像アイコンを設定しました！', 'success');
+    }
   };
   reader.readAsDataURL(file);
 }
 
 function processCustomAvatarUrl(urlStr, previewElemId) {
-  if (!urlStr || (!urlStr.startsWith('http://') && !urlStr.startsWith('https://') && !urlStr.startsWith('data:image/'))) {
-    showToast('有効な画像URLを入力してください (http/https/data:image)', 'error');
+  if (!urlStr || (!urlStr.startsWith('http://') && !urlStr.startsWith('https://') && !urlStr.startsWith('data:image/') && !urlStr.startsWith('data:video/'))) {
+    showToast('有効な画像・GIF・動画URLを入力してください (http/https/data:)', 'error');
     return;
   }
   myAvatar = urlStr.trim();
   updateMyProfileUI();
-  showToast('画像URLアイコンを設定しました！', 'success');
+  if (isVideoAvatar(myAvatar)) {
+    showToast('📹 動画URLアイコンを設定しました！', 'success');
+  } else if (myAvatar.toLowerCase().includes('.gif')) {
+    showToast('🎨 GIF URLアイコンを設定しました！', 'success');
+  } else {
+    showToast('🖼️ 画像URLアイコンを設定しました！', 'success');
+  }
 }
 
 function setupTripInputListeners() {

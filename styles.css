@@ -2739,7 +2739,13 @@ body.device-pc .sidebar-close-btn {
 .avatar-sm img,
 .msg-avatar-icon img,
 .wf-player-avatar img,
-.avatar-img-obj {
+.avatar-img-obj,
+.avatar-preview-box video,
+.avatar-circle video,
+.avatar-sm video,
+.msg-avatar-icon video,
+.wf-player-avatar video,
+.avatar-video-obj {
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
@@ -2748,9 +2754,7 @@ body.device-pc .sidebar-close-btn {
   object-position: center !important;
   border-radius: 50% !important;
   display: block !important;
-  image-rendering: pixelated;
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
+  pointer-events: none;
   flex-shrink: 0;
 }
 
