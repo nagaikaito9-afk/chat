@@ -84,6 +84,8 @@ let previousActiveUsersMap = null;
 let bannedUsersMap = new Map();
 let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored_users') || '[]'));
 let starredMsgSet = new Set(JSON.parse(localStorage.getItem('cyberchat_starred_msgs') || '[]'));
+let activeSidebarTab = 'active'; // 'ignored', 'active', 'online', 'friends', 'admins'
+let sidebarUserSearchTerm = '';
 let iceCandidateQueue = new Map();
 
 // Active Quiz State
@@ -779,9 +781,6 @@ function initApp() {
   setupBgmPlayer();
   setupScreenShare();
   setupPaintModal();
-  setupChatBackgroundContextMenu();
-  setupRoomBgModal();
-  listenRoomBackground(currentRoomId);
   setupReplyBanner();
   setupAdminSystem();
   setupWerewolfGameControls();
@@ -5493,8 +5492,6 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ==========================================================================
    5 Categorized Sidebar Lists & User Search
    ========================================================================== */
-let activeSidebarTab = 'active'; // 'ignored', 'active', 'online', 'friends', 'admins'
-let sidebarUserSearchTerm = '';
 
 function setupSidebarCategoryTabs() {
   const tabs = document.querySelectorAll('.sidebar-cat-btn');
