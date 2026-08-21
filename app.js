@@ -1332,11 +1332,7 @@ function setupTripInputListeners() {
   }
 }
 
-// Join Room Handler
-function setupJoinForm() {
-  const joinForm = document.getElementById('join-form');
-  const errorMsg = document.getElementById('join-error-msg');
-  const btnStart = document.getElementById('btn-stfunction updateMyProfileUI() {
+function updateMyProfileUI() {
   if (myAvatar) {
     localStorage.setItem('cyberchat_user_avatar', myAvatar);
   }
