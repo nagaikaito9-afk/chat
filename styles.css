@@ -2602,6 +2602,15 @@ html, body {
   transform: scale(1.2);
 }
 
+/* Ensure Creator Effects Modal is always on top and visible when unhidden */
+#creator-effects-modal:not(.hidden) {
+  display: flex !important;
+  z-index: 999999 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
 /* Dropdown Menu */
 .msg-actions-menu-btn {
   position: absolute;

@@ -5428,11 +5428,18 @@ window.toggleUserEffect = async (targetUid, targetName, effectType) => {
   }
 };
 
-window.openCreatorEffectsModal = (selectedUid = null) => {
+window.openCreatorEffectsModal = (evt = null, selectedUid = null) => {
+  if (evt && typeof evt === 'object') {
+    if (typeof evt.preventDefault === 'function') evt.preventDefault();
+    if (typeof evt.stopPropagation === 'function') evt.stopPropagation();
+  } else if (typeof evt === 'string') {
+    selectedUid = evt;
+  }
   const modal = document.getElementById('creator-effects-modal');
   if (modal) {
     modal.classList.remove('hidden');
-    modal.style.display = 'flex';
+    modal.style.setProperty('display', 'flex', 'important');
+    modal.style.setProperty('z-index', '999999', 'important');
     renderCreatorEffectsListUI(selectedUid);
   } else {
     console.error("creator-effects-modal element not found!");
