@@ -39,8 +39,10 @@ let unsubscribeFriends = null;
 
 let deviceMode = localStorage.getItem('cyberchat_device_mode') || 'pc';
 let currentTheme = localStorage.getItem('cyberchat_theme') || 'cyber';
-let isAdminMode = false;
+let isAdminMode = localStorage.getItem('cyberchat_is_admin') === 'true';
 const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei";
+let trustedUsersSet = new Set();
+let adminUsersSet = new Set();
 
 let globalOnlineUsersMap = new Map();
 let currentFriendChatUid = null;
@@ -323,11 +325,36 @@ function isCreatorName(name) {
   return name.includes('ただのネコ好き');
 }
 
-function renderCreatorBadge(name) {
+function getUserRoleBadges(uid, name) {
+  let badges = '';
   if (isCreatorName(name)) {
-    return ` <span class="creator-badge"><i class="fa-solid fa-crown text-warning"></i> 🛠️ 製作者</span>`;
+    badges += ` <span class="creator-badge"><i class="fa-solid fa-crown text-warning"></i> 🛠️ 製作者</span>`;
   }
+  if (trustedUsersSet.has(uid)) {
+    badges += ` <span class="trusted-badge"><i class="fa-solid fa-gem"></i> 💎 信用済み</span>`;
+  }
+  if (typeof friendsMap !== 'undefined' && friendsMap.has(uid)) {
+    badges += ` <span class="friend-badge"><i class="fa-solid fa-handshake"></i> 🤝 フレンド</span>`;
+  }
+  if ((isAdminMode && uid === myUserId) || adminUsersSet.has(uid)) {
+    badges += ` <span class="admin-badge"><i class="fa-solid fa-user-shield"></i> 🛡️ 運営</span>`;
+  }
+  return badges;
+}
+
+function getUserAvatarGlowClass(uid, name) {
+  if (isCreatorName(name)) return 'creator-avatar-glow';
+  if ((isAdminMode && uid === myUserId) || adminUsersSet.has(uid)) return 'admin-avatar-glow';
+  if (trustedUsersSet.has(uid)) return 'trusted-avatar-glow';
+  if (typeof friendsMap !== 'undefined' && friendsMap.has(uid)) return 'friend-avatar-glow';
   return '';
+}
+
+function getUserNameClass(uid, name) {
+  if (isCreatorName(name)) return 'user-item-name is-creator';
+  if ((isAdminMode && uid === myUserId) || adminUsersSet.has(uid)) return 'user-item-name is-admin';
+  if (trustedUsersSet.has(uid)) return 'user-item-name is-trusted';
+  return 'user-item-name';
 }
 
 function formatTime(timestamp) {
@@ -488,6 +515,7 @@ function initApp() {
   initBanCheckListener();
   initGlobalOnlineUsersListener();
   initGlobalFriendDmListener();
+  initTrustedUsersListener();
   setupPresenceConnectionHeartbeat();
 }
 
@@ -614,11 +642,14 @@ function setupAdminSystem() {
 
     if (inputPass === ADMIN_PASSWORD) {
       isAdminMode = true;
+      localStorage.setItem('cyberchat_is_admin', 'true');
       authModal.classList.add('hidden');
       openAuthBtn.classList.add('active');
       openAuthBtn.innerHTML = '<i class="fa-solid fa-crown text-warning"></i> <span>運営（認証済み）</span>';
       showToast('👑 運営認証に成功しました！管理コントロールパネルを開きます。', 'success');
       openAdminPanel();
+      if (typeof updateMyProfileUI === 'function') updateMyProfileUI();
+      if (typeof renderFriendsListUI === 'function') renderFriendsListUI();
     } else {
       authError.textContent = 'パスワードが正しくありません。';
       authError.classList.remove('hidden');
@@ -1396,17 +1427,17 @@ function updateMyProfileUI() {
     localStorage.setItem('cyberchat_user_avatar', myAvatar);
   }
 
-  const creatorBadgeHtml = renderCreatorBadge(myName);
+  const roleBadgesHtml = getUserRoleBadges(myUserId, myName);
 
   const nameDisp = document.getElementById('my-name-display');
-  if (nameDisp) nameDisp.innerHTML = `${escapeHtml(myName)}${creatorBadgeHtml}`;
+  if (nameDisp) nameDisp.innerHTML = `${escapeHtml(myName)}${roleBadgesHtml}`;
 
   const tripDisp = document.getElementById('my-trip-display');
   if (tripDisp) tripDisp.textContent = myTrip;
 
   const avatarDisp = document.getElementById('my-avatar');
   if (avatarDisp) {
-    avatarDisp.classList.toggle('creator-avatar-glow', isCreatorName(myName));
+    avatarDisp.className = 'avatar-md ' + getUserAvatarGlowClass(myUserId, myName);
     avatarDisp.innerHTML = renderAvatarHTML(myAvatar);
   }
 
@@ -1518,20 +1549,27 @@ function initFirebaseRealtimeSync() {
         count++;
         if (ignoredUsersSet.has(uid)) return;
 
-        const creatorBadgeHtml = renderCreatorBadge(uData.name);
-        const avatarGlowClass = isCreatorName(uData.name) ? 'creator-avatar-glow' : '';
-        const nameClass = isCreatorName(uData.name) ? 'user-item-name is-creator' : 'user-item-name';
+        const roleBadgesHtml = getUserRoleBadges(uid, uData.name);
+        const avatarGlowClass = getUserAvatarGlowClass(uid, uData.name);
+        const nameClass = getUserNameClass(uid, uData.name);
+
+        const trustBtnHtml = isCreatorName(myName) && uid !== myUserId ? `
+          <button class="btn-secondary btn-sm" onclick="window.toggleTrustUser('${uid}', '${escapeHtml(uData.name)}')" title="信用ステータスを付与/解除">
+            <i class="fa-solid fa-gem ${trustedUsersSet.has(uid) ? 'text-info' : ''}"></i>
+          </button>
+        ` : '';
 
         const li = document.createElement('li');
         li.className = 'user-item';
         li.innerHTML = `
           <div class="avatar-sm ${avatarGlowClass}">${renderAvatarHTML(uData.avatar || '🤖')}</div>
           <div class="user-item-info">
-            <div class="${nameClass}">${escapeHtml(uData.name)}${creatorBadgeHtml} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
+            <div class="${nameClass}">${escapeHtml(uData.name)}${roleBadgesHtml} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
             <div class="user-item-status">${escapeHtml(uData.status || '💬 雑談歓迎')}</div>
           </div>
           <button class="btn-secondary btn-sm" onclick="window.startWhisper('${uid}', '${escapeHtml(uData.name)}')" title="内緒話（DM）"><i class="fa-solid fa-lock"></i></button>
           ${uid !== myUserId ? `<button class="btn-secondary btn-sm" onclick="window.sendFriendRequest('${uid}', '${escapeHtml(uData.name)}')" title="フレンド申請"><i class="fa-solid fa-user-plus text-primary"></i></button>` : ''}
+          ${trustBtnHtml}
           ${uid !== myUserId ? `<button class="btn-mute-user" onclick="window.ignoreUser('${uid}', '${escapeHtml(uData.name)}')" title="無視（ブロック）"><i class="fa-solid fa-user-slash"></i></button>` : ''}
         `;
         userListEl.appendChild(li);
@@ -1920,6 +1958,7 @@ function renderSingleMessage(msgId, msg) {
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
         ${!isSelf ? `<button onclick="window.sendFriendRequest('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請</button>` : ''}
+        ${isCreatorName(myName) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${trustedUsersSet.has(msg.userId) ? '信用解除' : '💎 信用付与'}</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
         ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
       </div>
@@ -1928,14 +1967,14 @@ function renderSingleMessage(msgId, msg) {
     const whisperHeader = msg.whisperTo ? `<span style="color:#f472b6; font-weight:700;"><i class="fa-solid fa-lock"></i> 【内緒話】</span>` : '';
     const starBadge = isStarred ? `<i class="fa-solid fa-star text-warning" title="お気に入り"></i> ` : '';
 
-    const creatorBadgeHtml = renderCreatorBadge(msg.name);
-    const senderClass = isCreatorName(msg.name) ? 'msg-sender-name is-creator' : 'msg-sender-name';
-    const avatarGlowClass = isCreatorName(msg.name) ? 'creator-avatar-glow' : '';
+    const roleBadgesHtml = getUserRoleBadges(msg.userId, msg.name);
+    const senderClass = getUserNameClass(msg.userId, msg.name);
+    const avatarGlowClass = getUserAvatarGlowClass(msg.userId, msg.name);
 
     const metaHtml = `
       <div class="msg-meta">
         <span class="msg-avatar-icon ${avatarGlowClass}">${renderAvatarHTML(msg.avatar || '🤖')}</span>
-        <span class="${senderClass}">${starBadge}${whisperHeader} ${escapeHtml(msg.name)}${creatorBadgeHtml} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
+        <span class="${senderClass}">${starBadge}${whisperHeader} ${escapeHtml(msg.name)}${roleBadgesHtml} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
         <span class="msg-time">${formatTime(msg.timestamp)} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
     `;
@@ -4856,3 +4895,47 @@ function initGlobalFriendDmListener() {
     }
   });
 }
+
+function initTrustedUsersListener() {
+  const trustedRef = ref(db, 'trusted_users');
+  onValue(trustedRef, (snapshot) => {
+    trustedUsersSet.clear();
+    if (snapshot.exists()) {
+      Object.keys(snapshot.val()).forEach(uid => trustedUsersSet.add(uid));
+    }
+    if (typeof updateMyProfileUI === 'function') updateMyProfileUI();
+    if (typeof renderFriendsListUI === 'function') renderFriendsListUI();
+  });
+}
+
+// 💎 信用ステータス切替ハンドラー (製作者「ただのネコ好き」専用)
+window.toggleTrustUser = async (targetUid, targetName) => {
+  if (!isCreatorName(myName)) {
+    showToast('⚠️ 信用ステータスを付与・解除できるのは製作者（ただのネコ好き）のみです', 'error');
+    return;
+  }
+
+  const isTrusted = trustedUsersSet.has(targetUid);
+  const confirmText = isTrusted ? 
+    `「${targetName}」の信用ステータスを解除しますか？` : 
+    `「${targetName}」に【💎 信用済み】ステータスを付与しますか？`;
+
+  if (!confirm(confirmText)) return;
+
+  try {
+    if (isTrusted) {
+      await remove(ref(db, `trusted_users/${targetUid}`));
+      showToast(`「${targetName}」の信用ステータスを解除しました`, 'info');
+    } else {
+      await set(ref(db, `trusted_users/${targetUid}`), {
+        name: targetName,
+        trustedAt: Date.now(),
+        trustedBy: myName
+      });
+      showToast(`💎 「${targetName}」に【信用済み】ステータスを付与しました！`, 'success');
+    }
+  } catch (err) {
+    console.error("Trust user error:", err);
+    showToast(`信用ステータスの更新に失敗しました: ${err.message}`, 'error');
+  }
+};

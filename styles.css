@@ -2006,6 +2006,100 @@ html, body {
   margin-left: 4px;
 }
 
+/* 🛡️ 運営 (Admin) エフェクト */
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #ff3366 0%, #ffb800 100%);
+  color: #ffffff !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 10px rgba(255, 51, 102, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 184, 0, 0.5);
+}
+
+.admin-avatar-glow {
+  box-shadow: 0 0 14px #ff3366, 0 0 22px #ffb800 !important;
+  animation: adminPulse 2.5s infinite ease-in-out !important;
+  border: 2px solid #ff3366 !important;
+}
+
+@keyframes adminPulse {
+  0% { box-shadow: 0 0 10px #ff3366, 0 0 16px #ffb800; }
+  50% { box-shadow: 0 0 20px #ffb800, 0 0 28px #ff3366; }
+  100% { box-shadow: 0 0 10px #ff3366, 0 0 16px #ffb800; }
+}
+
+.msg-sender-name.is-admin {
+  color: #ff4d79 !important;
+  text-shadow: 0 0 8px rgba(255, 77, 121, 0.6);
+}
+
+/* 🤝 フレンド (Friend) エフェクト */
+.friend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #00f0ff 0%, #00ff88 100%);
+  color: #0a0d14 !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(0, 255, 136, 0.6);
+}
+
+.friend-avatar-glow {
+  box-shadow: 0 0 12px #00f0ff, 0 0 18px #00ff88 !important;
+  border: 2px solid #00f0ff !important;
+}
+
+/* 💎 信用済み (Trusted) エフェクト */
+.trusted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+  background-size: 200% 200%;
+  animation: creatorGradient 4s ease infinite;
+  color: #ffffff !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.6), 0 0 18px rgba(192, 132, 252, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.trusted-avatar-glow {
+  box-shadow: 0 0 14px #38bdf8, 0 0 22px #c084fc !important;
+  animation: trustedPulse 2.5s infinite ease-in-out !important;
+  border: 2px solid #38bdf8 !important;
+}
+
+@keyframes trustedPulse {
+  0% { box-shadow: 0 0 10px #38bdf8, 0 0 16px #c084fc; }
+  50% { box-shadow: 0 0 20px #c084fc, 0 0 28px #38bdf8; }
+  100% { box-shadow: 0 0 10px #38bdf8, 0 0 16px #c084fc; }
+}
+
+.msg-sender-name.is-trusted {
+  color: #38bdf8 !important;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+}
+
 .btn-file-download:hover {
   transform: scale(1.2);
 }
