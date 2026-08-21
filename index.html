@@ -82,7 +82,13 @@
 
         <div id="login-error-msg" class="error-banner hidden"></div>
 
-        <button type="submit" id="btn-submit-login" class="btn-primary btn-block btn-lg" style="margin-top:12px;">
+        <div style="text-align:right; margin-top:4px; margin-bottom:8px;">
+          <button type="button" id="btn-open-recover-modal" style="font-size:0.78rem; color:var(--accent-primary); background:none; border:none; cursor:pointer; text-decoration:underline;">
+            <i class="fa-solid fa-life-ring"></i> パスワードをお忘れの方 (アカウント復元)
+          </button>
+        </div>
+
+        <button type="submit" id="btn-submit-login" class="btn-primary btn-block btn-lg" style="margin-top:4px;">
           <i class="fa-solid fa-right-to-bracket"></i> ログインする
         </button>
       </form>
@@ -93,6 +99,12 @@
           <label for="reg-account-name"><i class="fa-solid fa-user-plus"></i> アカウント名 <span class="required">*</span></label>
           <input type="text" id="reg-account-name" placeholder="例: cyber_user" maxlength="20" required autocomplete="username">
           <span class="input-hint">※半角英数字や日本語（3〜20文字）</span>
+        </div>
+
+        <div class="input-group">
+          <label for="reg-recovery-email"><i class="fa-solid fa-envelope"></i> アカウント復元用メールアドレス (任意)</label>
+          <input type="email" id="reg-recovery-email" placeholder="例: user@example.com" autocomplete="email">
+          <span class="input-hint">※パスワード忘却時にアカウントを再発行・復元できます</span>
         </div>
 
         <div class="input-group">
@@ -184,9 +196,18 @@
       <div class="my-profile-card">
         <div class="avatar-circle" id="my-avatar">🤖</div>
         <div class="profile-info">
-          <div class="profile-name" id="my-name-display">ゲスト</div>
+          <div class="profile-name-row" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <span class="profile-name" id="my-name-display">ゲスト</span>
+            <span class="level-badge-pill" id="my-level-display">Lv.1</span>
+          </div>
           <div class="profile-status-badge" id="my-status-display">💬 雑談歓迎</div>
           <div class="profile-trip" id="my-trip-display">◆------</div>
+          <div class="exp-bar-box" title="発言・フレンド追加・ログインでEXP獲得！Lv.10ですべての機能が解放されます">
+            <div class="exp-bar-track">
+              <div id="my-exp-bar-fill" class="exp-bar-fill" style="width: 0%;"></div>
+            </div>
+            <span id="my-exp-text" class="exp-text-val">0 / 50 EXP</span>
+          </div>
         </div>
         <div class="profile-card-actions">
           <button id="btn-open-edit-profile" class="btn-icon" title="プロフィール変更">
@@ -868,6 +889,35 @@
     </div>
   </div>
 
+  <!-- 🔄 アカウント復元モーダル -->
+  <div id="recover-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width:400px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-life-ring text-primary"></i> アカウント復元</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:12px;">
+          登録時のアカウント名と復元用メールアドレスを入力してください。
+        </p>
+        <div class="input-group">
+          <label for="recover-acc-name">アカウント名 <span class="required">*</span></label>
+          <input type="text" id="recover-acc-name" placeholder="登録アカウント名" required>
+        </div>
+        <div class="input-group">
+          <label for="recover-email">復元用メールアドレス <span class="required">*</span></label>
+          <input type="email" id="recover-email" placeholder="例: user@example.com" required>
+        </div>
+        <div id="recover-error-msg" class="error-banner hidden"></div>
+        <div id="recover-success-msg" class="success-banner hidden" style="background:rgba(0,255,136,0.15); border:1px solid rgba(0,255,136,0.4); color:#00ff88; padding:10px 14px; border-radius:var(--radius-md); font-size:0.85rem; margin-top:8px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">閉じる</button>
+        <button id="btn-submit-recover" class="btn-primary"><i class="fa-solid fa-key"></i> 照会・復元する</button>
+      </div>
+    </div>
+  </div>
+
   <!-- プロフィール変更モーダル -->
   <div id="profile-modal" class="modal-overlay hidden">
     <div class="modal-card glass-panel animate-scale-up">
@@ -879,6 +929,12 @@
         <div class="input-group">
           <label for="edit-username">新しいユーザー名 <span class="required">*</span></label>
           <input type="text" id="edit-username" placeholder="新しい名前を入力" maxlength="20">
+        </div>
+
+        <div class="input-group">
+          <label for="edit-recovery-email"><i class="fa-solid fa-envelope"></i> 復元用メールアドレス (任意)</label>
+          <input type="email" id="edit-recovery-email" placeholder="例: user@example.com">
+          <span class="input-hint">※パスワードを忘れた場合のアカウント復元に使用します</span>
         </div>
 
         <div class="input-group">

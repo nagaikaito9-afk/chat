@@ -28,6 +28,9 @@ let myName = '';
 let myTrip = '◆(なし)';
 let myAvatar = localStorage.getItem('cyberchat_user_avatar') || '🤖';
 let myStatus = '💬 雑談歓迎';
+let myLevel = parseInt(localStorage.getItem('cyberchat_user_level') || '1');
+let myExp = parseInt(localStorage.getItem('cyberchat_user_exp') || '0');
+let lastExpMsgTime = 0;
 let currentRoomId = 'public_main';
 const unlockedRoomsSet = new Set(['public_main']);
 let pendingPassRoom = null;
@@ -325,10 +328,112 @@ function isCreatorName(name) {
   return name.includes('ただのネコ好き');
 }
 
-function getUserRoleBadges(uid, name) {
+// 🌟 Level & EXP Helper Functions
+function getNextLevelExp(level) {
+  if (level >= 50) return 0;
+  return level * 50;
+}
+
+function isFeatureUnlocked(requiredLevel) {
+  if (isCreatorName(myName) || (isAdminMode && myUserId)) return true;
+  return myLevel >= requiredLevel || myLevel >= 10;
+}
+
+function checkFeatureAccess(requiredLevel, featureName) {
+  if (!isFeatureUnlocked(requiredLevel)) {
+    showToast(`🔒 「${featureName}」は Lv.${requiredLevel} で解放されます！ (現在のレベル: Lv.${myLevel})`, 'error');
+    playSound('receive');
+    return false;
+  }
+  return true;
+}
+
+function gainExp(amount, reason = '') {
+  if (!myUserId || myLevel >= 50) {
+    if (myLevel >= 50) {
+      myLevel = 50;
+      myExp = 0;
+      updateMyProfileUI();
+    }
+    return;
+  }
+
+  myExp += amount;
+  let didLevelUp = false;
+
+  while (myLevel < 50 && myExp >= getNextLevelExp(myLevel)) {
+    myExp -= getNextLevelExp(myLevel);
+    myLevel++;
+    didLevelUp = true;
+  }
+
+  if (myLevel >= 50) {
+    myLevel = 50;
+    myExp = 0;
+  }
+
+  localStorage.setItem('cyberchat_user_level', myLevel);
+  localStorage.setItem('cyberchat_user_exp', myExp);
+
+  if (didLevelUp) {
+    playSound('fanfare');
+    if (myLevel >= 50) {
+      showToast(`👑 祝・最高レベル！ Lv.50 (LEVEL MAX) に到達しました！特別エフェクト解放！`, 'success');
+      sendSystemMessage(`🎉 祝！ ${renderAvatarHTML(myAvatar)} ${myName} が【👑 最高レベル Lv.50】に到達しました！`);
+    } else {
+      const unlockNotice = myLevel <= 10 ? ' 🔓 新しい機能が解放されました！' : '';
+      showToast(`🎉 LEVEL UP! レベル ${myLevel} に到達しました！ (+${amount} EXP: ${reason})${unlockNotice}`, 'success');
+    }
+  }
+
+  updateMyProfileUI();
+}
+
+function checkDailyLoginBonus() {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const lastLoginStr = localStorage.getItem('cyberchat_last_login_date') || '';
+
+  if (lastLoginStr !== todayStr) {
+    localStorage.setItem('cyberchat_last_login_date', todayStr);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    let streak = parseInt(localStorage.getItem('cyberchat_login_streak') || '0');
+    if (lastLoginStr === yesterday) {
+      streak += 1;
+    } else {
+      streak = 1;
+    }
+    localStorage.setItem('cyberchat_login_streak', streak);
+
+    const bonusExp = 100 + (streak - 1) * 20;
+    setTimeout(() => {
+      showToast(`📅 デイリーログインボーナス！ ${streak}日連続ログイン中 (+${bonusExp} EXP)`, 'info');
+      gainExp(bonusExp, `ログイン${streak}日連続`);
+    }, 1500);
+  }
+}
+
+function isVeteranUser(uid, joinedMonth = '') {
+  if (uid === myUserId) {
+    let isVet = localStorage.getItem('cyberchat_is_veteran');
+    if (!isVet) {
+      const currentMonth = new Date().toISOString().substring(0, 7);
+      if (currentMonth <= '2026-08') {
+        localStorage.setItem('cyberchat_is_veteran', 'true');
+        return true;
+      }
+    }
+    return isVet === 'true';
+  }
+  return joinedMonth && joinedMonth <= '2026-08';
+}
+
+function getUserRoleBadges(uid, name, level = 1, joinedMonth = '') {
   let badges = '';
   if (isCreatorName(name)) {
     badges += ` <span class="creator-badge"><i class="fa-solid fa-crown text-warning"></i> 🛠️ 製作者</span>`;
+  }
+  if (isVeteranUser(uid, joinedMonth)) {
+    badges += ` <span class="veteran-badge"><i class="fa-solid fa-scroll text-warning"></i> 📜 古参</span>`;
   }
   if (trustedUsersSet.has(uid)) {
     badges += ` <span class="trusted-badge"><i class="fa-solid fa-gem"></i> 💎 信用済み</span>`;
@@ -339,11 +444,22 @@ function getUserRoleBadges(uid, name) {
   if ((isAdminMode && uid === myUserId) || adminUsersSet.has(uid)) {
     badges += ` <span class="admin-badge"><i class="fa-solid fa-user-shield"></i> 🛡️ 運営</span>`;
   }
+
+  const userLv = uid === myUserId ? myLevel : (level || 1);
+  if (userLv >= 50) {
+    badges += ` <span class="max-level-badge"><i class="fa-solid fa-crown text-warning"></i> 👑 MAX Lv.50</span>`;
+  } else {
+    badges += ` <span class="level-badge-pill">Lv.${userLv}</span>`;
+  }
+
   return badges;
 }
 
-function getUserAvatarGlowClass(uid, name) {
+function getUserAvatarGlowClass(uid, name, level = 1, joinedMonth = '') {
+  const userLv = uid === myUserId ? myLevel : (level || 1);
+  if (userLv >= 50) return 'max-level-avatar-glow';
   if (isCreatorName(name)) return 'creator-avatar-glow';
+  if (isVeteranUser(uid, joinedMonth)) return 'veteran-avatar-glow';
   if ((isAdminMode && uid === myUserId) || adminUsersSet.has(uid)) return 'admin-avatar-glow';
   if (trustedUsersSet.has(uid)) return 'trusted-avatar-glow';
   if (typeof friendsMap !== 'undefined' && friendsMap.has(uid)) return 'friend-avatar-glow';
@@ -517,6 +633,7 @@ function initApp() {
   initGlobalFriendDmListener();
   initTrustedUsersListener();
   setupPresenceConnectionHeartbeat();
+  checkDailyLoginBonus();
 }
 
 if (document.readyState === 'loading') {
@@ -538,6 +655,7 @@ async function registerOnlineUser() {
       avatar: myAvatar,
       status: myStatus,
       trip: myTrip,
+      level: myLevel,
       lastSeen: Date.now()
     };
 
@@ -551,6 +669,7 @@ async function registerOnlineUser() {
       name: myName,
       avatar: myAvatar,
       status: myStatus,
+      level: myLevel,
       currentRoomId: currentRoomId,
       currentRoomName: roomTitleName,
       lastSeen: Date.now()
@@ -1098,6 +1217,7 @@ function setupAuthForms() {
     errorMsg.classList.add('hidden');
 
     const accName = document.getElementById('reg-account-name').value.trim();
+    const recEmail = document.getElementById('reg-recovery-email') ? document.getElementById('reg-recovery-email').value.trim() : '';
     const pass = document.getElementById('reg-password').value;
     const passConf = document.getElementById('reg-password-confirm').value;
     const status = document.getElementById('reg-status').value;
@@ -1146,22 +1266,29 @@ function setupAuthForms() {
       myStatus = status;
       myTrip = await generateTrip(accName);
 
+      const currentMonthStr = new Date().toISOString().substring(0, 7); // e.g. 2026-08
+
       await set(globalRef(`accounts/${key}`), {
         userId: myUserId,
         username: myName,
         accountKey: key,
         passwordHash: passHash,
+        recoveryEmail: recEmail,
         avatar: myAvatar,
         status: myStatus,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        joinedMonth: currentMonthStr
       });
 
       localStorage.setItem('cyberchat_user_id', myUserId);
       localStorage.setItem('cyberchat_account_key', key);
       localStorage.setItem('cyberchat_account_name', myName);
+      if (recEmail) localStorage.setItem('cyberchat_recovery_email', recEmail);
+      localStorage.setItem('cyberchat_is_veteran', 'true');
+      localStorage.setItem('cyberchat_joined_month', currentMonthStr);
 
       await completeUserLogin();
-      showToast(`新規会員登録完了！ようこそ ${myName} さん！`, 'success');
+      showToast(`新規会員登録完了！ようこそ ${myName} さん！ 📜「古参」エフェクトが贈呈されました！`, 'success');
 
     } catch (err) {
       console.error("Register error:", err);
@@ -1174,6 +1301,82 @@ function setupAuthForms() {
   };
 
   if (regForm) regForm.addEventListener('submit', handleRegSubmit);
+
+  // 🔄 アカウント復元モーダル処理
+  const btnOpenRecover = document.getElementById('btn-open-recover-modal');
+  const recoverModal = document.getElementById('recover-modal');
+  const btnSubmitRecover = document.getElementById('btn-submit-recover');
+
+  if (btnOpenRecover && recoverModal) {
+    btnOpenRecover.addEventListener('click', () => {
+      document.getElementById('recover-acc-name').value = '';
+      document.getElementById('recover-email').value = '';
+      document.getElementById('recover-error-msg').classList.add('hidden');
+      document.getElementById('recover-success-msg').classList.add('hidden');
+      recoverModal.classList.remove('hidden');
+    });
+
+    document.querySelectorAll('#recover-modal .modal-close').forEach(b => {
+      b.addEventListener('click', () => recoverModal.classList.add('hidden'));
+    });
+  }
+
+  if (btnSubmitRecover) {
+    btnSubmitRecover.addEventListener('click', async () => {
+      const accName = document.getElementById('recover-acc-name').value.trim();
+      const recEmail = document.getElementById('recover-email').value.trim();
+      const errBox = document.getElementById('recover-error-msg');
+      const succBox = document.getElementById('recover-success-msg');
+
+      errBox.classList.add('hidden');
+      succBox.classList.add('hidden');
+
+      if (!accName || !recEmail) {
+        errBox.textContent = 'アカウント名と登録済み復元メールアドレスを入力してください。';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      btnSubmitRecover.disabled = true;
+      btnSubmitRecover.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 照会中...';
+
+      try {
+        const key = sanitizeAccountKey(accName);
+        const snap = await get(globalRef(`accounts/${key}`));
+
+        if (!snap.exists()) {
+          errBox.textContent = '指定されたアカウント名の登録が見つかりませんでした。';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        const accData = snap.val();
+        if (!accData.recoveryEmail || accData.recoveryEmail.toLowerCase() !== recEmail.toLowerCase()) {
+          errBox.textContent = '復元用メールアドレスが一致しません。登録時のメールアドレスを確認してください。';
+          errBox.classList.remove('hidden');
+          return;
+        }
+
+        succBox.innerHTML = `
+          ✅ <strong>本人確認が取れました！</strong><br>
+          アカウント「<strong>${escapeHtml(accName)}</strong>」の復元用メールアドレスが確認されました。<br>
+          <div style="margin-top:6px; font-size:0.8rem; background:rgba(0,0,0,0.3); padding:6px; border-radius:4px;">
+            登録アカウント名: <code>${escapeHtml(accName)}</code><br>
+            登録メールアドレス: <code>${escapeHtml(accData.recoveryEmail)}</code>
+          </div>
+        `;
+        succBox.classList.remove('hidden');
+        showToast('🔓 アカウント認証成功！', 'success');
+
+      } catch (err) {
+        errBox.textContent = `復元エラー: ${err.message}`;
+        errBox.classList.remove('hidden');
+      } finally {
+        btnSubmitRecover.disabled = false;
+        btnSubmitRecover.innerHTML = '<i class="fa-solid fa-key"></i> 照会・復元する';
+      }
+    });
+  }
 
   const logoutBtn = document.getElementById('btn-logout-account');
   if (logoutBtn) {
@@ -1431,7 +1634,32 @@ function updateMyProfileUI() {
     localStorage.setItem('cyberchat_user_avatar', myAvatar);
   }
 
-  const roleBadgesHtml = getUserRoleBadges(myUserId, myName);
+  const levelDisp = document.getElementById('my-level-display');
+  if (levelDisp) {
+    if (myLevel >= 50) {
+      levelDisp.className = 'level-badge-pill max-level';
+      levelDisp.innerHTML = '<i class="fa-solid fa-crown text-warning"></i> Lv.50 MAX';
+    } else {
+      levelDisp.className = 'level-badge-pill';
+      levelDisp.textContent = `Lv.${myLevel}`;
+    }
+  }
+
+  const expFill = document.getElementById('my-exp-bar-fill');
+  const expText = document.getElementById('my-exp-text');
+  if (expFill && expText) {
+    if (myLevel >= 50) {
+      expFill.style.width = '100%';
+      expText.textContent = 'LEVEL MAX 👑';
+    } else {
+      const nextExp = getNextLevelExp(myLevel);
+      const pct = Math.min(100, Math.max(0, Math.floor((myExp / nextExp) * 100)));
+      expFill.style.width = `${pct}%`;
+      expText.textContent = `${myExp} / ${nextExp} EXP (${pct}%)`;
+    }
+  }
+
+  const roleBadgesHtml = getUserRoleBadges(myUserId, myName, myLevel);
 
   const nameDisp = document.getElementById('my-name-display');
   if (nameDisp) nameDisp.innerHTML = `${escapeHtml(myName)}${roleBadgesHtml}`;
@@ -1441,7 +1669,7 @@ function updateMyProfileUI() {
 
   const avatarDisp = document.getElementById('my-avatar');
   if (avatarDisp) {
-    avatarDisp.className = 'avatar-md ' + getUserAvatarGlowClass(myUserId, myName);
+    avatarDisp.className = 'avatar-md ' + getUserAvatarGlowClass(myUserId, myName, myLevel);
     avatarDisp.innerHTML = renderAvatarHTML(myAvatar);
   }
 
@@ -2941,6 +3169,12 @@ function setupChatControls() {
       previewBar.classList.add('hidden');
       cancelReply();
 
+      const now = Date.now();
+      if (now - lastExpMsgTime > 3000) {
+        lastExpMsgTime = now;
+        gainExp(15, 'メッセージ送信');
+      }
+
       playSound('send');
     } catch (err) {
       console.error("Send message error:", err);
@@ -3743,12 +3977,14 @@ function setupProfileModal() {
   const usernameInput = document.getElementById('edit-username');
   const statusInput = document.getElementById('edit-status');
   const tripkeyInput = document.getElementById('edit-tripkey');
+  const recEmailInput = document.getElementById('edit-recovery-email');
   const errorMsg = document.getElementById('edit-profile-error');
 
   openBtn.addEventListener('click', () => {
     usernameInput.value = myName;
     statusInput.value = myStatus;
     tripkeyInput.value = '';
+    if (recEmailInput) recEmailInput.value = localStorage.getItem('cyberchat_recovery_email') || '';
     document.getElementById('edit-trip-preview-code').textContent = myTrip;
     errorMsg.classList.add('hidden');
     modal.classList.remove('hidden');
@@ -3763,6 +3999,7 @@ function setupProfileModal() {
     const newName = usernameInput.value.trim();
     const newStatus = statusInput.value;
     const newTripKey = tripkeyInput.value;
+    const newRecEmail = recEmailInput ? recEmailInput.value.trim() : '';
 
     if (!newName) {
       errorMsg.textContent = 'ユーザー名を入力してください。';
@@ -3786,6 +4023,7 @@ function setupProfileModal() {
       myName = newName;
       myStatus = newStatus;
       if (newTripKey) myTrip = await generateTrip(newTripKey);
+      if (newRecEmail) localStorage.setItem('cyberchat_recovery_email', newRecEmail);
 
       const accKey = localStorage.getItem('cyberchat_account_key');
       if (accKey) {
@@ -3793,7 +4031,8 @@ function setupProfileModal() {
           await update(globalRef(`accounts/${accKey}`), {
             username: myName,
             avatar: myAvatar,
-            status: myStatus
+            status: myStatus,
+            recoveryEmail: newRecEmail
           });
         } catch (e) {
           console.warn("Account update error:", e);
@@ -4596,8 +4835,9 @@ window.acceptFriendRequest = async (fromUid, fromName = '', fromAvatar = '') => 
 
     await remove(globalRef(`friend_requests/${myUserId}/${fromUid}`));
 
+    gainExp(50, 'フレンド追加');
     playSound('fanfare');
-    showToast(`🎉 「${fromName}」さんとフレンドになりました！`, 'success');
+    showToast(`🎉 「${targetName}」さんとフレンドになりました！ (+50 EXP)`, 'success');
   } catch (e) {
     showToast('承認処理に失敗しました', 'error');
   }
@@ -4931,13 +5171,12 @@ function initTrustedUsersListener() {
   });
 }
 
-// 💎 信用ステータス切替ハンドラー (製作者「ただのネコ好き」およびフレンド対応)
+// 💎 信用ステータス切替ハンドラー (製作者「ただのネコ好き」専用)
 window.toggleTrustUser = async (targetUid, targetName) => {
   const isCreator = isCreatorName(myName);
-  const isFriend = typeof friendsMap !== 'undefined' && friendsMap.has(targetUid);
 
-  if (!isCreator && !isFriend) {
-    showToast('⚠️ 信用ステータスを付与・解除できるのは製作者（ただのネコ好き）または対象のフレンドのみです', 'error');
+  if (!isCreator) {
+    showToast('⚠️ 信用ステータスを付与・解除できるのは製作者（ただのネコ好き）のみです', 'error');
     return;
   }
 
