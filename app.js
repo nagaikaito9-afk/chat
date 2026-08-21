@@ -86,6 +86,7 @@ let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored
 let starredMsgSet = new Set(JSON.parse(localStorage.getItem('cyberchat_starred_msgs') || '[]'));
 let activeSidebarTab = 'active'; // 'ignored', 'active', 'online', 'friends', 'admins'
 let sidebarUserSearchTerm = '';
+let cachedAccountNamesMap = new Map();
 let iceCandidateQueue = new Map();
 
 // Active Quiz State
@@ -3108,51 +3109,7 @@ function setupChatControls() {
 
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-
-    const MAX_SIZE = 15 * 1024 * 1024; // 15MB
-    if (file.size > MAX_SIZE) {
-      showToast('ファイルサイズは15MB以下にしてください', 'error');
-      fileInput.value = '';
-      return;
-    }
-
-    selectedFileObject = file;
-    previewName.textContent = file.name;
-    previewSize.textContent = formatFileSize(file.size);
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const dataUrl = evt.target.result;
-      selectedFileObject.dataUrl = dataUrl;
-      selectedFileObject.fileName = file.name;
-      selectedFileObject.fileSize = file.size;
-
-      if (file.type.startsWith('image/')) {
-        selectedFileObject.msgType = 'image';
-        previewImg.src = dataUrl;
-        previewImg.classList.remove('hidden');
-        previewIcon.classList.add('hidden');
-      } else if (file.type.startsWith('video/')) {
-        selectedFileObject.msgType = 'video';
-        previewImg.classList.add('hidden');
-        previewIcon.innerHTML = '<i class="fa-solid fa-file-video text-danger" style="font-size:1.8rem;"></i>';
-        previewIcon.classList.remove('hidden');
-      } else if (file.type.startsWith('audio/')) {
-        selectedFileObject.msgType = 'audio';
-        previewImg.classList.add('hidden');
-        previewIcon.innerHTML = '<i class="fa-solid fa-file-audio text-success" style="font-size:1.8rem;"></i>';
-        previewIcon.classList.remove('hidden');
-      } else {
-        selectedFileObject.msgType = 'file';
-        previewImg.classList.add('hidden');
-        previewIcon.innerHTML = '<i class="fa-solid fa-file-lines text-primary" style="font-size:1.8rem;"></i>';
-        previewIcon.classList.remove('hidden');
-      }
-
-      previewBar.classList.remove('hidden');
-    };
-    reader.readAsDataURL(file);
+    if (file) handleFileSelection(file);
   });
 
   btnRemoveAttachment.addEventListener('click', () => {
@@ -5487,6 +5444,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSidebarCategoryTabs();
   setupChatMessageSearch();
   setupTranslationControls();
+  setupDragAndDropFileUpload();
   renderUnifiedSidebarUserList();
 });
 
@@ -5581,10 +5539,14 @@ function renderUnifiedSidebarUserList() {
     if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-group text-warning"></i> フレンドリスト';
     friendsMap.forEach((f, fUid) => {
       const isOnline = globalOnlineUsersMap.has(fUid);
+      const liveUser = globalOnlineUsersMap.get(fUid) || activeUsersMap.get(fUid);
+      const displayName = f.friendName || f.name || cachedAccountNamesMap.get(fUid) || (liveUser ? liveUser.name : '') || `フレンド_${fUid.slice(-4)}`;
+      const displayAvatar = f.friendAvatar || f.avatar || (liveUser ? liveUser.avatar : '🤖');
+
       usersToRender.push({
         userId: fUid,
-        name: f.name || 'フレンド',
-        avatar: f.avatar || '🤖',
+        name: displayName,
+        avatar: displayAvatar,
         isOnline: isOnline
       });
     });
@@ -5593,10 +5555,19 @@ function renderUnifiedSidebarUserList() {
     const combinedSet = new Set([...adminUsersSet, ...trustedUsersSet]);
     combinedSet.forEach(uId => {
       const liveUser = globalOnlineUsersMap.get(uId) || activeUsersMap.get(uId);
+      const friendData = friendsMap.get(uId);
+      let name = liveUser ? liveUser.name : (friendData ? (friendData.friendName || friendData.name) : cachedAccountNamesMap.get(uId));
+      let avatar = liveUser ? liveUser.avatar : (friendData ? (friendData.friendAvatar || friendData.avatar) : '👑');
+
+      if (!name) {
+        if (uId === myUserId) name = myName || 'あなた';
+        else name = `運営メンバー_${uId.slice(-4)}`;
+      }
+
       usersToRender.push({
         userId: uId,
-        name: liveUser ? liveUser.name : `運営メンバー_${uId.slice(-4)}`,
-        avatar: liveUser ? liveUser.avatar : '👑',
+        name: name,
+        avatar: avatar,
         isAdmin: adminUsersSet.has(uId),
         isTrusted: trustedUsersSet.has(uId)
       });
@@ -5811,3 +5782,111 @@ window.translateSingleMsg = async function(msgId, text) {
     showToast('翻訳が完了しました！', 'success');
   }
 };
+
+/* ==========================================================================
+   📁 Drag & Drop File Upload System
+   ========================================================================== */
+function handleFileSelection(file) {
+  if (!file) return;
+
+  const previewBar = document.getElementById('attachment-preview');
+  const previewImg = document.getElementById('preview-img');
+  const previewIcon = document.getElementById('preview-file-icon');
+  const previewName = document.getElementById('preview-filename');
+  const previewSize = document.getElementById('preview-filesize');
+  const fileInput = document.getElementById('media-file-input');
+
+  const MAX_SIZE = 15 * 1024 * 1024; // 15MB
+  if (file.size > MAX_SIZE) {
+    showToast('ファイルサイズは15MB以下にしてください', 'error');
+    if (fileInput) fileInput.value = '';
+    return;
+  }
+
+  selectedFileObject = file;
+  if (previewName) previewName.textContent = file.name;
+  if (previewSize) previewSize.textContent = formatFileSize(file.size);
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    const dataUrl = evt.target.result;
+    selectedFileObject.dataUrl = dataUrl;
+    selectedFileObject.fileName = file.name;
+    selectedFileObject.fileSize = file.size;
+
+    if (file.type.startsWith('image/')) {
+      selectedFileObject.msgType = 'image';
+      if (previewImg) {
+        previewImg.src = dataUrl;
+        previewImg.classList.remove('hidden');
+      }
+      if (previewIcon) previewIcon.classList.add('hidden');
+    } else if (file.type.startsWith('video/')) {
+      selectedFileObject.msgType = 'video';
+      if (previewImg) previewImg.classList.add('hidden');
+      if (previewIcon) {
+        previewIcon.innerHTML = '<i class="fa-solid fa-file-video text-danger" style="font-size:1.8rem;"></i>';
+        previewIcon.classList.remove('hidden');
+      }
+    } else if (file.type.startsWith('audio/')) {
+      selectedFileObject.msgType = 'audio';
+      if (previewImg) previewImg.classList.add('hidden');
+      if (previewIcon) {
+        previewIcon.innerHTML = '<i class="fa-solid fa-file-audio text-success" style="font-size:1.8rem;"></i>';
+        previewIcon.classList.remove('hidden');
+      }
+    } else {
+      selectedFileObject.msgType = 'file';
+      if (previewImg) previewImg.classList.add('hidden');
+      if (previewIcon) {
+        previewIcon.innerHTML = '<i class="fa-solid fa-file-lines text-primary" style="font-size:1.8rem;"></i>';
+        previewIcon.classList.remove('hidden');
+      }
+    }
+
+    if (previewBar) previewBar.classList.remove('hidden');
+    showToast(`「${file.name}」を添付しました！`, 'success');
+  };
+  reader.readAsDataURL(file);
+}
+
+function setupDragAndDropFileUpload() {
+  const overlay = document.getElementById('drag-drop-overlay');
+
+  let dragCounter = 0;
+
+  window.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    if (overlay && e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      overlay.classList.remove('hidden');
+    }
+  });
+
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  });
+
+  window.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      if (overlay) overlay.classList.add('hidden');
+    }
+  });
+
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    if (overlay) overlay.classList.add('hidden');
+
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      handleFileSelection(file);
+    }
+  });
+}
