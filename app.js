@@ -795,6 +795,7 @@ function setupAdminSystem() {
 function openAdminPanel() {
   renderAdminUsersTable();
   renderAdminBannedUsersUI();
+  renderAdminReportsUI();
   document.getElementById('admin-panel-modal').classList.remove('hidden');
 }
 
@@ -837,6 +838,63 @@ function renderAdminBannedUsersUI() {
     `;
     ul.appendChild(li);
   });
+}
+
+async function renderAdminReportsUI() {
+  const ul = document.getElementById('admin-reports-list');
+  if (!ul) return;
+  ul.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem;">報告・提案を読み込み中...</li>';
+
+  try {
+    const bugSnap = await get(ref(db, 'rooms/public_bug_report/messages'));
+    const featSnap = await get(ref(db, 'rooms/public_feature_request/messages'));
+    
+    ul.innerHTML = '';
+    const reports = [];
+
+    if (bugSnap.exists()) {
+      Object.entries(bugSnap.val()).forEach(([mId, mData]) => {
+        reports.push({ id: mId, type: 'bug', roomName: '🐛 バグ報告ホーム', roomId: 'public_bug_report', ...mData });
+      });
+    }
+
+    if (featSnap.exists()) {
+      Object.entries(featSnap.val()).forEach(([mId, mData]) => {
+        reports.push({ id: mId, type: 'feature', roomName: '💡 追加機能提案ホーム', roomId: 'public_feature_request', ...mData });
+      });
+    }
+
+    if (reports.length === 0) {
+      ul.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem;">まだバグ報告や機能提案の投稿はありません</li>';
+      return;
+    }
+
+    reports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    reports.forEach(r => {
+      const li = document.createElement('li');
+      li.className = 'admin-banned-item';
+      const icon = r.type === 'bug' ? '🐛' : '💡';
+      const tagColor = r.type === 'bug' ? '#ff3366' : '#ffb800';
+
+      li.innerHTML = `
+        <div style="flex:1; min-width:0; margin-right:8px;">
+          <div style="font-weight:600; font-size:0.82rem; color:${tagColor};">
+            ${icon} [${r.roomName}] ${escapeHtml(r.name || 'ゲスト')} (${formatTime(r.timestamp)})
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            ${escapeHtml(r.text || '')}
+          </div>
+        </div>
+        <button class="btn-secondary btn-sm" onclick="window.jumpToRoom('${r.roomId}', '${escapeHtml(r.roomName)}'); document.getElementById('admin-modal').classList.add('hidden');">移動</button>
+      `;
+      ul.appendChild(li);
+    });
+
+  } catch (e) {
+    console.error("renderAdminReportsUI error:", e);
+    ul.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem;">読み込みエラーが発生しました</li>';
+  }
 }
 
 window.adminBanUser = async (uid, name) => {
@@ -1431,10 +1489,14 @@ async function switchRoom(newRoomId, roomTitle, roomPR = '') {
 
   const titleEl = document.getElementById('current-room-title');
   if (titleEl) {
+    let iconHtml = '<i class="fa-solid fa-comments"></i>';
+    if (newRoomId === 'public_bug_report') iconHtml = '<i class="fa-solid fa-bug text-danger"></i>';
+    else if (newRoomId === 'public_feature_request') iconHtml = '<i class="fa-solid fa-lightbulb text-warning"></i>';
+
     if (roomTitle.includes('<i')) {
       titleEl.innerHTML = roomTitle;
     } else {
-      titleEl.innerHTML = `<i class="fa-solid fa-comments"></i> ${escapeHtml(roomTitle)}`;
+      titleEl.innerHTML = `${iconHtml} ${escapeHtml(roomTitle)}`;
     }
   }
 
@@ -1445,6 +1507,17 @@ async function switchRoom(newRoomId, roomTitle, roomPR = '') {
       prEl.classList.remove('hidden');
     } else {
       prEl.classList.add('hidden');
+    }
+  }
+
+  const msgInput = document.getElementById('message-input');
+  if (msgInput) {
+    if (newRoomId === 'public_bug_report') {
+      msgInput.placeholder = '🐛 不具合・バグ報告を入力... (例: 〇〇画面でボタンが押せない)';
+    } else if (newRoomId === 'public_feature_request') {
+      msgInput.placeholder = '💡 追加機能の提案・アイデアを入力... (例: 〇〇機能がほしい！)';
+    } else {
+      msgInput.placeholder = 'メッセージを入力... (Enterで送信, Shift+Enterで改行)';
     }
   }
 

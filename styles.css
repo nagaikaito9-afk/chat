@@ -1504,6 +1504,47 @@ html, body {
   transform: scale(1.1);
 }
 
+/* 🐛 バグ報告＆ 💡 追加機能提案専用 スタイリング */
+.room-tab.room-tab-bug {
+  border-color: rgba(255, 51, 102, 0.4);
+  background: rgba(255, 51, 102, 0.08);
+}
+.room-tab.room-tab-bug.active {
+  background: linear-gradient(135deg, #ff3366 0%, #ff6b8b 100%);
+  color: #ffffff;
+  border-color: #ff3366;
+  box-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
+}
+
+.room-tab.room-tab-feature {
+  border-color: rgba(255, 184, 0, 0.4);
+  background: rgba(255, 184, 0, 0.08);
+}
+.room-tab.room-tab-feature.active {
+  background: linear-gradient(135deg, #ffb800 0%, #ff8c00 100%);
+  color: #ffffff;
+  border-color: #ffb800;
+  box-shadow: 0 0 12px rgba(255, 184, 0, 0.4);
+}
+
+.snippet-tag.snippet-tag-bug {
+  background: rgba(255, 51, 102, 0.15);
+  border-color: rgba(255, 51, 102, 0.4);
+  color: #ff6b8b;
+}
+.snippet-tag.snippet-tag-bug:hover {
+  background: rgba(255, 51, 102, 0.3);
+}
+
+.snippet-tag.snippet-tag-feature {
+  background: rgba(255, 184, 0, 0.15);
+  border-color: rgba(255, 184, 0, 0.4);
+  color: var(--warning-color);
+}
+.snippet-tag.snippet-tag-feature:hover {
+  background: rgba(255, 184, 0, 0.3);
+}
+
 .btn-create-room {
   background: var(--accent-gradient);
   color: #ffffff;
