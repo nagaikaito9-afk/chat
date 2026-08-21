@@ -2073,9 +2073,6 @@ function initFirebaseRealtimeSync() {
     // クイズ回答判定
     checkQuizAnswer(msgData);
 
-    // AI Bot自動応答判定 (@bot)
-    checkAiBotTrigger(msgData);
-
     const container = document.getElementById('messages-container');
     if (container && container.children.length > 60) {
       container.removeChild(container.firstChild);
