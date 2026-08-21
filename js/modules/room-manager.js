@@ -70,33 +70,31 @@ window.deleteUserRoom = deleteUserRoom;
 
 // 🖼️ Setup Chat Messages Right-Click Context Menu Listener
 export function setupChatBackgroundContextMenu() {
-  const targets = [
-    document.getElementById('chat-messages'),
-    document.getElementById('messages-container')
-  ].filter(Boolean);
+  const chatMain = document.querySelector('.chat-main') || document.getElementById('chat-messages');
+  if (!chatMain) return;
 
-  targets.forEach(target => {
-    target.addEventListener('contextmenu', (e) => {
-      if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea') || e.target.closest('.msg-dropdown-menu')) {
-        return;
-      }
-      e.preventDefault();
+  chatMain.addEventListener('contextmenu', (e) => {
+    if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea') || e.target.closest('select') || e.target.closest('.msg-dropdown-menu')) {
+      return;
+    }
+    e.preventDefault();
 
-      const activeRoomId = getActiveRoomId();
-      const activeUserId = getMyUserId();
-      const isAdmin = getIsAdminMode();
-      const currentRoom = roomsCache[activeRoomId];
-      const isCreator = currentRoom && (currentRoom.createdBy === activeUserId);
-      const isAllowed = (activeRoomId === 'public_main') ? isAdmin : (isCreator || isAdmin);
+    const activeRoomId = getActiveRoomId();
+    const activeUserId = getMyUserId();
+    const isAdmin = getIsAdminMode();
+    const currentRoom = roomsCache[activeRoomId];
 
-      if (!isAllowed) {
-        const targetRole = activeRoomId === 'public_main' ? '運営（管理者）のみ' : '部屋の作成者のみ';
-        showToast(`チャット背景の変更は${targetRole}可能です`, 'warning');
-        return;
-      }
+    // If room metadata exists check createdBy; if custom room (room_*), fallback to allowing active user
+    const isCreator = currentRoom ? (currentRoom.createdBy === activeUserId) : activeRoomId.startsWith('room_');
+    const isAllowed = (activeRoomId === 'public_main') ? isAdmin : (isCreator || isAdmin);
 
-      openRoomBgModal();
-    });
+    if (!isAllowed) {
+      const targetRole = activeRoomId === 'public_main' ? '運営（管理者）のみ' : '部屋の作成者のみ';
+      showToast(`チャット背景の変更は${targetRole}可能です`, 'warning');
+      return;
+    }
+
+    openRoomBgModal();
   });
 }
 

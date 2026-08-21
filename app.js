@@ -2328,7 +2328,6 @@ function renderSingleMessage(msgId, msg) {
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
         ${!isSelf ? `<button onclick="window.sendFriendRequest('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請</button>` : ''}
-        ${isCreatorName(myName) && !isSelf ? `<button onclick="window.openCreatorEffectsModal('${msg.userId}')"><i class="fa-solid fa-wand-magic-sparkles text-warning"></i> ✨ エフェクトリスト</button>` : ''}
         ${(isCreatorName(myName) || (typeof friendsMap !== 'undefined' && friendsMap.has(msg.userId))) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${getUserEffects(msg.userId).trusted ? '信用解除' : '💎 信用付与'}</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
         ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
@@ -3110,8 +3109,9 @@ function setupChatControls() {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast('ファイルサイズは2MB以下にしてください', 'error');
+    const MAX_SIZE = 15 * 1024 * 1024; // 15MB
+    if (file.size > MAX_SIZE) {
+      showToast('ファイルサイズは15MB以下にしてください', 'error');
       fileInput.value = '';
       return;
     }
@@ -3120,57 +3120,38 @@ function setupChatControls() {
     previewName.textContent = file.name;
     previewSize.textContent = formatFileSize(file.size);
 
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const maxDim = 1920;
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, width, height);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const dataUrl = evt.target.result;
+      selectedFileObject.dataUrl = dataUrl;
+      selectedFileObject.fileName = file.name;
+      selectedFileObject.fileSize = file.size;
 
-          const format = (file.type === 'image/png' || file.type === 'image/gif') ? 'image/png' : 'image/jpeg';
-          selectedFileObject.dataUrl = canvas.toDataURL(format, 0.92);
-          selectedFileObject.msgType = 'image';
-
-          previewImg.src = selectedFileObject.dataUrl;
-          previewImg.classList.remove('hidden');
-          previewIcon.classList.add('hidden');
-          previewBar.classList.remove('hidden');
-        };
-        img.src = evt.target.result;
-      };
-      reader.readAsDataURL(file);
-    } else {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        selectedFileObject.dataUrl = evt.target.result;
-        if (file.type.startsWith('video/')) selectedFileObject.msgType = 'video';
-        else if (file.type.startsWith('audio/')) selectedFileObject.msgType = 'audio';
-        else selectedFileObject.msgType = 'file';
-
+      if (file.type.startsWith('image/')) {
+        selectedFileObject.msgType = 'image';
+        previewImg.src = dataUrl;
+        previewImg.classList.remove('hidden');
+        previewIcon.classList.add('hidden');
+      } else if (file.type.startsWith('video/')) {
+        selectedFileObject.msgType = 'video';
         previewImg.classList.add('hidden');
+        previewIcon.innerHTML = '<i class="fa-solid fa-file-video text-danger" style="font-size:1.8rem;"></i>';
         previewIcon.classList.remove('hidden');
-        previewBar.classList.remove('hidden');
-      };
-      reader.readAsDataURL(file);
-    }
+      } else if (file.type.startsWith('audio/')) {
+        selectedFileObject.msgType = 'audio';
+        previewImg.classList.add('hidden');
+        previewIcon.innerHTML = '<i class="fa-solid fa-file-audio text-success" style="font-size:1.8rem;"></i>';
+        previewIcon.classList.remove('hidden');
+      } else {
+        selectedFileObject.msgType = 'file';
+        previewImg.classList.add('hidden');
+        previewIcon.innerHTML = '<i class="fa-solid fa-file-lines text-primary" style="font-size:1.8rem;"></i>';
+        previewIcon.classList.remove('hidden');
+      }
+
+      previewBar.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
   });
 
   btnRemoveAttachment.addEventListener('click', () => {
