@@ -20,6 +20,8 @@ export function showToast(message, type = 'info') {
   }, 3000);
 }
 
+window.showToast = showToast;
+
 export function escapeHTML(str) {
   if (!str) return '';
   return String(str)
@@ -29,6 +31,7 @@ export function escapeHTML(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+export const escapeHtml = escapeHTML;
 
 export function formatTime(timestamp) {
   if (!timestamp) return '';

@@ -8,7 +8,7 @@ import {
 // Modular Imports
 import { state } from './js/state.js';
 import { setupPaintModal } from './js/modules/paint-studio.js';
-import { showToast, escapeHTML, formatTime, formatDate, parseMarkdown } from './js/utils/helpers.js';
+import { showToast, escapeHTML, escapeHtml, formatTime, formatDate, parseMarkdown } from './js/utils/helpers.js';
 import { generateMathQuiz, checkMathQuizAnswer } from './js/utils/math-quiz.js';
 import { setRoomsCache, deleteUserRoom, setupChatBackgroundContextMenu, setupRoomBgModal, listenRoomBackground } from './js/modules/room-manager.js';
 
@@ -313,25 +313,7 @@ async function cleanupInactiveAccounts() {
   }
 }
 
-// Toast Notifications
-function showToast(msg, type = 'info') {
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i> <span>${escapeHtml(msg)}</span>`;
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 3500);
-}
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
 
 // 50 Icon Choices Array (Categorized)
 const AVATAR_PRESETS_50 = [
@@ -572,11 +554,7 @@ function getUserNameClass(uid, name) {
   return 'user-item-name';
 }
 
-function formatTime(timestamp) {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
-  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-}
+
 
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 B';
