@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CyberChat - リアルタイム自由チャット (AI & ゲーム拡張版)</title>
+  <title>NoRestrictionsChat - リアルタイム自由チャット (AI & ゲーム拡張版)</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,7 +51,7 @@
       <div class="join-header">
         <div class="app-brand">
           <i class="fa-solid fa-comments brand-icon"></i>
-          <h2>CyberChat</h2>
+          <h2>NoRestrictionsChat</h2>
         </div>
         <p class="join-subtitle">アカウント登録・ログインしてチャットを開始</p>
         <div class="auth-author-tag">
@@ -187,7 +187,7 @@
       <div class="sidebar-header">
         <div class="app-brand-sm">
           <i class="fa-solid fa-comments brand-icon"></i>
-          <span>CyberChat</span>
+          <span>NoRestrictionsChat</span>
         </div>
         <button id="btn-close-sidebar" class="btn-icon sidebar-close-btn"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -666,7 +666,7 @@
   <div id="admin-panel-modal" class="modal-overlay hidden">
     <div class="modal-card glass-panel animate-scale-up" style="max-width: 650px;">
       <div class="modal-header" style="background: rgba(255, 51, 102, 0.15);">
-        <h3 class="text-danger"><i class="fa-solid fa-user-gear"></i> CyberChat 運営専用コントロールパネル</h3>
+        <h3 class="text-danger"><i class="fa-solid fa-user-gear"></i> NoRestrictionsChat 運営専用コントロールパネル</h3>
         <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
@@ -686,6 +686,10 @@
             <button id="btn-admin-toggle-crown" class="btn-admin-act primary">
               <i class="fa-solid fa-crown"></i>
               <span>👑 運営マーク切替</span>
+            </button>
+            <button id="btn-admin-clean-inactive" class="btn-admin-act warning">
+              <i class="fa-solid fa-user-xmark"></i>
+              <span>🧹 1ヶ月未ログイン垢を掃除</span>
             </button>
           </div>
         </div>
@@ -1013,6 +1017,26 @@
             <option value="🎵 音楽鑑賞">🎵 音楽鑑賞</option>
             <option value="❓ 質問・相談">❓ 質問・相談</option>
           </select>
+        </div>
+
+        <div class="input-group">
+          <label for="edit-bubble-color"><i class="fa-solid fa-palette text-primary"></i> チャット吹き出しカラー (相手にも反映・文字色自動反転)</label>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+            <input type="color" id="edit-bubble-color" value="#00f0ff" style="width:48px; height:38px; border:1px solid var(--glass-border); border-radius:6px; background:transparent; cursor:pointer;">
+            <div class="bubble-preset-colors" style="display:flex; gap:6px; flex-wrap:wrap; flex:1;">
+              <button type="button" class="bubble-preset-btn" data-color="#00f0ff" style="width:26px; height:26px; border-radius:50%; background:#00f0ff; border:1px solid #fff; cursor:pointer;" title="シアン"></button>
+              <button type="button" class="bubble-preset-btn" data-color="#ff007f" style="width:26px; height:26px; border-radius:50%; background:#ff007f; border:1px solid #fff; cursor:pointer;" title="ピンク"></button>
+              <button type="button" class="bubble-preset-btn" data-color="#00ff88" style="width:26px; height:26px; border-radius:50%; background:#00ff88; border:1px solid #fff; cursor:pointer;" title="グリーン"></button>
+              <button type="button" class="bubble-preset-btn" data-color="#ffb800" style="width:26px; height:26px; border-radius:50%; background:#ffb800; border:1px solid #fff; cursor:pointer;" title="ゴールド"></button>
+              <button type="button" class="bubble-preset-btn" data-color="#8a2be2" style="width:26px; height:26px; border-radius:50%; background:#8a2be2; border:1px solid #fff; cursor:pointer;" title="パープル"></button>
+              <button type="button" class="bubble-preset-btn" data-color="#ff6600" style="width:26px; height:26px; border-radius:50%; background:#ff6600; border:1px solid #fff; cursor:pointer;" title="オレンジ"></button>
+              <button type="button" class="bubble-preset-btn" data-color="#1e293b" style="width:26px; height:26px; border-radius:50%; background:#1e293b; border:1px solid #fff; cursor:pointer;" title="ダーク"></button>
+              <button type="button" class="bubble-preset-btn" data-color="#ffffff" style="width:26px; height:26px; border-radius:50%; background:#ffffff; border:1px solid #333; cursor:pointer;" title="ホワイト"></button>
+            </div>
+          </div>
+          <div id="edit-bubble-preview" style="margin-top:8px; padding:8px 14px; border-radius:12px; font-size:0.85rem; font-weight:600; text-align:center; transition:all 0.2s ease;">
+            💬 吹き出しカラープレビュー (反転文字色)
+          </div>
         </div>
 
         <div class="input-group">

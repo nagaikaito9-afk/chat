@@ -28,6 +28,7 @@ let myName = '';
 let myTrip = '◆(なし)';
 let myAvatar = localStorage.getItem('cyberchat_user_avatar') || '🤖';
 let myStatus = '💬 雑談歓迎';
+let myBubbleColor = localStorage.getItem('cyberchat_bubble_color') || '#00f0ff';
 let myLevel = parseInt(localStorage.getItem('cyberchat_user_level') || '1');
 let myExp = parseInt(localStorage.getItem('cyberchat_user_exp') || '0');
 let lastExpMsgTime = 0;
@@ -248,6 +249,59 @@ async function generateTrip(tripKey) {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   return '◆' + hashHex.substring(0, 10);
+}
+
+// 💬 吹き出し用コントラスト（反転）文字色計算関数 (YIQ Luminance Math)
+function getContrastTextColor(hexColor) {
+  if (!hexColor) return '#ffffff';
+  let hex = hexColor.replace('#', '');
+  if (hex.length === 3) {
+    hex = hex.split('').map(c => c + c).join('');
+  }
+  if (hex.length !== 6) return '#ffffff';
+
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+
+  const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+  return (yiq >= 128) ? '#0f172a' : '#ffffff';
+}
+
+// 🧹 1ヶ月（30日）以上未ログインの放置アカウント自動消去処理
+const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function cleanupInactiveAccounts() {
+  try {
+    const snap = await get(globalRef('accounts'));
+    if (!snap.exists()) return 0;
+
+    const accounts = snap.val();
+    const now = Date.now();
+    let deletedCount = 0;
+
+    for (const [accKey, accData] of Object.entries(accounts)) {
+      if (!accData) continue;
+      const lastActive = accData.lastLoginAt || accData.createdAt || 0;
+
+      if (lastActive > 0 && (now - lastActive > ONE_MONTH_MS)) {
+        console.log(`[Auto Cleanup] 1ヶ月以上未ログインのためアカウント「${accData.username} (${accKey})」を自動消去しました`);
+        await remove(globalRef(`accounts/${accKey}`));
+        if (accData.userId) {
+          await remove(globalRef(`global_online_users/${accData.userId}`));
+        }
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(`[Auto Cleanup] 合計 ${deletedCount} 件の放置アカウントを消去しました`);
+    }
+    return deletedCount;
+  } catch (err) {
+    console.warn("cleanupInactiveAccounts error:", err);
+    return 0;
+  }
 }
 
 // Toast Notifications
@@ -730,6 +784,7 @@ async function registerOnlineUser() {
       status: myStatus,
       trip: myTrip,
       level: myLevel,
+      bubbleColor: myBubbleColor,
       joinedMonth: joinedM,
       isVeteran: isVet,
       lastSeen: Date.now()
@@ -746,6 +801,7 @@ async function registerOnlineUser() {
       avatar: myAvatar,
       status: myStatus,
       level: myLevel,
+      bubbleColor: myBubbleColor,
       joinedMonth: joinedM,
       isVeteran: isVet,
       currentRoomId: currentRoomId,
@@ -985,6 +1041,20 @@ function setupAdminSystem() {
 
       await window.adminBanByName(targetName);
       manualBanInput.value = '';
+    });
+  }
+
+  // 🧹 1ヶ月未ログイン放置アカウント掃除ボタン
+  const btnCleanInactive = document.getElementById('btn-admin-clean-inactive');
+  if (btnCleanInactive) {
+    btnCleanInactive.addEventListener('click', async () => {
+      if (!confirm('【確認】最終ログインから1ヶ月（30日）以上経過した放置アカウントを一括消去しますか？')) return;
+      btnCleanInactive.disabled = true;
+      btnCleanInactive.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 削除中...';
+      const count = await cleanupInactiveAccounts();
+      showToast(`🧹 1ヶ月以上未ログインの放置アカウント ${count} 件を一括消去しました！`, 'success');
+      btnCleanInactive.disabled = false;
+      btnCleanInactive.innerHTML = '<i class="fa-solid fa-user-xmark"></i> <span>🧹 1ヶ月未ログイン垢を掃除</span>';
     });
   }
 }
@@ -1267,11 +1337,17 @@ function setupAuthForms() {
       myName = accData.username || accName;
       myAvatar = accData.avatar || '🤖';
       myStatus = accData.status || '💬 雑談歓迎';
+      myBubbleColor = accData.bubbleColor || localStorage.getItem('cyberchat_bubble_color') || '#00f0ff';
       myTrip = await generateTrip(accName);
 
       localStorage.setItem('cyberchat_user_id', myUserId);
       localStorage.setItem('cyberchat_account_key', key);
       localStorage.setItem('cyberchat_account_name', myName);
+      localStorage.setItem('cyberchat_bubble_color', myBubbleColor);
+
+      try {
+        await update(globalRef(`accounts/${key}`), { lastLoginAt: Date.now() });
+      } catch (e) {}
 
       await completeUserLogin();
       showToast(`ログイン成功！おかえりなさい、${myName} さん！`, 'success');
@@ -1485,7 +1561,13 @@ async function checkSavedSession() {
         myName = accData.username;
         myAvatar = accData.avatar || '🤖';
         myStatus = accData.status || '💬 雑談歓迎';
+        myBubbleColor = accData.bubbleColor || localStorage.getItem('cyberchat_bubble_color') || '#00f0ff';
         myTrip = await generateTrip(myName);
+        localStorage.setItem('cyberchat_bubble_color', myBubbleColor);
+
+        try {
+          await update(globalRef(`accounts/${savedKey}`), { lastLoginAt: Date.now() });
+        } catch (e) {}
 
         await completeUserLogin();
         return;
@@ -1512,6 +1594,8 @@ async function completeUserLogin() {
   updateMyProfileUI();
   initFirebaseRealtimeSync();
   initFriendListeners();
+
+  cleanupInactiveAccounts();
 }
 
 // Avatar Grid Selector & Custom Image Uploader
@@ -2318,17 +2402,18 @@ function renderSingleMessage(msgId, msg) {
 
     let contentHtml = '';
     const bubbleClass = `msg-bubble ${msg.whisperTo ? 'whisper' : ''}`;
+    const customBubbleStyle = msg.bubbleColor ? `style="background: ${msg.bubbleColor} !important; color: ${getContrastTextColor(msg.bubbleColor)} !important;"` : '';
 
     if (msg.deleted) {
-      contentHtml = `<div class="${bubbleClass}" style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</div>`;
+      contentHtml = `<div class="${bubbleClass}" ${customBubbleStyle} style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</div>`;
     } else if (msg.type === 'stamp') {
-      contentHtml = `<div class="${bubbleClass}">${quoteCardHtml}<div class="stamp-card-img">${escapeHtml(msg.text)}</div></div>`;
+      contentHtml = `<div class="${bubbleClass}" ${customBubbleStyle}>${quoteCardHtml}<div class="stamp-card-img">${escapeHtml(msg.text)}</div></div>`;
     } else if (msg.type === 'game' || msg.type === 'rps') {
-      contentHtml = `<div class="${bubbleClass}">${quoteCardHtml}${msg.text}</div>`;
+      contentHtml = `<div class="${bubbleClass}" ${customBubbleStyle}>${quoteCardHtml}${msg.text}</div>`;
     } else if (msg.type === 'image') {
       const fileName = msg.fileName || 'image.png';
       contentHtml = `
-        <div class="${bubbleClass}">
+        <div class="${bubbleClass}" ${customBubbleStyle}>
           ${quoteCardHtml}
           ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
           <div class="msg-media-box">
@@ -3077,6 +3162,7 @@ async function sendSpecialMessage(msgType, text) {
       trip: myTrip,
       avatar: myAvatar,
       level: myLevel,
+      bubbleColor: myBubbleColor,
       joinedMonth: localStorage.getItem('cyberchat_joined_month') || '2026-08',
       isVeteran: isVeteranUser(myUserId),
       type: msgType,
@@ -3219,6 +3305,7 @@ function setupChatControls() {
         trip: myTrip,
         avatar: myAvatar,
         level: myLevel,
+        bubbleColor: myBubbleColor,
         joinedMonth: localStorage.getItem('cyberchat_joined_month') || '2026-08',
         isVeteran: isVeteranUser(myUserId),
         type: selectedFileObject ? selectedFileObject.msgType : 'text',
@@ -4062,12 +4149,40 @@ function setupProfileModal() {
   const statusInput = document.getElementById('edit-status');
   const tripkeyInput = document.getElementById('edit-tripkey');
   const recEmailInput = document.getElementById('edit-recovery-email');
+  const bubbleColorInput = document.getElementById('edit-bubble-color');
+  const bubblePreview = document.getElementById('edit-bubble-preview');
   const errorMsg = document.getElementById('edit-profile-error');
+
+  const updateBubblePreview = (color) => {
+    if (!bubblePreview) return;
+    const txtColor = getContrastTextColor(color);
+    bubblePreview.style.backgroundColor = color;
+    bubblePreview.style.color = txtColor;
+    bubblePreview.textContent = `💬 吹き出しカラープレビュー (${color})`;
+  };
+
+  if (bubbleColorInput) {
+    bubbleColorInput.value = myBubbleColor;
+    updateBubblePreview(myBubbleColor);
+    bubbleColorInput.addEventListener('input', (e) => updateBubblePreview(e.target.value));
+  }
+
+  document.querySelectorAll('.bubble-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = btn.dataset.color;
+      if (bubbleColorInput) bubbleColorInput.value = c;
+      updateBubblePreview(c);
+    });
+  });
 
   openBtn.addEventListener('click', () => {
     usernameInput.value = myName;
     statusInput.value = myStatus;
     tripkeyInput.value = '';
+    if (bubbleColorInput) {
+      bubbleColorInput.value = myBubbleColor;
+      updateBubblePreview(myBubbleColor);
+    }
     if (recEmailInput) recEmailInput.value = localStorage.getItem('cyberchat_recovery_email') || '';
     document.getElementById('edit-trip-preview-code').textContent = myTrip;
     errorMsg.classList.add('hidden');
@@ -4106,6 +4221,10 @@ function setupProfileModal() {
       const oldName = myName;
       myName = newName;
       myStatus = newStatus;
+      if (bubbleColorInput) {
+        myBubbleColor = bubbleColorInput.value;
+        localStorage.setItem('cyberchat_bubble_color', myBubbleColor);
+      }
       if (newTripKey) myTrip = await generateTrip(newTripKey);
       if (newRecEmail) localStorage.setItem('cyberchat_recovery_email', newRecEmail);
 
@@ -4116,7 +4235,9 @@ function setupProfileModal() {
             username: myName,
             avatar: myAvatar,
             status: myStatus,
-            recoveryEmail: newRecEmail
+            bubbleColor: myBubbleColor,
+            recoveryEmail: newRecEmail,
+            lastLoginAt: Date.now()
           });
         } catch (e) {
           console.warn("Account update error:", e);
