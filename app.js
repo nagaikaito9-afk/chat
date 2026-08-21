@@ -318,6 +318,18 @@ function renderAvatarHTML(avatar, customClass = '') {
   return `<span class="avatar-fallback-text ${customClass}">${escapeHtml(avatar)}</span>`;
 }
 
+function isCreatorName(name) {
+  if (!name || typeof name !== 'string') return false;
+  return name.includes('ただのネコ好き');
+}
+
+function renderCreatorBadge(name) {
+  if (isCreatorName(name)) {
+    return ` <span class="creator-badge"><i class="fa-solid fa-crown text-warning"></i> 🛠️ 製作者</span>`;
+  }
+  return '';
+}
+
 function formatTime(timestamp) {
   if (!timestamp) return '';
   const date = new Date(timestamp);
@@ -1384,14 +1396,19 @@ function updateMyProfileUI() {
     localStorage.setItem('cyberchat_user_avatar', myAvatar);
   }
 
+  const creatorBadgeHtml = renderCreatorBadge(myName);
+
   const nameDisp = document.getElementById('my-name-display');
-  if (nameDisp) nameDisp.textContent = myName;
+  if (nameDisp) nameDisp.innerHTML = `${escapeHtml(myName)}${creatorBadgeHtml}`;
 
   const tripDisp = document.getElementById('my-trip-display');
   if (tripDisp) tripDisp.textContent = myTrip;
 
   const avatarDisp = document.getElementById('my-avatar');
-  if (avatarDisp) avatarDisp.innerHTML = renderAvatarHTML(myAvatar);
+  if (avatarDisp) {
+    avatarDisp.classList.toggle('creator-avatar-glow', isCreatorName(myName));
+    avatarDisp.innerHTML = renderAvatarHTML(myAvatar);
+  }
 
   const statusDisp = document.getElementById('my-status-display');
   if (statusDisp) statusDisp.textContent = myStatus;
@@ -1501,12 +1518,16 @@ function initFirebaseRealtimeSync() {
         count++;
         if (ignoredUsersSet.has(uid)) return;
 
+        const creatorBadgeHtml = renderCreatorBadge(uData.name);
+        const avatarGlowClass = isCreatorName(uData.name) ? 'creator-avatar-glow' : '';
+        const nameClass = isCreatorName(uData.name) ? 'user-item-name is-creator' : 'user-item-name';
+
         const li = document.createElement('li');
         li.className = 'user-item';
         li.innerHTML = `
-          <div class="avatar-sm">${renderAvatarHTML(uData.avatar || '🤖')}</div>
+          <div class="avatar-sm ${avatarGlowClass}">${renderAvatarHTML(uData.avatar || '🤖')}</div>
           <div class="user-item-info">
-            <div class="user-item-name">${escapeHtml(uData.name)} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
+            <div class="${nameClass}">${escapeHtml(uData.name)}${creatorBadgeHtml} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
             <div class="user-item-status">${escapeHtml(uData.status || '💬 雑談歓迎')}</div>
           </div>
           <button class="btn-secondary btn-sm" onclick="window.startWhisper('${uid}', '${escapeHtml(uData.name)}')" title="内緒話（DM）"><i class="fa-solid fa-lock"></i></button>
@@ -1668,47 +1689,7 @@ function setupAiBotControls() {
 }
 
 async function fetchAiBotResponse(prompt, senderName) {
-  if (!prompt || prompt.trim() === '') {
-    return `こんにちは！${senderName} さん！🤖 CyberBot です。質問、計算、お悩み相談、会話など何でも気軽に話しかけてくださいね！\n例: 「@bot 今日の運勢は？」「@bot 12 x 15 は？」「@bot 最新のAIニュースを教えて」`;
-  }
-
-  const apiKey = getAiApiKey();
-  if (apiKey) {
-    const models = ['gemini-1.5-flash', 'gemini-2.0-flash'];
-    for (const model of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              role: 'user',
-              parts: [{
-                text: `あなたはCyberChatの知性的でフレンドリーなAIアシスタント CyberBot 🤖 です。ユーザー「${senderName}」からの次のメッセージに対して、丁寧かつ分かりやすく、親しみやすい日本語で回答してください。\n\n質問: ${prompt}`
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 600
-            }
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text && text.trim()) {
-            return text.trim();
-          }
-        }
-      } catch (e) {
-        console.warn(`Gemini API fetch error (${model}):`, e);
-      }
-    }
-  }
-
-  return generateLocalAiResponse(prompt, senderName);
+  return `🤖 🚧 **【CyberBot】** こんにちは、${senderName} さん！\n現在 AI Bot 機能は**開発中（次回アップデート調整中）**です。機能実装をお楽しみに！✨`;
 }
 
 function checkAiBotTrigger(msgData) {
@@ -1724,8 +1705,8 @@ function checkAiBotTrigger(msgData) {
         const botRef = push(roomRef('messages'));
         await set(botRef, {
           userId: 'cyberbot_ai',
-          name: '🤖 CyberBot [AIアシスタント]',
-          trip: '◆AI_BOT_01',
+          name: '🤖 CyberBot [🚧 開発中]',
+          trip: '◆AI_BOT_DEV',
           avatar: '🤖',
           type: 'text',
           text: botResponse,
@@ -1947,10 +1928,14 @@ function renderSingleMessage(msgId, msg) {
     const whisperHeader = msg.whisperTo ? `<span style="color:#f472b6; font-weight:700;"><i class="fa-solid fa-lock"></i> 【内緒話】</span>` : '';
     const starBadge = isStarred ? `<i class="fa-solid fa-star text-warning" title="お気に入り"></i> ` : '';
 
+    const creatorBadgeHtml = renderCreatorBadge(msg.name);
+    const senderClass = isCreatorName(msg.name) ? 'msg-sender-name is-creator' : 'msg-sender-name';
+    const avatarGlowClass = isCreatorName(msg.name) ? 'creator-avatar-glow' : '';
+
     const metaHtml = `
       <div class="msg-meta">
-        <span class="msg-avatar-icon">${renderAvatarHTML(msg.avatar || '🤖')}</span>
-        <span class="msg-sender-name">${starBadge}${whisperHeader} ${escapeHtml(msg.name)} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
+        <span class="msg-avatar-icon ${avatarGlowClass}">${renderAvatarHTML(msg.avatar || '🤖')}</span>
+        <span class="${senderClass}">${starBadge}${whisperHeader} ${escapeHtml(msg.name)}${creatorBadgeHtml} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
         <span class="msg-time">${formatTime(msg.timestamp)} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
     `;
