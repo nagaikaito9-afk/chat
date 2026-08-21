@@ -54,9 +54,11 @@ let currentFilter = 'all';
 let searchKeyword = '';
 let allMessages = new Map();
 let activeUsersMap = new Map();
+let previousActiveUsersMap = null;
 let bannedUsersMap = new Map();
 let ignoredUsersSet = new Set(JSON.parse(localStorage.getItem('cyberchat_ignored_users') || '[]'));
 let starredMsgSet = new Set(JSON.parse(localStorage.getItem('cyberchat_starred_msgs') || '[]'));
+let iceCandidateQueue = new Map();
 
 // Active Quiz State
 let activeMathQuizAnswer = null;
@@ -1014,9 +1016,13 @@ function setupAuthForms() {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
       if (!confirm('ログアウトしますか？')) return;
+      try {
+        await sendSystemMessage(`${renderAvatarHTML(myAvatar)} ${myName} がログアウトして退室しました`);
+        await remove(roomRef(`active_users/${myUserId}`));
+        await remove(globalRef(`global_online_users/${myUserId}`));
+      } catch (e) {}
       localStorage.removeItem('cyberchat_account_key');
       localStorage.removeItem('cyberchat_account_name');
-      await remove(roomRef(`active_users/${myUserId}`));
       location.reload();
     });
   }
@@ -1366,8 +1372,12 @@ function setupRoomTabs() {
 async function switchRoom(newRoomId, roomTitle, roomPR = '') {
   if (currentRoomId === newRoomId) return;
 
-  await remove(roomRef(`active_users/${myUserId}`));
+  try {
+    await sendSystemMessage(`${renderAvatarHTML(myAvatar)} ${myName} が退室しました`);
+    await remove(roomRef(`active_users/${myUserId}`));
+  } catch (e) {}
 
+  previousActiveUsersMap = null;
   currentRoomId = newRoomId;
 
   const titleEl = document.getElementById('current-room-title');
@@ -1412,12 +1422,14 @@ function initFirebaseRealtimeSync() {
   if (unsubscribeTopic) unsubscribeTopic();
   if (unsubscribeScreen) unsubscribeScreen();
 
-  // 1. オンラインリスト（30秒以内の生存確認で確実表示＆古いデータの自動削除）
+  // 1. オンラインリスト（30秒以内の生存確認で確実表示＆古いデータの自動削除 ＋ 入退室の即時通知）
   unsubscribeActiveUsers = onValue(roomRef('active_users'), (snapshot) => {
     const userListEl = document.getElementById('online-user-list');
     const onlineCountEl = document.getElementById('online-count');
     userListEl.innerHTML = '';
     
+    const currentUsersMap = new Map();
+
     if (snapshot.exists()) {
       const users = snapshot.val();
       activeUsersMap.clear();
@@ -1431,6 +1443,7 @@ function initFirebaseRealtimeSync() {
         }
 
         activeUsersMap.set(uid, uData);
+        currentUsersMap.set(uid, uData);
         count++;
         if (ignoredUsersSet.has(uid)) return;
 
@@ -1452,6 +1465,24 @@ function initFirebaseRealtimeSync() {
     } else {
       onlineCountEl.textContent = '0人';
     }
+
+    // 🚪 リアルタイム入退室通知の判定処理
+    if (previousActiveUsersMap !== null) {
+      // 新規入室ユーザーの検出
+      currentUsersMap.forEach((uData, uid) => {
+        if (!previousActiveUsersMap.has(uid) && uid !== myUserId) {
+          showToast(`🚪 ${uData.name || '誰か'} がこの部屋に入室しました`, 'info');
+          playSound('receive');
+        }
+      });
+      // 退室ユーザーの検出
+      previousActiveUsersMap.forEach((oldData, uid) => {
+        if (!currentUsersMap.has(uid) && uid !== myUserId) {
+          showToast(`🚪 ${oldData.name || '誰か'} がこの部屋から退室しました`, 'info');
+        }
+      });
+    }
+    previousActiveUsersMap = new Map(currentUsersMap);
 
     if (typeof renderFriendsListUI === 'function') {
       renderFriendsListUI();
@@ -3095,8 +3126,11 @@ function leaveVoiceRoom() {
     localAudioStream = null;
   }
 
-  peerConnections.forEach(pc => pc.close());
+  peerConnections.forEach(pc => {
+    try { pc.close(); } catch(e) {}
+  });
   peerConnections.clear();
+  iceCandidateQueue.clear();
 
   const container = document.getElementById('remote-audio-container');
   if (container) container.innerHTML = '';
@@ -3104,70 +3138,119 @@ function leaveVoiceRoom() {
   const btnVcToggle = document.getElementById('btn-toggle-vc');
   const btnMicToggle = document.getElementById('btn-toggle-mic');
 
-  btnVcToggle.classList.remove('joined');
-  btnVcToggle.innerHTML = '<i class="fa-solid fa-microphone"></i> <span>ボイスチャット</span>';
-  btnMicToggle.classList.add('hidden');
-  document.getElementById('vc-section').classList.add('hidden');
+  if (btnVcToggle) {
+    btnVcToggle.classList.remove('joined');
+    btnVcToggle.innerHTML = '<i class="fa-solid fa-microphone"></i> <span>ボイスチャット</span>';
+  }
+  if (btnMicToggle) btnMicToggle.classList.add('hidden');
+  const vcSec = document.getElementById('vc-section');
+  if (vcSec) vcSec.classList.add('hidden');
 
-  remove(roomRef(`voice_room/${myUserId}`));
+  remove(roomRef(`voice_room/${myUserId}`)).catch(() => {});
+  remove(roomRef(`voice_signals/${myUserId}`)).catch(() => {});
   if (unsubscribeSignals) unsubscribeSignals();
   showToast('ボイスチャットから退出しました');
 }
 
-// WebRTC Signaling Handler
+// WebRTC Signaling Handler (Fixed structured paths & ICE candidate queueing)
 function initWebRtcSignaling() {
   const rtcConfig = {
-    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
   };
 
-  unsubscribeSignals = onValue(roomRef('voice_signals'), (snapshot) => {
+  const mySignalsRef = roomRef(`voice_signals/${myUserId}`);
+  onDisconnect(mySignalsRef).remove();
+
+  unsubscribeSignals = onValue(mySignalsRef, (snapshot) => {
     if (!snapshot.exists() || !isVoiceRoomJoined) return;
-    const signals = snapshot.val();
+    const fromSignals = snapshot.val();
 
-    Object.entries(signals).forEach(async ([pairKey, signalData]) => {
-      const [fromUid, toUid] = pairKey.split('_');
-      if (toUid !== myUserId) return;
+    Object.entries(fromSignals).forEach(async ([fromUid, sigData]) => {
+      if (!sigData || fromUid === myUserId) return;
 
-      if (signalData.type === 'offer') {
+      // Handle Offer
+      if (sigData.offer) {
         const pc = createPeerConnection(fromUid, rtcConfig);
-        await pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+        if (pc.signalingState !== 'stable') return;
 
-        await set(roomRef(`voice_signals/${myUserId}_${fromUid}`), {
-          type: 'answer',
-          sdp: answer
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(sigData.offer.sdp));
+          processQueuedCandidates(fromUid, pc);
+
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+
+          await set(roomRef(`voice_signals/${fromUid}/${myUserId}/answer`), {
+            sdp: answer,
+            timestamp: Date.now()
+          });
+        } catch (err) {
+          console.warn("WebRTC offer handle error:", err);
+        }
+      }
+
+      // Handle Answer
+      if (sigData.answer) {
+        const pc = peerConnections.get(fromUid);
+        if (pc && pc.signalingState === 'have-local-offer') {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(sigData.answer.sdp));
+            processQueuedCandidates(fromUid, pc);
+          } catch (err) {
+            console.warn("WebRTC answer handle error:", err);
+          }
+        }
+      }
+
+      // Handle Candidates
+      if (sigData.candidates) {
+        const pc = peerConnections.get(fromUid);
+        Object.values(sigData.candidates).forEach(cand => {
+          if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+            pc.addIceCandidate(new RTCIceCandidate(cand)).catch(e => {});
+          } else {
+            if (!iceCandidateQueue.has(fromUid)) iceCandidateQueue.set(fromUid, []);
+            iceCandidateQueue.get(fromUid).push(cand);
+          }
         });
-      } else if (signalData.type === 'answer') {
-        const pc = peerConnections.get(fromUid);
-        if (pc) {
-          await pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp));
-        }
-      } else if (signalData.candidate) {
-        const pc = peerConnections.get(fromUid);
-        if (pc) {
-          await pc.addIceCandidate(new RTCIceCandidate(signalData.candidate));
-        }
       }
     });
   });
 
+  // Initiate connection to existing users in voice_room
   get(roomRef('voice_room')).then((snapshot) => {
     if (!snapshot.exists()) return;
     const users = snapshot.val();
     Object.keys(users).forEach(async (targetUid) => {
       if (targetUid === myUserId) return;
 
-      const pc = createPeerConnection(targetUid, rtcConfig);
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      try {
+        const pc = createPeerConnection(targetUid, rtcConfig);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
 
-      await set(roomRef(`voice_signals/${myUserId}_${targetUid}`), {
-        type: 'offer',
-        sdp: offer
-      });
+        await set(roomRef(`voice_signals/${targetUid}/${myUserId}/offer`), {
+          sdp: offer,
+          timestamp: Date.now()
+        });
+      } catch (err) {
+        console.warn("WebRTC create offer error:", err);
+      }
     });
   });
+}
+
+function processQueuedCandidates(fromUid, pc) {
+  if (iceCandidateQueue.has(fromUid)) {
+    const candidates = iceCandidateQueue.get(fromUid);
+    candidates.forEach(cand => {
+      pc.addIceCandidate(new RTCIceCandidate(cand)).catch(e => {});
+    });
+    iceCandidateQueue.delete(fromUid);
+  }
 }
 
 function createPeerConnection(targetUid, rtcConfig) {
@@ -3184,22 +3267,30 @@ function createPeerConnection(targetUid, rtcConfig) {
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
-      set(roomRef(`voice_signals/${myUserId}_${targetUid}_ice`), {
-        candidate: e.candidate.toJSON()
-      });
+      push(roomRef(`voice_signals/${targetUid}/${myUserId}/candidates`), e.candidate.toJSON()).catch(err => {});
     }
   };
 
   pc.ontrack = (e) => {
     const container = document.getElementById('remote-audio-container');
+    if (!container) return;
     let audioEl = document.getElementById(`audio-${targetUid}`);
     if (!audioEl) {
       audioEl = document.createElement('audio');
       audioEl.id = `audio-${targetUid}`;
       audioEl.autoplay = true;
+      audioEl.playsInline = true;
       container.appendChild(audioEl);
     }
     audioEl.srcObject = e.streams[0];
+    audioEl.play().catch(e => {});
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+      const audioEl = document.getElementById(`audio-${targetUid}`);
+      if (audioEl) audioEl.remove();
+    }
   };
 
   return pc;
@@ -3599,6 +3690,46 @@ function setupProfileModal() {
       saveBtn.disabled = false;
     }
   });
+
+  // 🗑️ アカウント削除処理
+  const deleteAccountBtn = document.getElementById('btn-delete-account');
+  if (deleteAccountBtn) {
+    deleteAccountBtn.addEventListener('click', async () => {
+      const savedKey = localStorage.getItem('cyberchat_account_key');
+      const confirmDelete = confirm(`⚠️ 本当にアカウント「${myName}」を削除しますか？\n\n・アカウント登録データおよびプロフィールがFirebaseから永久抹消されます。\n・この操作を取り消すことはできません。`);
+      if (!confirmDelete) return;
+
+      try {
+        deleteAccountBtn.disabled = true;
+        deleteAccountBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 削除中...';
+
+        await sendSystemMessage(`🗑️ ${renderAvatarHTML(myAvatar)} ${myName} がアカウントを削除して退室しました`);
+
+        if (savedKey) {
+          await remove(globalRef(`accounts/${savedKey}`));
+        }
+        await remove(globalRef(`global_online_users/${myUserId}`));
+        await remove(roomRef(`active_users/${myUserId}`));
+
+        localStorage.removeItem('cyberchat_account_key');
+        localStorage.removeItem('cyberchat_account_name');
+        localStorage.removeItem('cyberchat_user_id');
+        localStorage.removeItem('cyberchat_user_avatar');
+
+        modal.classList.add('hidden');
+        showToast('アカウントを完全に削除しました。ご利用ありがとうございました。', 'info');
+
+        setTimeout(() => {
+          location.reload();
+        }, 1200);
+      } catch (err) {
+        console.error("Account deletion error:", err);
+        showToast(`アカウント削除処理エラー: ${err.message}`, 'error');
+        deleteAccountBtn.disabled = false;
+        deleteAccountBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> アカウントを削除';
+      }
+    });
+  }
 }
 
 function setupImageModal() {
