@@ -10,7 +10,7 @@ import { state } from './js/state.js';
 import { setupPaintModal } from './js/modules/paint-studio.js';
 import { showToast, escapeHTML, escapeHtml, formatTime, formatDate, parseMarkdown } from './js/utils/helpers.js';
 import { generateMathQuiz, checkMathQuizAnswer } from './js/utils/math-quiz.js';
-import { setRoomsCache, deleteUserRoom, setupChatBackgroundContextMenu, setupRoomBgModal, listenRoomBackground } from './js/modules/room-manager.js';
+import { setRoomsCache, deleteUserRoom } from './js/modules/room-manager.js';
 
 
 // Firebase Configuration
@@ -2039,6 +2039,7 @@ function initFirebaseRealtimeSync() {
     } else {
       onlineCountEl.textContent = '0人';
     }
+    if (typeof renderUnifiedSidebarUserList === 'function') renderUnifiedSidebarUserList();
 
     // 🚪 リアルタイム入退室通知の判定処理
     if (previousActiveUsersMap !== null) {
@@ -5512,5 +5513,334 @@ function setupCreatorEffectsControls() {
         renderCreatorEffectsListUI();
       });
     });
+  document.addEventListener('DOMContentLoaded', () => {
+    setupSidebarCategoryTabs();
+    setupChatMessageSearch();
+    setupTranslationControls();
+    renderUnifiedSidebarUserList();
+  });
+}
+
+/* ==========================================================================
+   5 Categorized Sidebar Lists & User Search
+   ========================================================================== */
+let activeSidebarTab = 'active'; // 'ignored', 'active', 'online', 'friends', 'admins'
+let sidebarUserSearchTerm = '';
+
+function setupSidebarCategoryTabs() {
+  const tabs = document.querySelectorAll('.sidebar-cat-btn');
+  const searchInput = document.getElementById('sidebar-user-search-input');
+  const clearBtn = document.getElementById('btn-clear-sidebar-search');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeSidebarTab = tab.dataset.listTab || 'active';
+      renderUnifiedSidebarUserList();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      sidebarUserSearchTerm = e.target.value.trim().toLowerCase();
+      if (clearBtn) clearBtn.classList.toggle('hidden', !sidebarUserSearchTerm);
+      renderUnifiedSidebarUserList();
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      sidebarUserSearchTerm = '';
+      clearBtn.classList.add('hidden');
+      renderUnifiedSidebarUserList();
+    });
   }
 }
+
+window.unignoreUser = function(uId) {
+  ignoredUsersSet.delete(uId);
+  localStorage.setItem('cyberchat_ignored_users', JSON.stringify([...ignoredUsersSet]));
+  showToast('無視リストから削除しました', 'info');
+  renderUnifiedSidebarUserList();
+};
+
+function renderUnifiedSidebarUserList() {
+  const ul = document.getElementById('sidebar-unified-user-ul');
+  const titleEl = document.getElementById('sidebar-list-title');
+  const countBadge = document.getElementById('sidebar-list-count-badge');
+  if (!ul) return;
+
+  ul.innerHTML = '';
+  let usersToRender = [];
+
+  if (activeSidebarTab === 'ignored') {
+    if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-slash text-danger"></i> 無視（ブロック）リスト';
+    ignoredUsersSet.forEach(uId => {
+      usersToRender.push({
+        userId: uId,
+        name: `ユーザー_${uId.slice(-4)}`,
+        isIgnored: true
+      });
+    });
+  } else if (activeSidebarTab === 'active') {
+    if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-microphone text-success"></i> 部屋の参加中メンバー';
+    activeUsersMap.forEach((u, uId) => {
+      usersToRender.push({
+        userId: uId,
+        name: u.name || 'ゲスト',
+        avatar: u.avatar || '🤖',
+        status: u.status || '💬 雑談歓迎',
+        level: u.level || 1,
+        trip: u.trip || '◆------',
+        joinedMonth: u.joinedMonth || '',
+        isVeteran: isVeteranUser(uId)
+      });
+    });
+  } else if (activeSidebarTab === 'online') {
+    if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-globe text-primary"></i> 全体オンラインメンバー';
+    globalOnlineUsersMap.forEach((u, uId) => {
+      usersToRender.push({
+        userId: uId,
+        name: u.name || 'ゲスト',
+        avatar: u.avatar || '🤖',
+        status: u.status || '💬 雑談歓迎',
+        currentRoomId: u.currentRoomId || 'public_main',
+        currentRoomName: u.currentRoomName || '💬 雑談部屋'
+      });
+    });
+  } else if (activeSidebarTab === 'friends') {
+    if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-group text-warning"></i> フレンドリスト';
+    friendsMap.forEach((f, fUid) => {
+      const isOnline = globalOnlineUsersMap.has(fUid);
+      usersToRender.push({
+        userId: fUid,
+        name: f.name || 'フレンド',
+        avatar: f.avatar || '🤖',
+        isOnline: isOnline
+      });
+    });
+  } else if (activeSidebarTab === 'admins') {
+    if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-shield-halved text-danger"></i> 運営・信頼メンバー';
+    const combinedSet = new Set([...adminUsersSet, ...trustedUsersSet]);
+    combinedSet.forEach(uId => {
+      const liveUser = globalOnlineUsersMap.get(uId) || activeUsersMap.get(uId);
+      usersToRender.push({
+        userId: uId,
+        name: liveUser ? liveUser.name : `運営メンバー_${uId.slice(-4)}`,
+        avatar: liveUser ? liveUser.avatar : '👑',
+        isAdmin: adminUsersSet.has(uId),
+        isTrusted: trustedUsersSet.has(uId)
+      });
+    });
+  }
+
+  // Filter by search term
+  if (sidebarUserSearchTerm) {
+    usersToRender = usersToRender.filter(u => {
+      const nameMatch = (u.name || '').toLowerCase().includes(sidebarUserSearchTerm);
+      const idMatch = (u.userId || '').toLowerCase().includes(sidebarUserSearchTerm);
+      const statusMatch = (u.status || '').toLowerCase().includes(sidebarUserSearchTerm);
+      return nameMatch || idMatch || statusMatch;
+    });
+  }
+
+  if (countBadge) countBadge.textContent = `${usersToRender.length}人`;
+
+  if (usersToRender.length === 0) {
+    ul.innerHTML = `<li style="padding:16px; text-align:center; color:var(--text-muted); font-size:0.85rem;"><i class="fa-solid fa-ghost"></i> 該当するメンバーがいません</li>`;
+    return;
+  }
+
+  usersToRender.forEach(u => {
+    const isSelf = u.userId === myUserId;
+    const li = document.createElement('li');
+    li.className = 'online-user-item glass-panel';
+    li.style.margin = '4px 0';
+    li.style.padding = '8px 10px';
+    li.style.display = 'flex';
+    li.style.alignItems = 'center';
+    li.style.justifyContent = 'space-between';
+    li.style.borderRadius = 'var(--radius-md)';
+
+    let badges = '';
+    if (u.isAdmin) badges += '<span class="admin-badge"><i class="fa-solid fa-crown text-warning"></i> 運営</span> ';
+    if (u.isTrusted) badges += '<span class="trusted-badge"><i class="fa-solid fa-gem text-info"></i> 信頼</span> ';
+    if (u.isOnline) badges += '<span style="font-size:0.7rem; color:var(--success-color);">🟢 オンライン</span>';
+
+    let actionBtns = '';
+    if (activeSidebarTab === 'ignored') {
+      actionBtns = `<button class="btn-secondary btn-sm" onclick="window.unignoreUser('${u.userId}')" title="無視解除"><i class="fa-solid fa-user-check"></i> 解除</button>`;
+    } else if (!isSelf) {
+      actionBtns = `
+        <button class="btn-icon btn-sm" onclick="window.startWhisper('${u.userId}', '${escapeHtml(u.name)}')" title="内緒話"><i class="fa-solid fa-lock text-primary"></i></button>
+        <button class="btn-icon btn-sm" onclick="window.sendFriendRequest('${u.userId}', '${escapeHtml(u.name)}')" title="フレンド申請"><i class="fa-solid fa-user-plus text-warning"></i></button>
+      `;
+    }
+
+    li.innerHTML = `
+      <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+        <div class="avatar-sm">${renderAvatarHTML(u.avatar || '🤖')}</div>
+        <div style="overflow:hidden;">
+          <div style="font-weight:600; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            ${escapeHtml(u.name)} ${isSelf ? '<span style="font-size:0.7rem; color:var(--accent-primary);">(あなた)</span>' : ''}
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            ${badges || escapeHtml(u.status || u.currentRoomName || '')}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; gap:4px; flex-shrink:0;">
+        ${actionBtns}
+      </div>
+    `;
+    ul.appendChild(li);
+  });
+}
+
+/* ==========================================================================
+   🔍 Realtime Chat Message Search Engine
+   ========================================================================== */
+let chatMsgSearchTerm = '';
+
+function setupChatMessageSearch() {
+  const input = document.getElementById('chat-msg-search-input');
+  const clearBtn = document.getElementById('btn-clear-chat-search');
+
+  if (!input) return;
+
+  input.addEventListener('input', (e) => {
+    chatMsgSearchTerm = e.target.value.trim().toLowerCase();
+    if (clearBtn) clearBtn.classList.toggle('hidden', !chatMsgSearchTerm);
+    filterAndHighlightChatMessages();
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      chatMsgSearchTerm = '';
+      clearBtn.classList.add('hidden');
+      filterAndHighlightChatMessages();
+    });
+  }
+}
+
+function filterAndHighlightChatMessages() {
+  const countTag = document.getElementById('chat-search-count-tag');
+  let matchCount = 0;
+
+  allMessages.forEach((msg, msgId) => {
+    const node = document.getElementById(`msg-${msgId}`);
+    if (!node) return;
+
+    if (!chatMsgSearchTerm) {
+      node.classList.remove('hidden');
+      const p = node.querySelector('.msg-bubble p') || node.querySelector('.msg-bubble');
+      if (p && p.dataset.originalHtml) {
+        p.innerHTML = p.dataset.originalHtml;
+      }
+      return;
+    }
+
+    const text = (msg.text || '').toLowerCase();
+    const name = (msg.name || '').toLowerCase();
+    const isMatch = text.includes(chatMsgSearchTerm) || name.includes(chatMsgSearchTerm);
+
+    if (isMatch) {
+      matchCount++;
+      node.classList.remove('hidden');
+      const p = node.querySelector('.msg-bubble p') || node.querySelector('.msg-bubble');
+      if (p) {
+        if (!p.dataset.originalHtml) p.dataset.originalHtml = p.innerHTML;
+        const safeQuery = chatMsgSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${safeQuery})`, 'gi');
+        p.innerHTML = p.dataset.originalHtml.replace(regex, '<mark class="search-highlight">$1</mark>');
+      }
+    } else {
+      node.classList.add('hidden');
+    }
+  });
+
+  if (countTag) {
+    if (chatMsgSearchTerm) {
+      countTag.textContent = `${matchCount}件ヒット`;
+      countTag.classList.remove('hidden');
+    } else {
+      countTag.classList.add('hidden');
+    }
+  }
+}
+
+/* ==========================================================================
+   🌐 50-Language Live Translation Engine
+   ========================================================================== */
+let currentTargetLang = localStorage.getItem('cyberchat_target_lang') || 'off';
+
+function setupTranslationControls() {
+  const langSelect = document.getElementById('chat-lang-select');
+  const toggleBtn = document.getElementById('btn-lang-picker-toggle');
+  const popup = document.getElementById('lang-picker-popup');
+
+  if (langSelect) {
+    langSelect.value = currentTargetLang;
+    langSelect.addEventListener('change', (e) => {
+      currentTargetLang = e.target.value;
+      localStorage.setItem('cyberchat_target_lang', currentTargetLang);
+      if (currentTargetLang !== 'off') {
+        showToast(`翻訳ターゲット言語を [${currentTargetLang}] に変更しました`, 'success');
+      } else {
+        showToast('自動翻訳をオフにしました', 'info');
+      }
+    });
+  }
+
+  if (toggleBtn && popup) {
+    toggleBtn.addEventListener('click', () => {
+      popup.classList.toggle('hidden');
+    });
+  }
+}
+
+async function fetchTranslation(text, targetLang) {
+  if (!text || targetLang === 'off') return null;
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data && data[0] && Array.isArray(data[0])) {
+      return data[0].map(item => item[0]).join('');
+    }
+  } catch (e) {
+    try {
+      const fallbackUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|${targetLang}`;
+      const res2 = await fetch(fallbackUrl);
+      const data2 = await res2.json();
+      if (data2 && data2.responseData && data2.responseData.translatedText) {
+        return data2.responseData.translatedText;
+      }
+    } catch (err) {}
+  }
+  return null;
+}
+
+window.translateSingleMsg = async function(msgId, text) {
+  const targetLang = currentTargetLang === 'off' ? 'ja' : currentTargetLang;
+  showToast('翻訳中...', 'info');
+  const translated = await fetchTranslation(text, targetLang);
+  if (!translated) {
+    showToast('翻訳に失敗しました', 'warning');
+    return;
+  }
+  const msgBubble = document.querySelector(`#msg-${msgId} .msg-bubble`);
+  if (msgBubble) {
+    let box = msgBubble.querySelector('.translated-text-box');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'translated-text-box';
+      msgBubble.appendChild(box);
+    }
+    box.innerHTML = `<i class="fa-solid fa-language text-primary"></i> <strong>翻訳 (${targetLang}):</strong> ${escapeHtml(translated)}`;
+    showToast('翻訳が完了しました！', 'success');
+  }
+};

@@ -19,7 +19,6 @@
   <!-- Custom Styles (Modularized) -->
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/components/paint-studio.css">
-  <link rel="stylesheet" href="css/components/room-bg.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -225,66 +224,32 @@
         </div>
       </div>
 
-      <!-- 🤝 フレンド管理セクション -->
-      <div class="friends-sidebar-section">
-        <div class="section-title">
-          <span><i class="fa-solid fa-user-group text-primary"></i> フレンド</span>
-          <span class="user-count-badge" id="friends-count-badge">0人</span>
-        </div>
-        <div class="friends-action-row" style="margin-bottom:8px; display:flex; gap:6px;">
-          <button type="button" id="btn-open-friend-modal" class="btn-secondary btn-sm" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;">
-            <i class="fa-solid fa-user-plus"></i> フレンド管理 <span id="friend-req-notify-badge" class="req-notify-badge hidden">0</span>
-          </button>
-        </div>
-        <ul id="friends-sidebar-ul" class="online-user-list">
-          <!-- JS動的生成 -->
-        </ul>
+      <!-- 5 Categorized List Tab Buttons -->
+      <div class="sidebar-category-tabs">
+        <button class="sidebar-cat-btn" data-list-tab="ignored" title="無視リスト"><i class="fa-solid fa-user-slash"></i> 無視</button>
+        <button class="sidebar-cat-btn active" data-list-tab="active" title="参加中リスト"><i class="fa-solid fa-microphone text-success"></i> 参加中</button>
+        <button class="sidebar-cat-btn" data-list-tab="online" title="オンラインリスト"><i class="fa-solid fa-globe text-primary"></i> オンライン</button>
+        <button class="sidebar-cat-btn" data-list-tab="friends" title="フレンドリスト"><i class="fa-solid fa-user-group text-warning"></i> フレンド</button>
+        <button class="sidebar-cat-btn" data-list-tab="admins" title="運営リスト"><i class="fa-solid fa-shield-halved text-danger"></i> 運営</button>
       </div>
 
-      <!-- フィルター・検索 -->
-      <div class="sidebar-search">
+      <!-- User List Search Box -->
+      <div class="sidebar-search-box">
         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-        <input type="text" id="search-input" placeholder="メッセージを検索...">
+        <input type="text" id="sidebar-user-search-input" placeholder="アカウント名・IDで検索...">
+        <button id="btn-clear-sidebar-search" class="btn-clear-search hidden"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
-      <div class="filter-pills">
-        <button class="pill-btn active" data-filter="all">すべて</button>
-        <button class="pill-btn" data-filter="star"><i class="fa-solid fa-star text-warning"></i> ブックマーク</button>
-        <button class="pill-btn" data-filter="image"><i class="fa-regular fa-image"></i> メディア</button>
-        <button class="pill-btn" data-filter="poll"><i class="fa-solid fa-chart-simple"></i> アンケート</button>
-        <button class="pill-btn" data-filter="file"><i class="fa-solid fa-paperclip"></i> ファイル</button>
+      <!-- Active Tab Header & Counter -->
+      <div class="sidebar-list-header">
+        <span id="sidebar-list-title"><i class="fa-solid fa-users text-primary"></i> 参加中メンバー</span>
+        <span id="sidebar-list-count-badge" class="user-count-badge">0人</span>
       </div>
 
-      <!-- ボイスチャット参加メンバー一覧 -->
-      <div id="vc-section" class="vc-sidebar-section hidden">
-        <div class="section-title">
-          <span><i class="fa-solid fa-microphone text-success pulse"></i> ボイスチャット参加中</span>
-          <span class="user-count-badge" id="vc-count">0人</span>
-        </div>
-        <ul id="vc-user-list" class="online-user-list">
-          <!-- 動的生成 -->
-        </ul>
-      </div>
-
-      <!-- オンラインユーザーリスト -->
-      <div class="online-section">
-        <div class="section-title">
-          <span><i class="fa-solid fa-circle text-success pulse"></i> 参加中メンバー</span>
-          <span class="user-count-badge" id="online-count">0人</span>
-        </div>
-        <ul id="online-user-list" class="online-user-list">
-          <!-- JSで動的生成 -->
-        </ul>
-      </div>
-
-      <!-- 無視（ブロック）リスト管理 -->
-      <div id="ignored-section" class="ignored-sidebar-section">
-        <div class="section-title">
-          <span><i class="fa-solid fa-user-slash"></i> 無視リスト</span>
-          <span class="user-count-badge" id="ignored-count">0人</span>
-        </div>
-        <ul id="ignored-user-list" class="ignored-user-list">
-          <!-- 動的生成 -->
+      <!-- Unified List View Container -->
+      <div class="sidebar-list-container">
+        <ul id="sidebar-unified-user-ul" class="online-user-list">
+          <!-- JS動的生成 -->
         </ul>
       </div>
     </aside>
@@ -455,6 +420,16 @@
         <span class="topic-label">本日のお題:</span>
         <span id="room-topic-text" class="topic-text">みんなの好きな食べ物や最近ハマっていることは？</span>
         <button id="btn-edit-topic" class="btn-edit-topic-icon" title="お題を変更"><i class="fa-solid fa-pen"></i></button>
+      </div>
+
+      <!-- 🔍 チャットメッセージ検索バー -->
+      <div class="chat-msg-search-container">
+        <div class="chat-msg-search-input-wrapper">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="chat-msg-search-input" class="chat-msg-search-input" placeholder="🔍 メッセージ本文・発言者をリアルタイム検索...">
+          <button id="btn-clear-chat-search" class="btn-clear-search hidden"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <span id="chat-search-count-tag" class="user-count-badge hidden">0件</span>
       </div>
 
       <!-- メッセージ表示エリア -->
@@ -1513,78 +1488,7 @@
 
 
 
-  <!-- 🖼️ チャット背景カスタマイズ モーダル -->
-  <div id="room-bg-modal" class="modal-overlay hidden">
-    <div class="modal-card glass-panel animate-scale-up room-bg-modal">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-image text-primary"></i> チャット背景カスタマイズ</h3>
-        <button class="btn-icon modal-close" title="閉じる"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body" style="padding: 18px;">
-        <div style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 14px;">
-          <i class="fa-solid fa-info-circle text-primary"></i> 右クリックメニューから開きました。変更した背景は部屋に滞在している<strong>全員の画面にリアルタイム適用</strong>されます！
-        </div>
 
-        <!-- プリセット壁紙テンプレート -->
-        <div class="room-bg-section-title">
-          <i class="fa-solid fa-palette text-warning"></i> プリセット・テーマ壁紙
-        </div>
-        <div class="room-bg-preset-grid">
-          <div class="room-bg-card bg-preset-cosmos" data-bg-type="preset" data-bg-val="cosmos">
-            <span class="room-bg-card-label">🌌 宇宙・銀河</span>
-          </div>
-          <div class="room-bg-card bg-preset-sakura" data-bg-type="preset" data-bg-val="sakura">
-            <span class="room-bg-card-label">🌸 ネオンサクラ</span>
-          </div>
-          <div class="room-bg-card bg-preset-matrix" data-bg-type="preset" data-bg-val="matrix">
-            <span class="room-bg-card-label">🟩 マトリックス</span>
-          </div>
-          <div class="room-bg-card bg-preset-vapor" data-bg-type="preset" data-bg-val="vapor">
-            <span class="room-bg-card-label">🌆 ヴェイパー</span>
-          </div>
-          <div class="room-bg-card bg-preset-ocean" data-bg-type="preset" data-bg-val="ocean">
-            <span class="room-bg-card-label">🌊 オーシャン</span>
-          </div>
-          <div class="room-bg-card bg-preset-forest" data-bg-type="preset" data-bg-val="forest">
-            <span class="room-bg-card-label">🌲 フォレスト</span>
-          </div>
-          <div class="room-bg-card bg-preset-wood" data-bg-type="preset" data-bg-val="wood">
-            <span class="room-bg-card-label">🪵 ウォームウッド</span>
-          </div>
-          <div class="room-bg-card bg-preset-dark" data-bg-type="preset" data-bg-val="dark">
-            <span class="room-bg-card-label">🖤 ダーク</span>
-          </div>
-          <div class="room-bg-card bg-preset-light" data-bg-type="preset" data-bg-val="light">
-            <span class="room-bg-card-label">⚪ クリーン</span>
-          </div>
-        </div>
-
-        <!-- カスタム画像アップロード & URL -->
-        <div class="room-bg-section-title">
-          <i class="fa-solid fa-cloud-arrow-up text-success"></i> オリジナル画像を適用
-        </div>
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <div class="room-bg-input-group">
-            <label for="room-bg-file-input" class="btn-secondary btn-sm" style="cursor:pointer; white-space:nowrap;">
-              <i class="fa-solid fa-folder-open"></i> 画像ファイルを選択
-              <input type="file" id="room-bg-file-input" accept="image/*" class="hidden-file-input">
-            </label>
-            <span id="room-bg-file-name" style="font-size:0.8rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">選択されていません</span>
-          </div>
-
-          <div class="room-bg-input-group">
-            <input type="url" id="room-bg-url-input" class="room-bg-url-input" placeholder="画像のWeb URLを入力 (例: https://example.com/bg.png)">
-            <button id="btn-apply-bg-url" class="btn-secondary btn-sm"><i class="fa-solid fa-link"></i> URL適用</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
-        <button id="btn-reset-room-bg" class="btn-danger-soft btn-sm"><i class="fa-solid fa-rotate-left"></i> 標準背景に戻す</button>
-        <button class="btn-secondary modal-close">閉じる</button>
-      </div>
-    </div>
-  </div>
 
   <!-- トースト通知 -->
   <div id="toast-container" class="toast-container"></div>
