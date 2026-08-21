@@ -5380,14 +5380,8 @@ window.toggleTrustUser = async (targetUid, targetName) => {
   return window.toggleUserEffect(targetUid, targetName, 'trusted');
 };
 
-// ✨ 製作者「ただのネコ好き」専用エフェクト操作ハンドラー
+// ✨ エフェクト操作ハンドラー (信用済み / 宣伝部隊 / 初期メンバー)
 window.toggleUserEffect = async (targetUid, targetName, effectType) => {
-  const isCreator = isCreatorName(myName);
-  if (!isCreator) {
-    showToast('⚠️ エフェクトを操作できるのは製作者（ただのネコ好き）のみです', 'error');
-    return;
-  }
-
   const currentEff = getUserEffects(targetUid);
   const newEffState = !currentEff[effectType];
   
@@ -5404,7 +5398,7 @@ window.toggleUserEffect = async (targetUid, targetName, effectType) => {
       pr: effectType === 'pr' ? newEffState : currentEff.pr,
       initial: effectType === 'initial' ? newEffState : currentEff.initial,
       updatedAt: Date.now(),
-      updatedBy: myName
+      updatedBy: myName || 'ただのネコ好き'
     };
 
     await set(ref(db, `user_effects/${targetUid}`), updatedObj);
@@ -5414,7 +5408,7 @@ window.toggleUserEffect = async (targetUid, targetName, effectType) => {
         await set(ref(db, `trusted_users/${targetUid}`), {
           name: targetName,
           trustedAt: Date.now(),
-          trustedBy: myName
+          trustedBy: myName || 'ただのネコ好き'
         });
       } else {
         await remove(ref(db, `trusted_users/${targetUid}`));
@@ -5422,6 +5416,7 @@ window.toggleUserEffect = async (targetUid, targetName, effectType) => {
     }
 
     showToast(`「${escapeHtml(targetName)}」の【${label}】を${newEffState ? '付与' : '解除'}しました！`, 'success');
+    renderCreatorEffectsListUI();
   } catch (err) {
     console.error("Toggle user effect error:", err);
     showToast(`エフェクトの更新に失敗しました: ${err.message}`, 'error');
