@@ -1,6 +1,5 @@
 import { state } from '../state.js';
 import { showToast } from '../utils/helpers.js';
-import { sendSpecialMessageWithMedia } from './chat.js';
 
 // Canvas Paint Studio Modal Setup
 export function setupPaintModal() {
@@ -397,7 +396,9 @@ export function setupPaintModal() {
     submitBtn.addEventListener('click', () => {
       const dataUrl = getExportDataUrl();
       modal.classList.add('hidden');
-      sendSpecialMessageWithMedia('image', '🎨 手書きイラスト', dataUrl);
+      if (typeof window.sendSpecialMessageWithMedia === 'function') {
+        window.sendSpecialMessageWithMedia('image', '🎨 手書きイラスト', dataUrl);
+      }
       showToast('イラストを投稿しました！', 'success');
     });
   }
