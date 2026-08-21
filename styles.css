@@ -888,10 +888,18 @@ html, body {
 }
 
 /* Avatar & Status Selectors */
-.avatar-picker-grid {
+.avatar-picker-grid,
+.avatar-picker-grid-50 {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
   gap: 6px;
+  max-height: 170px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
   margin-top: 6px;
 }
 
@@ -1004,7 +1012,11 @@ html, body {
 }
 
 .input-group input[type="text"],
-.input-group input[type="password"] {
+.input-group input[type="password"],
+.input-group input[type="email"],
+.input-group input[type="number"],
+.input-group input[type="url"],
+.input-group select {
   width: 100%;
   padding: 10px 14px;
   background: rgba(0, 0, 0, 0.2);
@@ -1017,7 +1029,11 @@ html, body {
 }
 
 [data-theme="light"] .input-group input[type="text"],
-[data-theme="light"] .input-group input[type="password"] {
+[data-theme="light"] .input-group input[type="password"],
+[data-theme="light"] .input-group input[type="email"],
+[data-theme="light"] .input-group input[type="number"],
+[data-theme="light"] .input-group input[type="url"],
+[data-theme="light"] .input-group select {
   background: rgba(255, 255, 255, 0.7);
 }
 
@@ -2745,17 +2761,21 @@ html, body {
 .modal-card {
   width: 100%;
   max-width: 500px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-md);
 }
 
 .modal-header {
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-header h3 {
@@ -2767,16 +2787,21 @@ html, body {
 }
 
 .modal-body {
-  padding: 24px;
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .modal-footer {
-  padding: 16px 24px;
+  padding: 12px 20px;
   border-top: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
 .poll-options-inputs {
