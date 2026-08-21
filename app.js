@@ -2698,22 +2698,24 @@ window.unignoreUser = (uid) => {
 function renderIgnoredUsersUI() {
   const listEl = document.getElementById('ignored-user-list');
   const countEl = document.getElementById('ignored-count');
-  listEl.innerHTML = '';
-  countEl.textContent = `${ignoredUsersSet.size}人`;
-
-  ignoredUsersSet.forEach(uid => {
-    const uData = activeUsersMap.get(uid) || { name: 'ユーザー ' + uid.substring(0, 6), avatar: '👤' };
-    const li = document.createElement('li');
-    li.className = 'user-item';
-    li.innerHTML = `
-      <div class="avatar-sm">${renderAvatarHTML(uData.avatar || '👤')}</div>
-      <div class="user-item-info">
-        <div class="user-item-name">${escapeHtml(uData.name)}</div>
-      </div>
-      <button class="btn-secondary btn-sm" onclick="window.unignoreUser('${uid}')">解除</button>
-    `;
-    listEl.appendChild(li);
-  });
+  if (listEl) {
+    listEl.innerHTML = '';
+    ignoredUsersSet.forEach(uid => {
+      const uData = activeUsersMap.get(uid) || { name: 'ユーザー ' + uid.substring(0, 6), avatar: '👤' };
+      const li = document.createElement('li');
+      li.className = 'user-item';
+      li.innerHTML = `
+        <div class="avatar-sm">${renderAvatarHTML(uData.avatar || '👤')}</div>
+        <div class="user-item-info">
+          <div class="user-item-name">${escapeHtml(uData.name)}</div>
+        </div>
+        <button class="btn-secondary btn-sm" onclick="window.unignoreUser('${uid}')">解除</button>
+      `;
+      listEl.appendChild(li);
+    });
+  }
+  if (countEl) countEl.textContent = `${ignoredUsersSet.size}人`;
+  if (typeof renderUnifiedSidebarUserList === 'function') renderUnifiedSidebarUserList();
 }
 
 window.votePoll = async (msgId, optionIndex) => {
