@@ -525,6 +525,42 @@ if (document.readyState === 'loading') {
   initApp();
 }
 
+// 🟢 オンラインユーザー登録・Presence管理関数
+async function registerOnlineUser() {
+  if (!myUserId || !myName) return;
+  try {
+    const titleEl = document.getElementById('current-room-title');
+    const roomTitleName = titleEl ? titleEl.textContent.trim() : '雑談部屋';
+
+    const userPresenceData = {
+      userId: myUserId,
+      name: myName,
+      avatar: myAvatar,
+      status: myStatus,
+      trip: myTrip,
+      lastSeen: Date.now()
+    };
+
+    const roomUserRef = roomRef(`active_users/${myUserId}`);
+    await set(roomUserRef, userPresenceData);
+    onDisconnect(roomUserRef).remove();
+
+    const globalUserRef = ref(db, `global_online_users/${myUserId}`);
+    await set(globalUserRef, {
+      userId: myUserId,
+      name: myName,
+      avatar: myAvatar,
+      status: myStatus,
+      currentRoomId: currentRoomId,
+      currentRoomName: roomTitleName,
+      lastSeen: Date.now()
+    });
+    onDisconnect(globalUserRef).remove();
+  } catch (err) {
+    console.error("registerOnlineUser error:", err);
+  }
+}
+
 // 🟢 部屋にいるのに消える・オフラインなのに残るバグ修正 Presence & Heartbeat Handler
 function setupPresenceConnectionHeartbeat() {
   const connectedRef = ref(db, '.info/connected');
