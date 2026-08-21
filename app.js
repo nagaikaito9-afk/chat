@@ -792,7 +792,6 @@ function initApp() {
   initGlobalOnlineUsersListener();
   initGlobalFriendDmListener();
   initUserEffectsListener();
-  setupCreatorEffectsControls();
   setupPresenceConnectionHeartbeat();
   checkDailyLoginBonus();
 }
