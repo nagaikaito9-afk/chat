@@ -791,26 +791,159 @@
     </div>
   </div>
 
-  <!-- お絵かきキャンバスモーダル -->
+  <!-- 🎨 お絵かき・手書きイラストスタジオ モーダル -->
   <div id="paint-modal" class="modal-overlay hidden">
-    <div class="modal-card glass-panel animate-scale-up" style="max-width: 420px;">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-paintbrush"></i> お絵かき・手書き投稿</h3>
-        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body" style="text-align:center;">
-        <canvas id="paint-canvas" width="360" height="260" style="background:#fff; border-radius:12px; border:2px solid var(--glass-border); cursor:crosshair; touch-action:none;"></canvas>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-          <div style="display:flex; gap:6px; align-items:center;">
-            <input type="color" id="paint-color" value="#00f0ff" style="border:none; width:32px; height:32px; cursor:pointer; background:transparent;">
-            <input type="range" id="paint-size" min="2" max="20" value="5" style="width:90px;">
-          </div>
-          <button id="btn-clear-paint" class="btn-secondary btn-sm"><i class="fa-solid fa-eraser"></i> 消去</button>
+    <div class="modal-card glass-panel animate-scale-up paint-studio-modal">
+      <div class="modal-header paint-modal-header">
+        <div class="paint-header-left">
+          <h3><i class="fa-solid fa-paintbrush text-primary"></i> 手書きイラストスタジオ</h3>
+        </div>
+        <div class="paint-header-actions">
+          <button type="button" id="btn-paint-undo" class="btn-secondary btn-sm" title="元に戻す (Ctrl+Z)" disabled>
+            <i class="fa-solid fa-rotate-left"></i> 元に戻す
+          </button>
+          <button type="button" id="btn-paint-redo" class="btn-secondary btn-sm" title="やり直し (Ctrl+Y)" disabled>
+            <i class="fa-solid fa-rotate-right"></i> やり直し
+          </button>
+          <button type="button" id="btn-clear-paint" class="btn-danger-soft btn-sm" title="キャンバスを全消去">
+            <i class="fa-solid fa-trash-can"></i> 全消去
+          </button>
+          <button type="button" class="btn-icon modal-close" title="閉じる"><i class="fa-solid fa-xmark"></i></button>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-secondary modal-close">キャンセル</button>
-        <button id="btn-submit-paint" class="btn-primary"><i class="fa-solid fa-paper-plane"></i> イラストを投稿</button>
+
+      <div class="modal-body paint-studio-body">
+        <!-- 🛠️ ツール選択バー -->
+        <div class="paint-toolbar">
+          <div class="paint-tool-group">
+            <button type="button" class="paint-tool-btn active" data-tool="pen" title="ペン (通常描画)">
+              <i class="fa-solid fa-pen"></i><span>ペン</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="eraser" title="消しゴム">
+              <i class="fa-solid fa-eraser"></i><span>消しゴム</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="blur" title="ぼかし (描画線をぼかす)">
+              <i class="fa-solid fa-droplet"></i><span>ぼかし</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="bucket" title="バケツ塗りつぶし">
+              <i class="fa-solid fa-fill-drip"></i><span>塗りつぶし</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="highlighter" title="蛍光ペン (裏抜けマーカー)">
+              <i class="fa-solid fa-highlighter"></i><span>蛍光ペン</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="neon" title="ネオン (光るペン)">
+              <i class="fa-solid fa-wand-magic-sparkles"></i><span>ネオン</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="rainbow" title="レインボー">
+              <i class="fa-solid fa-rainbow"></i><span>虹色</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="stamp" title="キラキラスタンプ">
+              <i class="fa-solid fa-star"></i><span>スタンプ</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="shape" title="図形描画">
+              <i class="fa-solid fa-shapes"></i><span>図形</span>
+            </button>
+            <button type="button" class="paint-tool-btn" data-tool="eyedropper" title="スポイト (色取得)">
+              <i class="fa-solid fa-eye-dropper"></i><span>スポイト</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ⚙️ 調整コントロールパネル -->
+        <div class="paint-controls-bar">
+          <!-- 図形設定（図形ツール選択時） -->
+          <div id="paint-shape-options" class="paint-option-group hidden">
+            <label><i class="fa-solid fa-vector-square"></i> 種類:</label>
+            <select id="paint-shape-type" class="paint-select-sm">
+              <option value="line">直線</option>
+              <option value="rect">長方形</option>
+              <option value="circle">円 / 楕円</option>
+              <option value="arrow">矢印</option>
+            </select>
+            <label class="paint-checkbox-label">
+              <input type="checkbox" id="paint-shape-fill"> 塗りつぶし
+            </label>
+          </div>
+
+          <!-- スタンプ設定（スタンプツール選択時） -->
+          <div id="paint-stamp-options" class="paint-option-group hidden">
+            <label><i class="fa-solid fa-icons"></i> スタンプ:</label>
+            <select id="paint-stamp-type" class="paint-select-sm">
+              <option value="star">★ 星</option>
+              <option value="heart">♥ ハート</option>
+              <option value="sparkle">✨ キラキラ</option>
+              <option value="note">🎵 音符</option>
+            </select>
+          </div>
+
+          <!-- カラーパレット & カラーピッカー -->
+          <div class="paint-color-section">
+            <input type="color" id="paint-color" value="#00f0ff" title="カラーピッカー">
+            <div class="paint-swatches">
+              <button type="button" class="paint-swatch" data-color="#000000" style="background:#000000;"></button>
+              <button type="button" class="paint-swatch" data-color="#ffffff" style="background:#ffffff; border:1px solid #ccc;"></button>
+              <button type="button" class="paint-swatch" data-color="#ff3366" style="background:#ff3366;"></button>
+              <button type="button" class="paint-swatch" data-color="#ff9900" style="background:#ff9900;"></button>
+              <button type="button" class="paint-swatch" data-color="#ffcc00" style="background:#ffcc00;"></button>
+              <button type="button" class="paint-swatch" data-color="#00ff88" style="background:#00ff88;"></button>
+              <button type="button" class="paint-swatch active" data-color="#00f0ff" style="background:#00f0ff;"></button>
+              <button type="button" class="paint-swatch" data-color="#7000ff" style="background:#7000ff;"></button>
+              <button type="button" class="paint-swatch" data-color="#ff00ff" style="background:#ff00ff;"></button>
+            </div>
+          </div>
+
+          <!-- 太さ ＆ 透明度スライダー -->
+          <div class="paint-sliders-section">
+            <div class="paint-slider-item">
+              <span>太さ: <strong id="paint-size-val">6px</strong></span>
+              <input type="range" id="paint-size" min="1" max="60" value="6">
+            </div>
+            <div class="paint-slider-item">
+              <span>透明度: <strong id="paint-opacity-val">100%</strong></span>
+              <input type="range" id="paint-opacity" min="10" max="100" value="100">
+            </div>
+            <!-- リアルタイムプレビュープレビューサークル -->
+            <div class="paint-brush-preview-wrapper" title="ブラシプレビュー">
+              <div id="paint-brush-preview"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 🖼️ キャンバス描画領域 -->
+        <div class="paint-canvas-wrapper" id="paint-canvas-wrapper">
+          <canvas id="paint-canvas" width="720" height="480"></canvas>
+        </div>
+      </div>
+
+      <div class="modal-footer paint-modal-footer">
+        <div class="paint-footer-left">
+          <!-- 背景選択 -->
+          <div class="paint-bg-selector">
+            <label for="paint-bg-type"><i class="fa-solid fa-layer-group"></i> キャンバス背景:</label>
+            <select id="paint-bg-type" class="paint-select-sm">
+              <option value="white">白背景</option>
+              <option value="black">黒背景</option>
+              <option value="grid">方眼紙 (グリッド)</option>
+              <option value="transparent">透明</option>
+            </select>
+          </div>
+          <!-- 背景画像読込 -->
+          <label for="paint-bg-file" class="btn-secondary btn-sm" title="下絵・背景画像を読込">
+            <i class="fa-solid fa-image"></i> 画像読込
+            <input type="file" id="paint-bg-file" accept="image/*" class="hidden-file-input">
+          </label>
+          <!-- PNG保存 -->
+          <button type="button" id="btn-download-paint" class="btn-secondary btn-sm" title="画像として保存">
+            <i class="fa-solid fa-download"></i> 保存
+          </button>
+        </div>
+
+        <div class="paint-footer-right">
+          <button type="button" class="btn-secondary modal-close">キャンセル</button>
+          <button type="button" id="btn-submit-paint" class="btn-primary">
+            <i class="fa-solid fa-paper-plane"></i> イラストを投稿
+          </button>
+        </div>
       </div>
     </div>
   </div>
