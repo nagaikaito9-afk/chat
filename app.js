@@ -31,8 +31,13 @@ const db = getDatabase(app);
 // Global State
 let myUserId = localStorage.getItem('cyberchat_user_id') || 'usr_' + Math.random().toString(36).substring(2, 10);
 localStorage.setItem('cyberchat_user_id', myUserId);
+window.myUserId = myUserId;
+state.myUserId = myUserId;
 
 let myName = '';
+window.myName = myName;
+state.myName = myName;
+
 let myTrip = '◆(なし)';
 let myAvatar = localStorage.getItem('cyberchat_user_avatar') || '🤖';
 let myStatus = '💬 雑談歓迎';
@@ -40,7 +45,14 @@ let myBubbleColor = localStorage.getItem('cyberchat_bubble_color') || '#00f0ff';
 let myLevel = parseInt(localStorage.getItem('cyberchat_user_level') || '1');
 let myExp = parseInt(localStorage.getItem('cyberchat_user_exp') || '0');
 let lastExpMsgTime = 0;
+
 let currentRoomId = 'public_main';
+window.currentRoomId = currentRoomId;
+state.currentRoomId = currentRoomId;
+
+let isAdminMode = localStorage.getItem('cyberchat_is_admin') === 'true';
+window.isAdminMode = isAdminMode;
+state.isAdminMode = isAdminMode;
 const unlockedRoomsSet = new Set(['public_main']);
 let pendingPassRoom = null;
 
@@ -957,6 +969,8 @@ function setupAdminSystem() {
 
     if (inputPass === ADMIN_PASSWORD) {
       isAdminMode = true;
+      window.isAdminMode = true;
+      state.isAdminMode = true;
       localStorage.setItem('cyberchat_is_admin', 'true');
       authModal.classList.add('hidden');
       openAuthBtn.classList.add('active');
@@ -1908,6 +1922,8 @@ async function switchRoom(newRoomId, roomTitle, roomPR = '') {
 
   previousActiveUsersMap = null;
   currentRoomId = newRoomId;
+  window.currentRoomId = newRoomId;
+  state.currentRoomId = newRoomId;
 
   const titleEl = document.getElementById('current-room-title');
   if (titleEl) {

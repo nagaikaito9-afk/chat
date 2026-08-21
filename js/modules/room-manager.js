@@ -10,6 +10,22 @@ export function setRoomsCache(rooms) {
   roomsCache = rooms || {};
 }
 
+function getActiveRoomId() {
+  return window.currentRoomId || state.currentRoomId || 'public_main';
+}
+
+function getMyUserId() {
+  return window.myUserId || state.myUserId || localStorage.getItem('cyberchat_user_id');
+}
+
+function getMyName() {
+  return window.myName || state.myName || localStorage.getItem('cyberchat_account_name') || 'ゲスト';
+}
+
+function getIsAdminMode() {
+  return (typeof window.isAdminMode !== 'undefined') ? window.isAdminMode : (state.isAdminMode || (localStorage.getItem('cyberchat_is_admin') === 'true'));
+}
+
 // 🗑️ Delete Room Handler
 export async function deleteUserRoom(roomId, roomName, event) {
   if (event) event.stopPropagation();
@@ -20,8 +36,9 @@ export async function deleteUserRoom(roomId, roomName, event) {
   }
 
   const roomData = roomsCache[roomId];
-  const isCreator = roomData && roomData.createdBy === state.myUserId;
-  const isAdmin = state.isAdminMode;
+  const activeUserId = getMyUserId();
+  const isCreator = roomData && roomData.createdBy === activeUserId;
+  const isAdmin = getIsAdminMode();
 
   if (!isCreator && !isAdmin) {
     showToast('この部屋の作成者のみ削除可能です', 'warning');
@@ -37,7 +54,7 @@ export async function deleteUserRoom(roomId, roomName, event) {
 
     showToast(`部屋「${roomName}」を削除しました`, 'success');
 
-    if (state.currentRoomId === roomId) {
+    if (getActiveRoomId() === roomId) {
       if (window.switchRoom) {
         window.switchRoom('public_main', '💬 雑談部屋', '誰でも自由に雑談できるメインの部屋です');
       }
@@ -53,27 +70,33 @@ window.deleteUserRoom = deleteUserRoom;
 
 // 🖼️ Setup Chat Messages Right-Click Context Menu Listener
 export function setupChatBackgroundContextMenu() {
-  const chatMessagesEl = document.getElementById('chat-messages');
-  if (!chatMessagesEl) return;
+  const targets = [
+    document.getElementById('chat-messages'),
+    document.getElementById('messages-container')
+  ].filter(Boolean);
 
-  chatMessagesEl.addEventListener('contextmenu', (e) => {
-    if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) {
-      return;
-    }
-    e.preventDefault();
+  targets.forEach(target => {
+    target.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea') || e.target.closest('.msg-dropdown-menu')) {
+        return;
+      }
+      e.preventDefault();
 
-    const currentRoom = roomsCache[state.currentRoomId];
-    const isCreator = currentRoom && currentRoom.createdBy === state.myUserId;
-    const isAdmin = state.isAdminMode;
-    const isAllowed = (state.currentRoomId === 'public_main') ? isAdmin : (isCreator || isAdmin);
+      const activeRoomId = getActiveRoomId();
+      const activeUserId = getMyUserId();
+      const isAdmin = getIsAdminMode();
+      const currentRoom = roomsCache[activeRoomId];
+      const isCreator = currentRoom && (currentRoom.createdBy === activeUserId);
+      const isAllowed = (activeRoomId === 'public_main') ? isAdmin : (isCreator || isAdmin);
 
-    if (!isAllowed) {
-      const targetRole = state.currentRoomId === 'public_main' ? '運営（管理者）のみ' : '部屋の作成者のみ';
-      showToast(`チャット背景の変更は${targetRole}可能です`, 'warning');
-      return;
-    }
+      if (!isAllowed) {
+        const targetRole = activeRoomId === 'public_main' ? '運営（管理者）のみ' : '部屋の作成者のみ';
+        showToast(`チャット背景の変更は${targetRole}可能です`, 'warning');
+        return;
+      }
 
-    openRoomBgModal();
+      openRoomBgModal();
+    });
   });
 }
 
@@ -81,6 +104,8 @@ export function openRoomBgModal() {
   const modal = document.getElementById('room-bg-modal');
   if (modal) modal.classList.remove('hidden');
 }
+
+window.openRoomBgModal = openRoomBgModal;
 
 // ⚙️ Setup Room Background Customizer Modal Controls
 export function setupRoomBgModal() {
@@ -152,12 +177,13 @@ export function setupRoomBgModal() {
 // 🔄 Update Background Config in Firebase
 async function updateRoomBackgroundConfig(config) {
   try {
+    const activeRoomId = getActiveRoomId();
     if (config) {
-      config.updatedBy = state.myName || 'User';
+      config.updatedBy = getMyName();
       config.updatedAt = Date.now();
-      await set(ref(db, `rooms_meta/${state.currentRoomId}/bgConfig`), config);
+      await set(ref(db, `rooms_meta/${activeRoomId}/bgConfig`), config);
     } else {
-      await remove(ref(db, `rooms_meta/${state.currentRoomId}/bgConfig`));
+      await remove(ref(db, `rooms_meta/${activeRoomId}/bgConfig`));
     }
   } catch (err) {
     console.error('Failed to update room background config:', err);
