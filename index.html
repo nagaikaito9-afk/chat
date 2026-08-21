@@ -16,7 +16,10 @@
   <!-- SVG Favicon -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
 
-  <!-- Custom Styles -->
+  <!-- Custom Styles (Modularized) -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components/paint-studio.css">
+  <link rel="stylesheet" href="css/components/room-bg.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -1548,6 +1551,79 @@
         <div id="effect-user-card-list" class="effect-user-list">
           <!-- JS動的生成 -->
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🖼️ チャット背景カスタマイズ モーダル -->
+  <div id="room-bg-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up room-bg-modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-image text-primary"></i> チャット背景カスタマイズ</h3>
+        <button class="btn-icon modal-close" title="閉じる"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding: 18px;">
+        <div style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 14px;">
+          <i class="fa-solid fa-info-circle text-primary"></i> 右クリックメニューから開きました。変更した背景は部屋に滞在している<strong>全員の画面にリアルタイム適用</strong>されます！
+        </div>
+
+        <!-- プリセット壁紙テンプレート -->
+        <div class="room-bg-section-title">
+          <i class="fa-solid fa-palette text-warning"></i> プリセット・テーマ壁紙
+        </div>
+        <div class="room-bg-preset-grid">
+          <div class="room-bg-card bg-preset-cosmos" data-bg-type="preset" data-bg-val="cosmos">
+            <span class="room-bg-card-label">🌌 宇宙・銀河</span>
+          </div>
+          <div class="room-bg-card bg-preset-sakura" data-bg-type="preset" data-bg-val="sakura">
+            <span class="room-bg-card-label">🌸 ネオンサクラ</span>
+          </div>
+          <div class="room-bg-card bg-preset-matrix" data-bg-type="preset" data-bg-val="matrix">
+            <span class="room-bg-card-label">🟩 マトリックス</span>
+          </div>
+          <div class="room-bg-card bg-preset-vapor" data-bg-type="preset" data-bg-val="vapor">
+            <span class="room-bg-card-label">🌆 ヴェイパー</span>
+          </div>
+          <div class="room-bg-card bg-preset-ocean" data-bg-type="preset" data-bg-val="ocean">
+            <span class="room-bg-card-label">🌊 オーシャン</span>
+          </div>
+          <div class="room-bg-card bg-preset-forest" data-bg-type="preset" data-bg-val="forest">
+            <span class="room-bg-card-label">🌲 フォレスト</span>
+          </div>
+          <div class="room-bg-card bg-preset-wood" data-bg-type="preset" data-bg-val="wood">
+            <span class="room-bg-card-label">🪵 ウォームウッド</span>
+          </div>
+          <div class="room-bg-card bg-preset-dark" data-bg-type="preset" data-bg-val="dark">
+            <span class="room-bg-card-label">🖤 ダーク</span>
+          </div>
+          <div class="room-bg-card bg-preset-light" data-bg-type="preset" data-bg-val="light">
+            <span class="room-bg-card-label">⚪ クリーン</span>
+          </div>
+        </div>
+
+        <!-- カスタム画像アップロード & URL -->
+        <div class="room-bg-section-title">
+          <i class="fa-solid fa-cloud-arrow-up text-success"></i> オリジナル画像を適用
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div class="room-bg-input-group">
+            <label for="room-bg-file-input" class="btn-secondary btn-sm" style="cursor:pointer; white-space:nowrap;">
+              <i class="fa-solid fa-folder-open"></i> 画像ファイルを選択
+              <input type="file" id="room-bg-file-input" accept="image/*" class="hidden-file-input">
+            </label>
+            <span id="room-bg-file-name" style="font-size:0.8rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">選択されていません</span>
+          </div>
+
+          <div class="room-bg-input-group">
+            <input type="url" id="room-bg-url-input" class="room-bg-url-input" placeholder="画像のWeb URLを入力 (例: https://example.com/bg.png)">
+            <button id="btn-apply-bg-url" class="btn-secondary btn-sm"><i class="fa-solid fa-link"></i> URL適用</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button id="btn-reset-room-bg" class="btn-danger-soft btn-sm"><i class="fa-solid fa-rotate-left"></i> 標準背景に戻す</button>
+        <button class="btn-secondary modal-close">閉じる</button>
       </div>
     </div>
   </div>

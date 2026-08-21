@@ -5,6 +5,14 @@ import {
   remove, get, update, serverTimestamp, onDisconnect, query, limitToLast 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
+// Modular Imports
+import { state } from './js/state.js';
+import { setupPaintModal } from './js/modules/paint-studio.js';
+import { showToast, escapeHTML, formatTime, formatDate, parseMarkdown } from './js/utils/helpers.js';
+import { generateMathQuiz, checkMathQuizAnswer } from './js/utils/math-quiz.js';
+import { setRoomsCache, deleteUserRoom, setupChatBackgroundContextMenu, setupRoomBgModal, listenRoomBackground } from './js/modules/room-manager.js';
+
+
 // Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBcwXMn0N7qct45IORGaVqF_pdeGgb9NIA",
@@ -782,6 +790,9 @@ function initApp() {
   setupBgmPlayer();
   setupScreenShare();
   setupPaintModal();
+  setupChatBackgroundContextMenu();
+  setupRoomBgModal();
+  listenRoomBackground(currentRoomId);
   setupReplyBanner();
   setupAdminSystem();
   setupWerewolfGameControls();
@@ -1966,8 +1977,11 @@ async function switchRoom(newRoomId, roomTitle, roomPR = '') {
   await registerOnlineUser();
   sendSystemMessage(`🚪 ${myName} がこの部屋に入室しました`);
   initFirebaseRealtimeSync();
+  listenRoomBackground(newRoomId);
   showToast(`「${roomTitle.trim()}」に移動しました`);
 }
+
+window.switchRoom = switchRoom;
 
 // Realtime Listeners
 function initFirebaseRealtimeSync() {
@@ -4330,6 +4344,7 @@ function initRoomsRealtimeSync() {
     if (!tabsListEl) return;
 
     const rooms = snapshot.exists() ? snapshot.val() : {};
+    setRoomsCache(rooms);
     const now = Date.now();
     const INACTIVE_LIMIT = 30 * 60 * 1000;
 
@@ -4367,11 +4382,13 @@ function initRoomsRealtimeSync() {
       const lockIcon = rData.isPrivate ? '<i class="fa-solid fa-lock text-warning" style="font-size:0.75rem;"></i> ' : '';
       const uCount = roomUserCounts[roomId] || 0;
       const countBadge = uCount > 0 ? `<span class="room-user-count-badge">👤 ${uCount}</span>` : '';
-      const adminDelBtn = isAdminMode ? `<button class="btn-admin-del-room" onclick="window.adminDeleteRoom('${roomId}', '${escapeHtml(rData.name)}', event)" title="運営権限で部屋を削除"><i class="fa-solid fa-trash"></i></button>` : '';
+      const isCreator = rData.createdBy === myUserId;
+      const canDelete = isCreator || isAdminMode;
+      const userDelBtn = canDelete ? `<button class="btn-delete-room" onclick="window.deleteUserRoom('${roomId}', '${escapeHtml(rData.name)}', event)" title="部屋を削除"><i class="fa-solid fa-trash-can"></i></button>` : '';
 
       html += `
         <button class="room-tab ${isActive ? 'active' : ''}" data-room="${roomId}" data-name="${escapeHtml(rData.name)}" data-pr="${escapeHtml(rData.pr || '')}" data-private="${rData.isPrivate ? 'true' : 'false'}">
-          ${lockIcon}${icon} ${escapeHtml(rData.name)}${countBadge}${adminDelBtn}
+          ${lockIcon}${icon} ${escapeHtml(rData.name)}${countBadge}${userDelBtn}
         </button>
       `;
     });
@@ -4380,7 +4397,7 @@ function initRoomsRealtimeSync() {
 
     tabsListEl.querySelectorAll('.room-tab').forEach(tab => {
       tab.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-admin-del-room')) return;
+        if (e.target.closest('.btn-delete-room') || e.target.closest('.btn-admin-del-room')) return;
         const roomId = tab.dataset.room;
         const name = tab.dataset.name;
         const pr = tab.dataset.pr;

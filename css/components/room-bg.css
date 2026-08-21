@@ -1,0 +1,170 @@
+/* ==========================================================================
+   🖼️ Room Deletion & Chat Background Customizer Styles
+   ========================================================================== */
+
+/* 🗑️ Room Delete Button on Room Tab */
+.btn-delete-room {
+  background: rgba(255, 51, 102, 0.2);
+  border: 1px solid rgba(255, 51, 102, 0.4);
+  color: #ff3366;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  margin-left: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-delete-room:hover {
+  background: #ff3366;
+  color: #ffffff;
+  transform: scale(1.15);
+  box-shadow: 0 0 8px rgba(255, 51, 102, 0.6);
+}
+
+/* 🖼️ Chat Background Customizer Modal */
+.room-bg-modal {
+  max-width: 680px !important;
+  width: 92vw;
+}
+
+.room-bg-section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-bg-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.room-bg-card {
+  height: 80px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--glass-border);
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 6px;
+  transition: all var(--transition-fast);
+}
+
+.room-bg-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.room-bg-card.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 12px var(--accent-primary);
+}
+
+.room-bg-card.active::after {
+  content: "✓";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--accent-primary);
+  color: #000;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.room-bg-card-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+  width: 100%;
+}
+
+/* Preset Gradients & Visuals */
+.bg-preset-cosmos {
+  background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #090514 100%), radial-gradient(circle at 80% 20%, #4c1d95 0%, transparent 50%);
+}
+
+.bg-preset-sakura {
+  background: linear-gradient(135deg, #2a081a 0%, #4a1232 50%, #1a0410 100%);
+}
+
+.bg-preset-matrix {
+  background: linear-gradient(180deg, #021a08 0%, #053310 100%);
+}
+
+.bg-preset-vapor {
+  background: linear-gradient(135deg, #240038 0%, #590059 50%, #00334e 100%);
+}
+
+.bg-preset-ocean {
+  background: linear-gradient(135deg, #021e38 0%, #004e7a 100%);
+}
+
+.bg-preset-forest {
+  background: linear-gradient(135deg, #042416 0%, #0a472c 100%);
+}
+
+.bg-preset-wood {
+  background: linear-gradient(135deg, #2d1810 0%, #4a281b 100%);
+}
+
+.bg-preset-dark {
+  background: #090c15;
+}
+
+.bg-preset-light {
+  background: #f1f5f9;
+}
+
+/* Custom Input Controls */
+.room-bg-input-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.room-bg-url-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.room-bg-url-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Smooth Chat Messages Background Overlay */
+.chat-messages {
+  transition: background-image 0.3s ease, background-color 0.3s ease;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

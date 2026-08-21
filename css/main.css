@@ -1,0 +1,207 @@
+/* ==========================================================================
+   CyberChat CSS - Core Theme Variables & Main Styles
+   ========================================================================== */
+
+:root {
+  /* Dynamic Color Palette - Dark Cyber Mode (Default) */
+  --bg-base: #0a0d14;
+  --bg-surface: rgba(18, 24, 38, 0.75);
+  --bg-surface-hover: rgba(28, 36, 56, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-focus: rgba(0, 240, 255, 0.4);
+
+  --accent-primary: #00f0ff;
+  --accent-primary-hover: #33f3ff;
+  --accent-secondary: #7000ff;
+  --accent-gradient: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #33f3ff 0%, #8a2be2 100%);
+  --accent-glow: rgba(0, 240, 255, 0.25);
+
+  --text-primary: #f0f4f8;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-inverse: #0a0d14;
+
+  --msg-self-bg: linear-gradient(135deg, rgba(0, 240, 255, 0.15) 0%, rgba(112, 0, 255, 0.2) 100%);
+  --msg-self-border: rgba(0, 240, 255, 0.25);
+  --msg-other-bg: rgba(255, 255, 255, 0.05);
+  --msg-other-border: rgba(255, 255, 255, 0.07);
+
+  --msg-whisper-bg: linear-gradient(135deg, rgba(147, 51, 234, 0.25) 0%, rgba(219, 39, 119, 0.25) 100%);
+  --msg-whisper-border: rgba(219, 39, 119, 0.4);
+
+  --badge-trip-bg: rgba(112, 0, 255, 0.25);
+  --badge-trip-color: #c4b5fd;
+  --badge-trip-border: rgba(167, 139, 250, 0.3);
+
+  --danger-color: #ff3366;
+  --success-color: #00ff88;
+  --warning-color: #ffb800;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 20px rgba(0, 240, 255, 0.3);
+
+  --font-main: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 💚 Matrix Code Theme */
+[data-theme="matrix"] {
+  --bg-base: #020b05;
+  --bg-surface: rgba(4, 28, 12, 0.85);
+  --bg-surface-hover: rgba(8, 42, 18, 0.95);
+  --glass-border: rgba(0, 255, 102, 0.15);
+  --accent-primary: #00ff66;
+  --accent-primary-hover: #33ff85;
+  --accent-secondary: #008033;
+  --accent-gradient: linear-gradient(135deg, #00ff66 0%, #008033 100%);
+  --accent-glow: rgba(0, 255, 102, 0.3);
+  --text-primary: #e0ffe8;
+  --text-secondary: #66cc85;
+  --msg-self-bg: linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 128, 51, 0.25) 100%);
+  --msg-self-border: rgba(0, 255, 102, 0.3);
+}
+
+/* 🌇 Vaporwave Sunset Theme */
+[data-theme="vapor"] {
+  --bg-base: #120418;
+  --bg-surface: rgba(35, 10, 48, 0.85);
+  --bg-surface-hover: rgba(52, 15, 71, 0.95);
+  --glass-border: rgba(255, 0, 128, 0.2);
+  --accent-primary: #ff007f;
+  --accent-primary-hover: #ff3399;
+  --accent-secondary: #00f0ff;
+  --accent-gradient: linear-gradient(135deg, #ff007f 0%, #7000ff 100%);
+  --accent-glow: rgba(255, 0, 128, 0.35);
+  --text-primary: #ffe6f2;
+  --text-secondary: #cc80b3;
+  --msg-self-bg: linear-gradient(135deg, rgba(255, 0, 128, 0.18) 0%, rgba(112, 0, 255, 0.22) 100%);
+  --msg-self-border: rgba(255, 0, 128, 0.35);
+}
+
+/* ⚡ Electric Ocean Theme */
+[data-theme="ocean"] {
+  --bg-base: #031326;
+  --bg-surface: rgba(8, 32, 64, 0.85);
+  --bg-surface-hover: rgba(12, 46, 92, 0.95);
+  --glass-border: rgba(0, 153, 255, 0.2);
+  --accent-primary: #0099ff;
+  --accent-primary-hover: #33adff;
+  --accent-secondary: #00e5ff;
+  --accent-gradient: linear-gradient(135deg, #0099ff 0%, #00e5ff 100%);
+  --accent-glow: rgba(0, 153, 255, 0.3);
+  --text-primary: #e6f5ff;
+  --text-secondary: #80c4ff;
+  --msg-self-bg: linear-gradient(135deg, rgba(0, 153, 255, 0.15) 0%, rgba(0, 229, 255, 0.2) 100%);
+  --msg-self-border: rgba(0, 153, 255, 0.3);
+}
+
+/* 🌸 Sakura Neon Theme */
+[data-theme="sakura"] {
+  --bg-base: #1a0b16;
+  --bg-surface: rgba(38, 16, 32, 0.85);
+  --bg-surface-hover: rgba(56, 24, 48, 0.95);
+  --glass-border: rgba(255, 110, 180, 0.2);
+  --accent-primary: #ff6eb4;
+  --accent-primary-hover: #ff85c0;
+  --accent-secondary: #ff3385;
+  --accent-gradient: linear-gradient(135deg, #ff6eb4 0%, #ff1493 100%);
+  --accent-glow: rgba(255, 110, 180, 0.35);
+  --text-primary: #fff0f7;
+  --text-secondary: #f4a6d7;
+  --msg-self-bg: linear-gradient(135deg, rgba(255, 110, 180, 0.18) 0%, rgba(255, 20, 147, 0.22) 100%);
+  --msg-self-border: rgba(255, 110, 180, 0.35);
+}
+
+/* Reset & Basic Setup */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-main);
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  overflow: hidden;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Background Ambient Glows */
+.bg-glow {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.2;
+  will-change: transform;
+}
+
+.bg-glow-1 {
+  width: 350px;
+  height: 350px;
+  top: -100px;
+  left: -100px;
+  background: var(--accent-primary);
+}
+
+.bg-glow-2 {
+  width: 400px;
+  height: 400px;
+  bottom: -150px;
+  right: -150px;
+  background: var(--accent-secondary);
+}
+
+/* Utility Classes */
+.glass-panel {
+  background: var(--bg-surface);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.required {
+  color: var(--danger-color);
+}
+
+.trip-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-family: monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--badge-trip-bg);
+  color: var(--badge-trip-color);
+  border: 1px solid var(--badge-trip-border);
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.5px;
+}
+
+.text-success { color: var(--success-color); }
+.text-warning { color: var(--warning-color); }
+.text-danger { color: var(--danger-color); }
+.text-primary { color: var(--accent-primary); }
+.pulse { animation: pulseAnim 2s infinite; }
+
+@keyframes pulseAnim {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
