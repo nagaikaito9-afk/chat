@@ -63,7 +63,6 @@ let unsubscribeFriends = null;
 
 let deviceMode = localStorage.getItem('cyberchat_device_mode') || 'pc';
 let currentTheme = localStorage.getItem('cyberchat_theme') || 'cyber';
-let isAdminMode = localStorage.getItem('cyberchat_is_admin') === 'true';
 const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei";
 let trustedUsersSet = new Set();
 let adminUsersSet = new Set();
