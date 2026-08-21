@@ -1988,7 +1988,7 @@ function initFirebaseRealtimeSync() {
   unsubscribeActiveUsers = onValue(roomRef('active_users'), (snapshot) => {
     const userListEl = document.getElementById('online-user-list');
     const onlineCountEl = document.getElementById('online-count');
-    userListEl.innerHTML = '';
+    if (userListEl) userListEl.innerHTML = '';
     
     const currentUsersMap = new Map();
 
@@ -2006,7 +2006,7 @@ function initFirebaseRealtimeSync() {
         activeUsersMap.set(uid, uData);
         currentUsersMap.set(uid, uData);
         count++;
-        if (ignoredUsersSet.has(uid)) return;
+        if (ignoredUsersSet.has(uid) || !userListEl) return;
 
         const roleBadgesHtml = getUserRoleBadges(uid, uData.name, uData.level || 1, uData.joinedMonth || '', uData.isVeteran || false);
         const avatarGlowClass = getUserAvatarGlowClass(uid, uData.name, uData.level || 1, uData.joinedMonth || '', uData.isVeteran || false);
@@ -2035,9 +2035,9 @@ function initFirebaseRealtimeSync() {
         `;
         userListEl.appendChild(li);
       });
-      onlineCountEl.textContent = `${count}人`;
+      if (onlineCountEl) onlineCountEl.textContent = `${count}人`;
     } else {
-      onlineCountEl.textContent = '0人';
+      if (onlineCountEl) onlineCountEl.textContent = '0人';
     }
     if (typeof renderUnifiedSidebarUserList === 'function') renderUnifiedSidebarUserList();
 
@@ -3250,10 +3250,13 @@ function setupChatControls() {
     });
   });
 
-  document.getElementById('search-input').addEventListener('input', (e) => {
-    searchKeyword = e.target.value.trim();
-    filterAllMessages();
-  });
+  const searchInputEl = document.getElementById('search-input');
+  if (searchInputEl) {
+    searchInputEl.addEventListener('input', (e) => {
+      searchKeyword = e.target.value.trim();
+      filterAllMessages();
+    });
+  }
 
   const soundBtn = document.getElementById('btn-toggle-sound');
   soundBtn.addEventListener('click', () => {
@@ -3264,8 +3267,10 @@ function setupChatControls() {
   });
 
   const sidebar = document.getElementById('sidebar');
-  document.getElementById('btn-toggle-sidebar').addEventListener('click', () => sidebar.classList.add('open'));
-  document.getElementById('btn-close-sidebar').addEventListener('click', () => sidebar.classList.remove('open'));
+  const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+  if (btnToggleSidebar) btnToggleSidebar.addEventListener('click', () => sidebar && sidebar.classList.add('open'));
+  const btnCloseSidebar = document.getElementById('btn-close-sidebar');
+  if (btnCloseSidebar) btnCloseSidebar.addEventListener('click', () => sidebar && sidebar.classList.remove('open'));
 
   const emojiBtn = document.getElementById('btn-emoji-toggle');
   const emojiPicker = document.getElementById('emoji-picker');
