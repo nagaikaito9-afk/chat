@@ -379,10 +379,8 @@ function renderAvatarHTML(avatar, customClass = '') {
 }
 
 function isCreatorName(name) {
-  if (isAdminMode) return true;
-  const localAccName = localStorage.getItem('cyberchat_account_name') || '';
-  const targetStr = ((name || myName || localAccName) + '').toLowerCase();
-  return targetStr.includes('ネコ') || targetStr.includes('ただのネコ好き') || targetStr.includes('製作者') || targetStr.includes('creator');
+  if (!name || typeof name !== 'string') return false;
+  return name.includes('ただのネコ好き');
 }
 
 // 🌟 Level & EXP Helper Functions
@@ -5434,11 +5432,6 @@ window.toggleUserEffect = async (targetUid, targetName, effectType) => {
 };
 
 window.openCreatorEffectsModal = (selectedUid = null) => {
-  const isCreator = isCreatorName(myName) || isAdminMode;
-  if (!isCreator) {
-    showToast('⚠️ エフェクトリストは製作者（ただのネコ好き）専用メニューです', 'error');
-    return;
-  }
   const modal = document.getElementById('creator-effects-modal');
   if (modal) {
     modal.classList.remove('hidden');
