@@ -1336,93 +1336,7 @@ function setupTripInputListeners() {
 function setupJoinForm() {
   const joinForm = document.getElementById('join-form');
   const errorMsg = document.getElementById('join-error-msg');
-  const btnStart = document.getElementById('btn-start-chat');
-
-  const handleJoinSubmit = async (e) => {
-    if (e) e.preventDefault();
-    errorMsg.classList.add('hidden');
-    
-    const inputName = document.getElementById('join-username').value.trim();
-    const inputTripKey = document.getElementById('join-tripkey').value;
-    const inputStatus = document.getElementById('join-status').value;
-
-    if (!inputName) {
-      errorMsg.textContent = 'ユーザー名を入力してください。';
-      errorMsg.classList.remove('hidden');
-      return;
-    }
-
-    btnStart.disabled = true;
-    btnStart.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 接続中...';
-
-    try {
-      const isDuplicate = await checkDuplicateName(inputName, myUserId);
-      if (isDuplicate) {
-        errorMsg.textContent = `「${inputName}」は現在オンラインの他ユーザーが使用しています。別の名前を入力してください。`;
-        errorMsg.classList.remove('hidden');
-        btnStart.disabled = false;
-        btnStart.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> チャットを開始する';
-        return;
-      }
-
-      myName = inputName;
-      myTrip = await generateTrip(inputTripKey);
-      myStatus = inputStatus;
-
-      await registerOnlineUser();
-
-      const joinModal = document.getElementById('join-modal');
-      if (joinModal) {
-        joinModal.classList.remove('active');
-        joinModal.classList.add('hidden');
-        joinModal.style.display = 'none';
-      }
-      document.getElementById('app-container').classList.remove('hidden');
-
-      updateMyProfileUI();
-      sendSystemMessage(`${myAvatar} ${myName} (${myTrip}) がチャットに参加しました！`);
-      initFirebaseRealtimeSync();
-
-    } catch (err) {
-      console.error("Join error:", err);
-      errorMsg.textContent = `接続エラー: ${err.message || 'Firebaseデータベースにアクセスできませんでした。'}`;
-      errorMsg.classList.remove('hidden');
-    } finally {
-      btnStart.disabled = false;
-      btnStart.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> チャットを開始する';
-    }
-  };
-
-  if (joinForm) joinForm.addEventListener('submit', handleJoinSubmit);
-  if (btnStart) btnStart.addEventListener('click', handleJoinSubmit);
-}
-
-async function registerOnlineUser() {
-  const userRef = roomRef(`active_users/${myUserId}`);
-  onDisconnect(userRef).remove();
-  const roomTitleEl = document.getElementById('current-room-title');
-  const roomNameText = roomTitleEl ? roomTitleEl.textContent.trim() : '雑談部屋';
-
-  const userData = {
-    userId: myUserId,
-    name: myName,
-    trip: myTrip,
-    avatar: myAvatar,
-    status: myStatus,
-    currentRoomId: currentRoomId,
-    currentRoomName: roomNameText,
-    joinedAt: Date.now(),
-    lastSeen: Date.now()
-  };
-
-  await set(userRef, userData);
-
-  const globalUserRef = ref(db, `global_online_users/${myUserId}`);
-  onDisconnect(globalUserRef).remove();
-  await set(globalUserRef, userData);
-}
-
-function updateMyProfileUI() {
+  const btnStart = document.getElementById('btn-stfunction updateMyProfileUI() {
   if (myAvatar) {
     localStorage.setItem('cyberchat_user_avatar', myAvatar);
   }
@@ -1514,6 +1428,121 @@ async function switchRoom(newRoomId, roomTitle, roomPR = '') {
   await registerOnlineUser();
   sendSystemMessage(`${renderAvatarHTML(myAvatar)} ${myName} がこの部屋に入室しました`);
   initFirebaseRealtimeSync();
+  showToast(`「${roomTitle.trim()}」に移動しました`);
+}
+
+// Realtime Listeners
+function initFirebaseRealtimeSync() {
+  if (unsubscribeActiveUsers) unsubscribeActiveUsers();
+  if (unsubscribeMessages) unsubscribeMessages();
+  if (unsubscribeTyping) unsubscribeTyping();
+  if (unsubscribeTopic) unsubscribeTopic();
+  if (unsubscribeScreen) unsubscribeScreen();
+
+  previousActiveUsersMap = null; // ルーム切り替え・同期開始時の通知誤発火を防止
+
+  // 1. オンラインリスト（180秒以内の生存確認で確実表示＆古いデータの自動非表示 ＋ 入退室の即時通知）
+  unsubscribeActiveUsers = onValue(roomRef('active_users'), (snapshot) => {
+    const userListEl = document.getElementById('online-user-list');
+    const onlineCountEl = document.getElementById('online-count');
+    if (!userListEl || !onlineCountEl) return;
+    userListEl.innerHTML = '';
+    
+    const currentUsersMap = new Map();
+
+    if (snapshot.exists()) {
+      const users = snapshot.val();
+      activeUsersMap.clear();
+      const now = Date.now();
+      const validUsersList = [];
+
+      Object.entries(users).forEach(([uid, uData]) => {
+        if (!uData || (uData.lastSeen && (now - uData.lastSeen > 180000))) {
+          return;
+        }
+
+        activeUsersMap.set(uid, uData);
+        currentUsersMap.set(uid, uData);
+
+        if (!ignoredUsersSet.has(uid)) {
+          validUsersList.push({ uid, uData });
+        }
+      });
+
+      // 自分（あなた）を一番上に配置し、残りは名前順でキレイにソート
+      validUsersList.sort((a, b) => {
+        if (a.uid === myUserId) return -1;
+        if (b.uid === myUserId) return 1;
+        const nameA = a.uData.name || '';
+        const nameB = b.uData.name || '';
+        return nameA.localeCompare(nameB, 'ja');
+      });
+
+      validUsersList.forEach(({ uid, uData }) => {
+        const uName = uData.name || 'ゲスト';
+        const roleBadgesHtml = getUserRoleBadges(uid, uName);
+        const avatarGlowClass = getUserAvatarGlowClass(uid, uName);
+        const nameClass = getUserNameClass(uid, uName);
+
+        const isCreator = isCreatorName(myName);
+        const isFriend = typeof friendsMap !== 'undefined' && friendsMap.has(uid);
+        const canTrust = (isCreator || isFriend) && uid !== myUserId;
+
+        const trustBtnHtml = canTrust ? `
+          <button class="btn-secondary btn-sm" onclick="window.toggleTrustUser('${uid}', '${escapeHtml(uName)}')" title="信用ステータスを付与/解除">
+            <i class="fa-solid fa-gem ${trustedUsersSet.has(uid) ? 'text-info' : ''}"></i>
+          </button>
+        ` : '';
+
+        const li = document.createElement('li');
+        li.className = 'user-item';
+        li.innerHTML = `
+          <div class="avatar-sm ${avatarGlowClass}">${renderAvatarHTML(uData.avatar || '🤖')}</div>
+          <div class="user-item-info">
+            <div class="${nameClass}">${escapeHtml(uName)}${roleBadgesHtml} ${uid === myUserId ? '<span style="font-size:0.75rem; opacity:0.6;">(あなた)</span>' : ''}</div>
+            <div class="user-item-status">${escapeHtml(uData.status || '💬 雑談歓迎')}</div>
+          </div>
+          <button class="btn-secondary btn-sm" onclick="window.startWhisper('${uid}', '${escapeHtml(uName)}')" title="内緒話（DM）"><i class="fa-solid fa-lock"></i></button>
+          ${uid !== myUserId ? `<button class="btn-secondary btn-sm" onclick="window.sendFriendRequest('${uid}', '${escapeHtml(uName)}')" title="フレンド申請"><i class="fa-solid fa-user-plus text-primary"></i></button>` : ''}
+          ${trustBtnHtml}
+          ${uid !== myUserId ? `<button class="btn-mute-user" onclick="window.ignoreUser('${uid}', '${escapeHtml(uName)}')" title="無視（ブロック）"><i class="fa-solid fa-user-slash"></i></button>` : ''}
+        `;
+        userListEl.appendChild(li);
+      });
+
+      onlineCountEl.textContent = `${validUsersList.length}人`;
+    } else {
+      onlineCountEl.textContent = '0人';
+    }
+
+    // 🚪 リアルタイム入退室通知の判定処理（初回およびルーム切替時は発火させない）
+    if (previousActiveUsersMap !== null) {
+      currentUsersMap.forEach((uData, uid) => {
+        if (!previousActiveUsersMap.has(uid) && uid !== myUserId) {
+          showToast(`🚪 ${uData.name || '誰か'} がこの部屋に入室しました`, 'info');
+          playSound('receive');
+        }
+      });
+      previousActiveUsersMap.forEach((oldData, uid) => {
+        if (!currentUsersMap.has(uid) && uid !== myUserId) {
+          showToast(`🚪 ${oldData.name || '誰か'} がこの部屋から退室しました`, 'info');
+        }
+      });
+    }
+    previousActiveUsersMap = new Map(currentUsersMap);
+
+    if (typeof renderFriendsListUI === 'function') {
+      renderFriendsListUI();
+    }
+  });ク）"><i class="fa-solid fa-user-slash"></i></button>` : ''}
+        `;
+        userListEl.appendChild(li);
+      });
+
+      onlineCountEl.textContent = `${validUsersList.length}人`;
+    } else {
+      onlineCountEl.textContent = '0人';
+    }Sync();
   showToast(`「${roomTitle.trim()}」に移動しました`);
 }
 
@@ -1958,7 +1987,7 @@ function renderSingleMessage(msgId, msg) {
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
         ${!isSelf ? `<button onclick="window.sendFriendRequest('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請</button>` : ''}
-        ${isCreatorName(myName) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${trustedUsersSet.has(msg.userId) ? '信用解除' : '💎 信用付与'}</button>` : ''}
+        ${(isCreatorName(myName) || (typeof friendsMap !== 'undefined' && friendsMap.has(msg.userId))) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${trustedUsersSet.has(msg.userId) ? '信用解除' : '💎 信用付与'}</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
         ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
       </div>
@@ -4908,10 +4937,13 @@ function initTrustedUsersListener() {
   });
 }
 
-// 💎 信用ステータス切替ハンドラー (製作者「ただのネコ好き」専用)
+// 💎 信用ステータス切替ハンドラー (製作者「ただのネコ好き」およびフレンド対応)
 window.toggleTrustUser = async (targetUid, targetName) => {
-  if (!isCreatorName(myName)) {
-    showToast('⚠️ 信用ステータスを付与・解除できるのは製作者（ただのネコ好き）のみです', 'error');
+  const isCreator = isCreatorName(myName);
+  const isFriend = typeof friendsMap !== 'undefined' && friendsMap.has(targetUid);
+
+  if (!isCreator && !isFriend) {
+    showToast('⚠️ 信用ステータスを付与・解除できるのは製作者（ただのネコ好き）または対象のフレンドのみです', 'error');
     return;
   }
 
