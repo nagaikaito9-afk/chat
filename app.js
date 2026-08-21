@@ -494,13 +494,27 @@ function setupPresenceConnectionHeartbeat() {
     }
   });
 
+  let lastHeartbeatUpdate = 0;
+  const touchHeartbeat = () => {
+    const now = Date.now();
+    if (now - lastHeartbeatUpdate > 8000 && myName && myUserId) {
+      lastHeartbeatUpdate = now;
+      update(roomRef(`active_users/${myUserId}`), { lastSeen: now }).catch(() => {});
+      update(ref(db, `global_online_users/${myUserId}`), { lastSeen: now }).catch(() => {});
+    }
+  };
+
+  ['pointermove', 'keydown', 'click', 'scroll', 'touchstart', 'focus'].forEach(evt => {
+    window.addEventListener(evt, touchHeartbeat, { passive: true });
+  });
+
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(() => {
     if (myName && myUserId) {
-      update(roomRef(`active_users/${myUserId}`), { lastSeen: Date.now() });
-      update(ref(db, `global_online_users/${myUserId}`), { lastSeen: Date.now() });
+      update(roomRef(`active_users/${myUserId}`), { lastSeen: Date.now() }).catch(() => {});
+      update(ref(db, `global_online_users/${myUserId}`), { lastSeen: Date.now() }).catch(() => {});
     }
-  }, 8000);
+  }, 10000);
 
   const cleanUpPresence = () => {
     if (myUserId) {
@@ -1478,8 +1492,7 @@ function initFirebaseRealtimeSync() {
       let count = 0;
 
       Object.entries(users).forEach(([uid, uData]) => {
-        if (!uData || (uData.lastSeen && (now - uData.lastSeen > 30000))) {
-          remove(roomRef(`active_users/${uid}`)).catch(() => {});
+        if (!uData || (uData.lastSeen && (now - uData.lastSeen > 180000))) {
           return;
         }
 
@@ -1962,30 +1975,54 @@ function renderSingleMessage(msgId, msg) {
     } else if (msg.type === 'game' || msg.type === 'rps') {
       contentHtml = `<div class="${bubbleClass}">${quoteCardHtml}${msg.text}</div>`;
     } else if (msg.type === 'image') {
+      const fileName = msg.fileName || 'image.png';
       contentHtml = `
         <div class="${bubbleClass}">
           ${quoteCardHtml}
           ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
-          <img src="${msg.fileUrl}" class="msg-image" alt="投稿画像" onclick="window.openImageModal('${msg.fileUrl}')">
+          <div class="msg-media-box">
+            <img src="${msg.fileUrl}" class="msg-image" alt="投稿画像" onclick="window.openImageModal('${msg.fileUrl}')">
+            <div class="media-download-bar">
+              <button type="button" class="btn-download-media" onclick="window.downloadFile('${msg.fileUrl}', '${escapeHtml(fileName)}')" title="画像を保存">
+                <i class="fa-solid fa-download"></i> 画像をダウンロード ${msg.fileSize ? `<span class="file-size-tag">(${formatFileSize(msg.fileSize)})</span>` : ''}
+              </button>
+            </div>
+          </div>
         </div>
       `;
     } else if (msg.type === 'video') {
+      const fileName = msg.fileName || 'video.mp4';
       contentHtml = `
         <div class="${bubbleClass}">
           ${quoteCardHtml}
           ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
-          <video src="${msg.fileUrl}" controls class="msg-video"></video>
+          <div class="msg-media-box">
+            <video src="${msg.fileUrl}" controls class="msg-video"></video>
+            <div class="media-download-bar">
+              <button type="button" class="btn-download-media" onclick="window.downloadFile('${msg.fileUrl}', '${escapeHtml(fileName)}')" title="動画を保存">
+                <i class="fa-solid fa-download"></i> 動画をダウンロード ${msg.fileSize ? `<span class="file-size-tag">(${formatFileSize(msg.fileSize)})</span>` : ''}
+              </button>
+            </div>
+          </div>
         </div>
       `;
     } else if (msg.type === 'audio' || msg.type === 'voice') {
+      const defaultName = msg.type === 'voice' ? 'voice_message.webm' : 'audio.mp3';
+      const fileName = msg.fileName || defaultName;
       contentHtml = `
         <div class="${bubbleClass}">
           ${quoteCardHtml}
           ${msg.type === 'voice' ? '<div style="font-size:0.8rem; font-weight:600; margin-bottom:4px;"><i class="fa-solid fa-microphone text-success"></i> ボイスメッセージ</div>' : ''}
           <audio src="${msg.fileUrl}" controls class="msg-audio"></audio>
+          <div class="media-download-bar" style="margin-top:6px;">
+            <button type="button" class="btn-download-media" onclick="window.downloadFile('${msg.fileUrl}', '${escapeHtml(fileName)}')" title="音声ファイルを保存">
+              <i class="fa-solid fa-download"></i> 音声ファイルをダウンロード ${msg.fileSize ? `<span class="file-size-tag">(${formatFileSize(msg.fileSize)})</span>` : ''}
+            </button>
+          </div>
         </div>
       `;
     } else if (msg.type === 'file') {
+      const fileName = msg.fileName || 'file';
       contentHtml = `
         <div class="${bubbleClass}">
           ${quoteCardHtml}
@@ -1993,12 +2030,12 @@ function renderSingleMessage(msgId, msg) {
           <div class="msg-file-card">
             <i class="fa-solid fa-file-lines file-icon"></i>
             <div class="file-details">
-              <div class="file-name">${escapeHtml(msg.fileName || '添付ファイル')}</div>
+              <div class="file-name">${escapeHtml(fileName)}</div>
               <div class="file-size">${formatFileSize(msg.fileSize || 0)}</div>
             </div>
-            <a href="${msg.fileUrl}" download="${escapeHtml(msg.fileName || 'file')}" class="btn-file-download" title="ダウンロード">
-              <i class="fa-solid fa-download"></i>
-            </a>
+            <button type="button" onclick="window.downloadFile('${msg.fileUrl}', '${escapeHtml(fileName)}')" class="btn-file-download" title="ファイルをダウンロード">
+              <i class="fa-solid fa-download"></i> ダウンロード
+            </button>
           </div>
         </div>
       `;
@@ -4780,7 +4817,7 @@ function initGlobalOnlineUsersListener() {
       const users = snapshot.val();
       const now = Date.now();
       Object.entries(users).forEach(([uid, uData]) => {
-        if (uData && (!uData.lastSeen || (now - uData.lastSeen <= 30000))) {
+        if (uData && (!uData.lastSeen || (now - uData.lastSeen <= 180000))) {
           globalOnlineUsersMap.set(uid, uData);
         }
       });
@@ -4788,6 +4825,30 @@ function initGlobalOnlineUsersListener() {
     renderFriendsListUI();
   });
 }
+
+// 💾 万能ファイルダウンロードヘルパー
+window.downloadFile = (fileUrl, fileName) => {
+  if (!fileUrl) {
+    showToast('ダウンロード可能なファイルデータがありません', 'error');
+    return;
+  }
+  try {
+    const targetName = fileName || ('cyberchat_file_' + Date.now());
+    const a = document.createElement('a');
+    a.href = fileUrl;
+    a.download = targetName;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) document.body.removeChild(a);
+    }, 150);
+    showToast(`「${targetName}」をダウンロード開始しました`, 'success');
+  } catch (err) {
+    console.error("Download error:", err);
+    window.open(fileUrl, '_blank');
+  }
+};
 
 function initGlobalFriendDmListener() {
   if (!myUserId) return;
