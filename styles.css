@@ -2344,9 +2344,258 @@ html, body {
   100% { box-shadow: 0 0 10px #38bdf8, 0 0 16px #c084fc; }
 }
 
-.msg-sender-name.is-trusted {
+.msg-sender-name.is-trusted, .user-item-name.is-trusted {
   color: #38bdf8 !important;
   text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+}
+
+/* 📢 宣伝部隊 (PR Team) エフェクト */
+.pr-member-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #ff7e5f 0%, #feb47b 50%, #ff2a6d 100%);
+  background-size: 200% 200%;
+  animation: creatorGradient 3.5s ease infinite;
+  color: #ffffff !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 12px rgba(255, 126, 95, 0.6), 0 0 18px rgba(255, 42, 109, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.pr-avatar-glow {
+  box-shadow: 0 0 14px #ff7e5f, 0 0 22px #ff2a6d !important;
+  animation: prPulse 2.2s infinite ease-in-out !important;
+  border: 2px solid #ff7e5f !important;
+}
+
+@keyframes prPulse {
+  0% { box-shadow: 0 0 10px #ff7e5f, 0 0 16px #ff2a6d; }
+  50% { box-shadow: 0 0 22px #ff2a6d, 0 0 30px #feb47b; }
+  100% { box-shadow: 0 0 10px #ff7e5f, 0 0 16px #ff2a6d; }
+}
+
+.msg-sender-name.is-pr-member, .user-item-name.is-pr-member {
+  color: #ff9e64 !important;
+  text-shadow: 0 0 8px rgba(255, 158, 100, 0.7);
+}
+
+/* ⭐ 初期メンバー (Initial Member) エフェクト */
+.initial-member-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #ffe066 0%, #f59e0b 50%, #d97706 100%);
+  background-size: 200% 200%;
+  animation: creatorGradient 4s ease infinite;
+  color: #1e1b4b !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 12px rgba(255, 224, 102, 0.8), 0 0 20px rgba(245, 158, 11, 0.5);
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 243, 199, 0.8);
+}
+
+.initial-avatar-glow {
+  box-shadow: 0 0 16px #ffe066, 0 0 24px #f59e0b !important;
+  animation: initialPulse 2s infinite ease-in-out !important;
+  border: 2px solid #ffe066 !important;
+}
+
+@keyframes initialPulse {
+  0% { box-shadow: 0 0 12px #ffe066, 0 0 18px #f59e0b; }
+  50% { box-shadow: 0 0 24px #f59e0b, 0 0 35px #ffe066; }
+  100% { box-shadow: 0 0 12px #ffe066, 0 0 18px #f59e0b; }
+}
+
+.msg-sender-name.is-initial-member, .user-item-name.is-initial-member {
+  color: #ffd700 !important;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.7);
+}
+
+/* 🛠️ 製作者専用「エフェクトリスト」モーダル & ボタン UI */
+.btn-creator-effect {
+  background: linear-gradient(135deg, rgba(255, 0, 128, 0.25), rgba(112, 0, 255, 0.25));
+  border: 1px solid rgba(255, 0, 128, 0.5);
+  color: #ff79c6;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-creator-effect:hover {
+  background: linear-gradient(135deg, rgba(255, 0, 128, 0.4), rgba(112, 0, 255, 0.4));
+  box-shadow: 0 0 15px rgba(255, 0, 128, 0.5);
+  transform: translateY(-1px);
+}
+
+.effect-modal-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.effect-search-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.effect-search-bar input {
+  flex: 1;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+}
+
+.effect-filter-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.effect-filter-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.effect-filter-btn.active {
+  background: var(--accent-primary);
+  color: #ffffff;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+.effect-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.effect-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  gap: 14px;
+  transition: all 0.2s ease;
+}
+
+.effect-user-card:hover {
+  border-color: rgba(0, 240, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.effect-user-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.effect-user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.effect-user-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.effect-user-uid {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.effect-toggle-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.effect-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-muted);
+}
+
+.effect-toggle-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* 💎 信用済み ボタン状態 */
+.effect-toggle-btn.trusted.active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(192, 132, 252, 0.3));
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+/* 📢 宣伝部隊 ボタン状態 */
+.effect-toggle-btn.pr.active {
+  background: linear-gradient(135deg, rgba(255, 126, 95, 0.3), rgba(255, 42, 109, 0.3));
+  border-color: #ff7e5f;
+  color: #ff9e64;
+  box-shadow: 0 0 10px rgba(255, 126, 95, 0.4);
+}
+
+/* ⭐ 初期メンバー ボタン状態 */
+.effect-toggle-btn.initial.active {
+  background: linear-gradient(135deg, rgba(255, 224, 102, 0.3), rgba(245, 158, 11, 0.3));
+  border-color: #ffe066;
+  color: #ffd700;
+  box-shadow: 0 0 10px rgba(255, 224, 102, 0.5);
 }
 
 .btn-file-download:hover {

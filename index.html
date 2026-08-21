@@ -220,6 +220,9 @@
           </div>
           <span id="my-exp-text" class="exp-text-val">0 / 50 EXP (0%)</span>
         </div>
+        <button id="btn-sidebar-creator-effects" class="btn-secondary btn-sm creator-only-btn hidden" style="width:100%; margin-top:8px; background: linear-gradient(135deg, rgba(255, 0, 128, 0.2), rgba(112, 0, 255, 0.2)); border: 1px solid rgba(255, 0, 128, 0.5); color: #ff79c6; font-weight:700;">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ エフェクトリスト
+        </button>
       </div>
 
       <!-- 🤝 フレンド管理セクション -->
@@ -305,6 +308,12 @@
         </div>
 
         <div class="header-actions">
+          <!-- ✨ 製作者専用エフェクトリストボタン -->
+          <button id="btn-open-creator-effects" class="btn-creator-effect hidden" title="✨ エフェクトリスト (ただのネコ好き専用)">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>エフェクト</span>
+          </button>
+
           <!-- 運営管理ボタン -->
           <button id="btn-open-admin-auth" class="btn-admin" title="運営専用管理画面">
             <i class="fa-solid fa-user-shield"></i>
@@ -1377,6 +1386,41 @@
             <i class="fa-solid fa-paper-plane"></i> 送信
           </button>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✨ 製作者専用「エフェクトリスト」モーダル -->
+  <div id="creator-effects-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 680px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(255, 0, 128, 0.2), rgba(112, 0, 255, 0.2)); border-bottom: 1px solid rgba(255, 0, 128, 0.4);">
+        <div>
+          <h3 style="color: #ff79c6; display:flex; align-items:center; gap:8px; margin:0;">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ エフェクトリスト (製作者専用)
+          </h3>
+          <div class="effect-modal-sub">
+            ユーザーに特別エフェクトを付与・解除できます。相手画面にも即時反映され永久に維持されます。
+          </div>
+        </div>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <!-- 検索バー -->
+        <div class="effect-search-bar">
+          <i class="fa-solid fa-magnifying-glass search-icon" style="position:relative; margin-left:12px; color:var(--text-muted); pointer-events:none;"></i>
+          <input type="text" id="effect-user-search-input" placeholder="ユーザー名で検索..." style="padding-left: 12px; margin-left:-24px;">
+        </div>
+        <!-- フィルターボタン -->
+        <div class="effect-filter-pills">
+          <button class="effect-filter-btn active" data-effect-filter="all">すべて</button>
+          <button class="effect-filter-btn" data-effect-filter="trusted">💎 信用済みのみ</button>
+          <button class="effect-filter-btn" data-effect-filter="pr">📢 宣伝部隊のみ</button>
+          <button class="effect-filter-btn" data-effect-filter="initial">⭐ 初期メンバーのみ</button>
+        </div>
+        <!-- ユーザーカードリスト -->
+        <div id="effect-user-card-list" class="effect-user-list">
+          <!-- JS動的生成 -->
+        </div>
       </div>
     </div>
   </div>

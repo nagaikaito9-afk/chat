@@ -47,6 +47,7 @@ let isAdminMode = localStorage.getItem('cyberchat_is_admin') === 'true';
 const ADMIN_PASSWORD = "Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei";
 let trustedUsersSet = new Set();
 let adminUsersSet = new Set();
+let userEffectsMap = new Map();
 
 let globalOnlineUsersMap = new Map();
 let currentFriendChatUid = null;
@@ -481,6 +482,17 @@ function isVeteranUser(uid, joinedMonth = '') {
   return joinedMonth && joinedMonth <= '2026-08';
 }
 
+function getUserEffects(uid) {
+  if (!uid) return { trusted: false, pr: false, initial: false };
+  const eff = userEffectsMap.get(uid);
+  const isTrustedLegacy = trustedUsersSet.has(uid);
+  return {
+    trusted: (eff && eff.trusted) || isTrustedLegacy,
+    pr: eff ? !!eff.pr : false,
+    initial: eff ? !!eff.initial : false
+  };
+}
+
 function getUserRoleBadges(uid, name, level = 1, joinedMonth = '') {
   let badges = '';
   if (isCreatorName(name)) {
@@ -489,9 +501,18 @@ function getUserRoleBadges(uid, name, level = 1, joinedMonth = '') {
   if (isVeteranUser(uid, joinedMonth)) {
     badges += ` <span class="veteran-badge"><i class="fa-solid fa-scroll text-warning"></i> 📜 古参</span>`;
   }
-  if (trustedUsersSet.has(uid)) {
+
+  const eff = getUserEffects(uid);
+  if (eff.trusted) {
     badges += ` <span class="trusted-badge"><i class="fa-solid fa-gem"></i> 💎 信用済み</span>`;
   }
+  if (eff.pr) {
+    badges += ` <span class="pr-member-badge"><i class="fa-solid fa-bullhorn text-warning"></i> 📢 宣伝部隊</span>`;
+  }
+  if (eff.initial) {
+    badges += ` <span class="initial-member-badge"><i class="fa-solid fa-star text-warning"></i> ⭐ 初期メンバー</span>`;
+  }
+
   if (typeof friendsMap !== 'undefined' && friendsMap.has(uid)) {
     badges += ` <span class="friend-badge"><i class="fa-solid fa-handshake"></i> 🤝 フレンド</span>`;
   }
@@ -513,9 +534,16 @@ function getUserAvatarGlowClass(uid, name, level = 1, joinedMonth = '') {
   const userLv = uid === myUserId ? myLevel : (level || 1);
   if (userLv >= 50) return 'max-level-avatar-glow';
   if (isCreatorName(name)) return 'creator-avatar-glow';
+
+  const eff = getUserEffects(uid);
+  let glowClasses = [];
+  if (eff.initial) glowClasses.push('initial-avatar-glow');
+  if (eff.pr) glowClasses.push('pr-avatar-glow');
+  if (eff.trusted) glowClasses.push('trusted-avatar-glow');
+  if (glowClasses.length > 0) return glowClasses.join(' ');
+
   if (isVeteranUser(uid, joinedMonth)) return 'veteran-avatar-glow';
   if ((isAdminMode && uid === myUserId) || adminUsersSet.has(uid)) return 'admin-avatar-glow';
-  if (trustedUsersSet.has(uid)) return 'trusted-avatar-glow';
   if (typeof friendsMap !== 'undefined' && friendsMap.has(uid)) return 'friend-avatar-glow';
   return '';
 }
@@ -523,7 +551,16 @@ function getUserAvatarGlowClass(uid, name, level = 1, joinedMonth = '') {
 function getUserNameClass(uid, name) {
   if (isCreatorName(name)) return 'user-item-name is-creator';
   if ((isAdminMode && uid === myUserId) || adminUsersSet.has(uid)) return 'user-item-name is-admin';
-  if (trustedUsersSet.has(uid)) return 'user-item-name is-trusted';
+
+  const eff = getUserEffects(uid);
+  let extraClasses = [];
+  if (eff.initial) extraClasses.push('is-initial-member');
+  if (eff.pr) extraClasses.push('is-pr-member');
+  if (eff.trusted) extraClasses.push('is-trusted');
+
+  if (extraClasses.length > 0) {
+    return 'user-item-name ' + extraClasses.join(' ');
+  }
   return 'user-item-name';
 }
 
@@ -756,7 +793,8 @@ function initApp() {
   initBanCheckListener();
   initGlobalOnlineUsersListener();
   initGlobalFriendDmListener();
-  initTrustedUsersListener();
+  initUserEffectsListener();
+  setupCreatorEffectsControls();
   setupPresenceConnectionHeartbeat();
   checkDailyLoginBonus();
 }
@@ -1821,6 +1859,12 @@ function updateMyProfileUI() {
     }
   }
 
+  const isCreator = isCreatorName(myName);
+  const btnHeaderEff = document.getElementById('btn-open-creator-effects');
+  if (btnHeaderEff) btnHeaderEff.classList.toggle('hidden', !isCreator);
+  const btnSidebarEff = document.getElementById('btn-sidebar-creator-effects');
+  if (btnSidebarEff) btnSidebarEff.classList.toggle('hidden', !isCreator);
+
   const roleBadgesHtml = getUserRoleBadges(myUserId, myName, myLevel);
 
   const nameDisp = document.getElementById('my-name-display');
@@ -2369,7 +2413,8 @@ function renderSingleMessage(msgId, msg) {
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
         ${!isSelf ? `<button onclick="window.sendFriendRequest('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請</button>` : ''}
-        ${(isCreatorName(myName) || (typeof friendsMap !== 'undefined' && friendsMap.has(msg.userId))) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${trustedUsersSet.has(msg.userId) ? '信用解除' : '💎 信用付与'}</button>` : ''}
+        ${isCreatorName(myName) && !isSelf ? `<button onclick="window.openCreatorEffectsModal('${msg.userId}')"><i class="fa-solid fa-wand-magic-sparkles text-warning"></i> ✨ エフェクトリスト</button>` : ''}
+        ${(isCreatorName(myName) || (typeof friendsMap !== 'undefined' && friendsMap.has(msg.userId))) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${getUserEffects(msg.userId).trusted ? '信用解除' : '💎 信用付与'}</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
         ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
       </div>
@@ -5378,48 +5423,256 @@ function initGlobalFriendDmListener() {
   });
 }
 
-function initTrustedUsersListener() {
-  const trustedRef = ref(db, 'trusted_users');
-  onValue(trustedRef, (snapshot) => {
+function initUserEffectsListener() {
+  const effectsRef = ref(db, 'user_effects');
+  onValue(effectsRef, (snapshot) => {
+    userEffectsMap.clear();
     trustedUsersSet.clear();
     if (snapshot.exists()) {
-      Object.keys(snapshot.val()).forEach(uid => trustedUsersSet.add(uid));
+      const data = snapshot.val();
+      Object.entries(data).forEach(([uid, eff]) => {
+        if (eff) {
+          const trusted = !!eff.trusted;
+          const pr = !!eff.pr;
+          const initial = !!eff.initial;
+          userEffectsMap.set(uid, { trusted, pr, initial });
+          if (trusted) trustedUsersSet.add(uid);
+        }
+      });
     }
-    if (typeof updateMyProfileUI === 'function') updateMyProfileUI();
-    if (typeof renderFriendsListUI === 'function') renderFriendsListUI();
+    refreshAllUserViews();
+  });
+
+  const legacyTrustedRef = ref(db, 'trusted_users');
+  onValue(legacyTrustedRef, (snapshot) => {
+    if (snapshot.exists()) {
+      Object.keys(snapshot.val()).forEach(uid => {
+        trustedUsersSet.add(uid);
+        const current = userEffectsMap.get(uid) || { trusted: false, pr: false, initial: false };
+        current.trusted = true;
+        userEffectsMap.set(uid, current);
+      });
+    }
+    refreshAllUserViews();
   });
 }
 
-// 💎 信用ステータス切替ハンドラー (製作者「ただのネコ好き」専用)
-window.toggleTrustUser = async (targetUid, targetName) => {
-  const isCreator = isCreatorName(myName);
+function refreshAllUserViews() {
+  if (typeof updateMyProfileUI === 'function') updateMyProfileUI();
+  if (typeof renderFriendsListUI === 'function') renderFriendsListUI();
+  if (typeof renderOnlineUsersUI === 'function') renderOnlineUsersUI();
+  const modal = document.getElementById('creator-effects-modal');
+  if (modal && !modal.classList.contains('hidden')) {
+    renderCreatorEffectsListUI();
+  }
+}
 
+// 💎 信用ステータス互換切替ハンドラー
+window.toggleTrustUser = async (targetUid, targetName) => {
+  return window.toggleUserEffect(targetUid, targetName, 'trusted');
+};
+
+// ✨ 製作者「ただのネコ好き」専用エフェクト操作ハンドラー
+window.toggleUserEffect = async (targetUid, targetName, effectType) => {
+  const isCreator = isCreatorName(myName);
   if (!isCreator) {
-    showToast('⚠️ 信用ステータスを付与・解除できるのは製作者（ただのネコ好き）のみです', 'error');
+    showToast('⚠️ エフェクトを操作できるのは製作者（ただのネコ好き）のみです', 'error');
     return;
   }
 
-  const isTrusted = trustedUsersSet.has(targetUid);
-  const confirmText = isTrusted ? 
-    `「${targetName}」の信用ステータスを解除しますか？` : 
-    `「${targetName}」に【💎 信用済み】ステータスを付与しますか？`;
-
-  if (!confirm(confirmText)) return;
+  const currentEff = getUserEffects(targetUid);
+  const newEffState = !currentEff[effectType];
+  
+  const effectLabels = {
+    trusted: '💎 信用済みエフェクト',
+    pr: '📢 宣伝部隊エフェクト',
+    initial: '⭐ 初期メンバーエフェクト'
+  };
+  const label = effectLabels[effectType] || effectType;
 
   try {
-    if (isTrusted) {
-      await remove(ref(db, `trusted_users/${targetUid}`));
-      showToast(`「${targetName}」の信用ステータスを解除しました`, 'info');
-    } else {
-      await set(ref(db, `trusted_users/${targetUid}`), {
-        name: targetName,
-        trustedAt: Date.now(),
-        trustedBy: myName
-      });
-      showToast(`💎 「${targetName}」に【信用済み】ステータスを付与しました！`, 'success');
+    const updatedObj = {
+      trusted: effectType === 'trusted' ? newEffState : currentEff.trusted,
+      pr: effectType === 'pr' ? newEffState : currentEff.pr,
+      initial: effectType === 'initial' ? newEffState : currentEff.initial,
+      updatedAt: Date.now(),
+      updatedBy: myName
+    };
+
+    await set(ref(db, `user_effects/${targetUid}`), updatedObj);
+
+    if (effectType === 'trusted') {
+      if (newEffState) {
+        await set(ref(db, `trusted_users/${targetUid}`), {
+          name: targetName,
+          trustedAt: Date.now(),
+          trustedBy: myName
+        });
+      } else {
+        await remove(ref(db, `trusted_users/${targetUid}`));
+      }
     }
+
+    showToast(`「${escapeHtml(targetName)}」の【${label}】を${newEffState ? '付与' : '解除'}しました！`, 'success');
   } catch (err) {
-    console.error("Trust user error:", err);
-    showToast(`信用ステータスの更新に失敗しました: ${err.message}`, 'error');
+    console.error("Toggle user effect error:", err);
+    showToast(`エフェクトの更新に失敗しました: ${err.message}`, 'error');
   }
 };
+
+window.openCreatorEffectsModal = (selectedUid = null) => {
+  if (!isCreatorName(myName)) {
+    showToast('⚠️ 製作者（ただのネコ好き）のみ利用できる専用メニューです', 'error');
+    return;
+  }
+  const modal = document.getElementById('creator-effects-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    renderCreatorEffectsListUI(selectedUid);
+  }
+};
+
+let currentEffectFilter = 'all';
+
+function renderCreatorEffectsListUI(highlightUid = null) {
+  const listEl = document.getElementById('effect-user-card-list');
+  if (!listEl) return;
+
+  const searchInput = document.getElementById('effect-user-search-input');
+  const searchKey = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  // Collect all unique users across active online users, friends, and existing effect records
+  const userMap = new Map();
+
+  // 1. Add active online users
+  if (typeof globalOnlineUsersMap !== 'undefined' && globalOnlineUsersMap.size > 0) {
+    globalOnlineUsersMap.forEach((uData, uid) => {
+      userMap.set(uid, { uid, name: uData.name || 'ユーザー', avatar: uData.avatar || '🤖', level: uData.level || 1 });
+    });
+  }
+  if (typeof currentUsersMap !== 'undefined' && currentUsersMap.size > 0) {
+    currentUsersMap.forEach((uData, uid) => {
+      if (!userMap.has(uid)) {
+        userMap.set(uid, { uid, name: uData.name || 'ユーザー', avatar: uData.avatar || '🤖', level: uData.level || 1 });
+      }
+    });
+  }
+
+  // 2. Add friends
+  if (typeof friendsMap !== 'undefined' && friendsMap.size > 0) {
+    friendsMap.forEach((fData, uid) => {
+      if (!userMap.has(uid)) {
+        userMap.set(uid, { uid, name: fData.name || 'フレンド', avatar: fData.avatar || '🤖', level: fData.level || 1 });
+      }
+    });
+  }
+
+  // 3. Add users from userEffectsMap
+  userEffectsMap.forEach((eff, uid) => {
+    if (!userMap.has(uid)) {
+      userMap.set(uid, { uid, name: `ユーザー (${uid.substring(0,6)})`, avatar: '🤖', level: 1 });
+    }
+  });
+
+  // Always include myself
+  if (myUserId && !userMap.has(myUserId)) {
+    userMap.set(myUserId, { uid: myUserId, name: myName, avatar: myAvatar, level: myLevel });
+  }
+
+  let users = Array.from(userMap.values());
+
+  // Filter by search keyword
+  if (searchKey) {
+    users = users.filter(u => u.name.toLowerCase().includes(searchKey) || u.uid.toLowerCase().includes(searchKey));
+  }
+
+  // Filter by effect category pill
+  if (currentEffectFilter !== 'all') {
+    users = users.filter(u => {
+      const eff = getUserEffects(u.uid);
+      if (currentEffectFilter === 'trusted') return eff.trusted;
+      if (currentEffectFilter === 'pr') return eff.pr;
+      if (currentEffectFilter === 'initial') return eff.initial;
+      return true;
+    });
+  }
+
+  if (users.length === 0) {
+    listEl.innerHTML = `
+      <div style="text-align:center; padding:32px 16px; color:var(--text-muted);">
+        <i class="fa-solid fa-ghost" style="font-size:2.4rem; margin-bottom:10px; display:block; color:var(--accent-primary);"></i>
+        該当するユーザーが見つかりません
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = users.map(u => {
+    const eff = getUserEffects(u.uid);
+    const avatarGlow = getUserAvatarGlowClass(u.uid, u.name, u.level);
+    const nameClass = getUserNameClass(u.uid, u.name);
+    const badgesHtml = getUserRoleBadges(u.uid, u.name, u.level);
+    const isHighlight = u.uid === highlightUid;
+
+    return `
+      <div class="effect-user-card ${isHighlight ? 'highlight' : ''}" style="${isHighlight ? 'border-color:var(--accent-primary); box-shadow:0 0 12px rgba(0,240,255,0.4);' : ''}">
+        <div class="effect-user-card-info">
+          <div class="avatar-sm ${avatarGlow}">${renderAvatarHTML(u.avatar || '🤖')}</div>
+          <div class="effect-user-details">
+            <div class="${nameClass}">${escapeHtml(u.name)}${badgesHtml}</div>
+            <div class="effect-user-uid">ID: ${escapeHtml(u.uid)}</div>
+          </div>
+        </div>
+        <div class="effect-toggle-group">
+          <button class="effect-toggle-btn trusted ${eff.trusted ? 'active' : ''}" onclick="window.toggleUserEffect('${u.uid}', '${escapeHtml(u.name)}', 'trusted')">
+            <i class="fa-solid fa-gem"></i> 💎 信用 ${eff.trusted ? '解除' : '付与'}
+          </button>
+          <button class="effect-toggle-btn pr ${eff.pr ? 'active' : ''}" onclick="window.toggleUserEffect('${u.uid}', '${escapeHtml(u.name)}', 'pr')">
+            <i class="fa-solid fa-bullhorn"></i> 📢 宣伝部隊 ${eff.pr ? '解除' : '付与'}
+          </button>
+          <button class="effect-toggle-btn initial ${eff.initial ? 'active' : ''}" onclick="window.toggleUserEffect('${u.uid}', '${escapeHtml(u.name)}', 'initial')">
+            <i class="fa-solid fa-star"></i> ⭐ 初期メンバー ${eff.initial ? '解除' : '付与'}
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function setupCreatorEffectsControls() {
+  const btnHeader = document.getElementById('btn-open-creator-effects');
+  if (btnHeader) {
+    btnHeader.addEventListener('click', () => window.openCreatorEffectsModal());
+  }
+
+  const btnSidebar = document.getElementById('btn-sidebar-creator-effects');
+  if (btnSidebar) {
+    btnSidebar.addEventListener('click', () => window.openCreatorEffectsModal());
+  }
+
+  const modal = document.getElementById('creator-effects-modal');
+  if (modal) {
+    modal.querySelectorAll('.modal-close').forEach(b => {
+      b.addEventListener('click', () => modal.classList.add('hidden'));
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+
+    const searchInput = document.getElementById('effect-user-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => renderCreatorEffectsListUI());
+    }
+
+    const filterBtns = modal.querySelectorAll('.effect-filter-btn');
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentEffectFilter = btn.dataset.effectFilter || 'all';
+        renderCreatorEffectsListUI();
+      });
+    });
+  }
+}
