@@ -518,11 +518,6 @@
               <i class="fa-solid fa-brain text-warning"></i>
             </button>
 
-            <!-- 🐺 人狼ゲーム ボタン -->
-            <button type="button" id="btn-open-werewolf-recruitment" onclick="window.startWerewolfRecruitment()" class="btn-icon-tool" title="人狼ゲーム参加者を募集する (GM)">
-              <i class="fa-solid fa-wolf-pack-battalion text-danger"></i>
-            </button>
-
             <button type="button" id="btn-emoji-toggle" class="btn-icon-tool" title="絵文字">
               <i class="fa-regular fa-face-smile"></i>
             </button>
@@ -1514,119 +1509,6 @@
     </div>
   </div>
 
-  <!-- 🐺 オンライン人狼ゲーム モーダル -->
-  <div id="werewolf-modal" class="modal-overlay hidden">
-    <div class="modal-card glass-panel animate-scale-up" style="max-width: 620px; width: 95%;">
-      <div class="modal-header" style="background: linear-gradient(135deg, rgba(255, 51, 102, 0.25), rgba(112, 0, 255, 0.25));">
-        <h3><i class="fa-solid fa-wolf-pack-battalion text-danger"></i> 🐺 オンライン人狼ゲーム (部屋対戦)</h3>
-        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-
-      <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
-        
-        <!-- 👁️ 観覧モード通知用バナー -->
-        <div id="werewolf-spectator-banner" class="hidden" style="padding: 10px 14px; background: rgba(0, 240, 255, 0.12); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: var(--radius-md); margin-bottom: 12px; font-weight: 700; color: #00f0ff; display: flex; align-items: center; gap: 8px;">
-          <i class="fa-solid fa-eye fa-lg pulse"></i>
-          <div>
-            <div>👁️ 観覧モード (現在この部屋で人狼ゲームが進行中)</div>
-            <div style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 500; margin-top: 2px;">他プレイヤーのゲーム進行を観覧しています。途中退室・途中参加はできません。</div>
-          </div>
-        </div>
-
-        <!-- ⚠️ 中断リクエスト (/LeaveRoom) アラートバー -->
-        <div id="werewolf-leaveroom-status-bar" class="hidden" style="padding: 8px 12px; background: rgba(255, 184, 0, 0.12); border: 1px solid rgba(255, 184, 0, 0.4); border-radius: var(--radius-md); margin-bottom: 12px; font-size: 0.82rem; color: #ffb800; display: flex; align-items: center; justify-content: space-between;">
-          <span><i class="fa-solid fa-triangle-exclamation"></i> ゲーム中断 (/LeaveRoom) 同意状況:</span>
-          <span id="werewolf-leaveroom-count" style="font-weight: 800; font-size: 0.95rem;">0 / 0 人</span>
-        </div>
-
-        <!-- 状態1: ロビー画面 (ゲーム開始前) -->
-        <div id="werewolf-screen-lobby">
-          <div class="admin-section-box" style="background: rgba(255, 255, 255, 0.03);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <h4 style="margin:0;"><i class="fa-solid fa-users text-primary"></i> 参加者ロビー (<span id="werewolf-player-count">0</span>名)</h4>
-              <button type="button" id="btn-werewolf-toggle-join" class="btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> 参加する</button>
-            </div>
-            <ul id="werewolf-lobby-players-ul" style="list-style:none; padding:0; margin:0; display:grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap:8px;">
-              <!-- JS動的生成 -->
-            </ul>
-          </div>
-
-          <div style="margin-top:14px; text-align:center;">
-            <button type="button" id="btn-werewolf-start-game" class="btn-primary" style="padding: 12px 28px; font-size: 1.05rem; background: linear-gradient(135deg, #ff3366, #7000ff); border: none; box-shadow: 0 0 16px rgba(255, 51, 102, 0.4);">
-              <i class="fa-solid fa-play"></i> ゲーム開始！ (役職自動配布)
-            </button>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">※最低1名からテスト開始可能！部屋にいる他メンバーを誘って対戦しよう。</div>
-          </div>
-        </div>
-
-        <!-- 状態2: ゲームプレイ画面 (昼/夜/投票) -->
-        <div id="werewolf-screen-play" class="hidden">
-          
-          <!-- フェーズヘッダー -->
-          <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0, 0, 0, 0.4); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--glass-border); margin-bottom: 12px;">
-            <div style="font-weight: 800; font-size: 1.1rem; color: #ffb800;" id="werewolf-phase-title">
-              🌙 夜のフェーズ (1日目)
-            </div>
-            <div style="font-family: monospace; font-size: 1.1rem; font-weight: 700; color: #00f0ff;" id="werewolf-phase-timer">
-              ⏱️ --:--
-            </div>
-          </div>
-
-          <!-- 自分の役職カード -->
-          <div id="werewolf-my-role-card" style="padding: 12px 16px; border-radius: var(--radius-md); background: linear-gradient(135deg, rgba(255, 51, 102, 0.15), rgba(0, 240, 255, 0.15)); border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 12px;">
-            <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">あなたの秘密の役職:</div>
-            <div id="werewolf-my-role-name" style="font-size: 1.3rem; font-weight: 900; color: #00f0ff; margin: 2px 0;">
-              👤 役職確認中...
-            </div>
-            <div id="werewolf-my-role-desc" style="font-size: 0.8rem; color: #cbd5e1;">
-              能力説明がここに表示されます
-            </div>
-          </div>
-
-          <!-- 夜の能力アクション操作パネル -->
-          <div id="werewolf-action-panel" class="hidden" style="padding: 12px 14px; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--glass-border); border-radius: var(--radius-md); margin-bottom: 12px;">
-            <h5 style="margin:0 0 8px 0; color: var(--accent-primary);"><i class="fa-solid fa-wand-magic-sparkles"></i> <span id="werewolf-action-title">夜の行動を選択</span></h5>
-            <div id="werewolf-action-targets" style="display:flex; flex-wrap:wrap; gap:6px;">
-              <!-- 選択ボタンJS生成 -->
-            </div>
-          </div>
-
-          <!-- 投票パネル (昼の投票時) -->
-          <div id="werewolf-vote-panel" class="hidden" style="padding: 12px 14px; background: rgba(255, 51, 102, 0.1); border: 1px solid rgba(255, 51, 102, 0.3); border-radius: var(--radius-md); margin-bottom: 12px;">
-            <h5 style="margin:0 0 8px 0; color: #ff3366;"><i class="fa-solid fa-check-to-slot"></i> 処刑したい人物に投票してください</h5>
-            <div id="werewolf-vote-targets" style="display:flex; flex-wrap:wrap; gap:6px;">
-              <!-- 投票ボタンJS生成 -->
-            </div>
-          </div>
-
-          <!-- プレイヤー生死リスト -->
-          <div class="admin-section-box" style="margin-bottom: 12px;">
-            <h5 style="margin: 0 0 8px 0;"><i class="fa-solid fa-address-book"></i> 参加者の状態 (生者 / 犠牲者)</h5>
-            <div id="werewolf-players-status-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px;">
-              <!-- JS生成 -->
-            </div>
-          </div>
-
-          <!-- 人狼ゲームログ・アナウンス -->
-          <div class="admin-section-box">
-            <h5 style="margin: 0 0 6px 0;"><i class="fa-solid fa-scroll"></i> ゲーム実況ログ</h5>
-            <div id="werewolf-game-log-box" style="max-height: 140px; overflow-y: auto; font-size: 0.82rem; line-height: 1.5; color: var(--text-primary); background: rgba(0, 0, 0, 0.4); padding: 8px 10px; border-radius: var(--radius-sm);">
-              <div>🎮 ゲームを開始しました</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="font-size:0.75rem; color:var(--text-muted);">
-          ※退室したい場合はチャットで <code style="color:#ffb800; background:rgba(0,0,0,0.4); padding:2px 4px; border-radius:4px;">/LeaveRoom</code> と入力
-        </div>
-        <button class="btn-secondary modal-close">閉じる</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ⚙️ 設定モーダル (音量 & 文字サイズ) -->
   <div id="settings-modal" class="modal-overlay hidden">
     <div class="modal-card glass-panel animate-scale-up" style="max-width: 440px;">
@@ -1659,6 +1541,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Application Logic Script -->
-  <script type="module" src="app.js?v=27"></script>
+  <script type="module" src="app.js?v=28"></script>
 </body>
 </html>
