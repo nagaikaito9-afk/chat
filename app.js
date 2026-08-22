@@ -34,6 +34,8 @@ localStorage.setItem('cyberchat_user_id', myUserId);
 window.myUserId = myUserId;
 state.myUserId = myUserId;
 
+let lastMessageTime = 0;
+
 // 🐱 作者「ただのネコ好き」の学年動的計算（11月10日の誕生日で進級）
 function getCreatorGradeStr(date = new Date()) {
   const currentYear = date.getFullYear();
@@ -3436,6 +3438,7 @@ function stopBgm() {
 // WebRTC Voice Chat Implementation
 function setupVoiceChatAndRec() {
   const recBtn = document.getElementById('btn-record-voice');
+  if (!recBtn) return;
   const recBar = document.getElementById('voice-rec-preview');
   const recTimeEl = document.getElementById('voice-rec-time');
   const btnCancelRec = document.getElementById('btn-cancel-voice');
