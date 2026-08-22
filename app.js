@@ -5517,6 +5517,8 @@ function initGlobalFriendDmListener() {
       }
     }
   });
+}
+
 function refreshAllUserViews() {
   if (typeof updateMyProfileUI === 'function') updateMyProfileUI();
   if (typeof renderFriendsListUI === 'function') renderFriendsListUI();
