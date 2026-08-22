@@ -2515,17 +2515,21 @@ function renderSingleMessage(msgId, msg) {
           </div>
         </div>
       `;
-    } else if (msg.type === 'audio' || msg.type === 'voice') {
+    } else if (msg.type === 'audio' || msg.type === 'voice' || msg.audioUrl || (msg.fileUrl && (msg.fileUrl.startsWith('data:audio') || msg.fileUrl.includes('audio')))) {
       const defaultName = msg.type === 'voice' ? 'voice_message.webm' : 'audio.mp3';
       const fileName = msg.fileName || defaultName;
+      const audioSrc = msg.audioUrl || msg.fileUrl;
       contentHtml = `
         <div class="${bubbleClass}">
           ${quoteCardHtml}
-          ${msg.type === 'voice' ? '<div style="font-size:0.8rem; font-weight:600; margin-bottom:4px;"><i class="fa-solid fa-microphone text-success"></i> ボイスメッセージ</div>' : ''}
-          <audio src="${msg.fileUrl}" controls class="msg-audio"></audio>
+          <div style="font-size:0.82rem; font-weight:700; color:var(--accent-primary); margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-microphone text-danger pulse"></i>
+            <span>ボイスメッセージ ${msg.audioDuration ? `(${msg.audioDuration}秒)` : ''}</span>
+          </div>
+          <audio src="${audioSrc}" controls style="width:100%; max-width:280px; height:40px; border-radius:8px; outline:none;"></audio>
           <div class="media-download-bar" style="margin-top:6px;">
-            <button type="button" class="btn-download-media" onclick="window.downloadFile('${msg.fileUrl}', '${escapeHtml(fileName)}')" title="音声ファイルを保存">
-              <i class="fa-solid fa-download"></i> 音声ファイルをダウンロード ${msg.fileSize ? `<span class="file-size-tag">(${formatFileSize(msg.fileSize)})</span>` : ''}
+            <button type="button" class="btn-download-media" onclick="window.downloadFile('${audioSrc}', '${escapeHtml(fileName)}')" title="音声ファイルを保存">
+              <i class="fa-solid fa-download"></i> 音声をダウンロード
             </button>
           </div>
         </div>
@@ -3733,6 +3737,151 @@ function setupVoiceChatAndRec() {
       mediaRecorder.stop();
     }
   }
+}
+
+/* ==========================================================================
+   🎙️ Microphone Voice Message Recording (音声メッセージ機能)
+   ========================================================================== */
+let voiceRecorder = null;
+let voiceAudioChunks = [];
+let voiceRecordingTimer = null;
+let voiceRecordingSecs = 0;
+let voiceAudioStream = null;
+
+window.toggleVoiceRecording = async function() {
+  const bar = document.getElementById('voice-rec-bar');
+  if (voiceRecorder && voiceRecorder.state === 'recording') {
+    window.stopAndSendVoiceRecording();
+    return;
+  }
+
+  try {
+    voiceAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    voiceAudioChunks = [];
+
+    let mimeType = 'audio/webm';
+    if (typeof MediaRecorder !== 'undefined') {
+      if (!MediaRecorder.isTypeSupported('audio/webm')) {
+        if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+        else mimeType = '';
+      }
+    }
+
+    voiceRecorder = mimeType ? new MediaRecorder(voiceAudioStream, { mimeType }) : new MediaRecorder(voiceAudioStream);
+
+    voiceRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) voiceAudioChunks.push(e.data);
+    };
+
+    voiceRecorder.start(100);
+    voiceRecordingSecs = 0;
+
+    const timerDisp = document.getElementById('voice-rec-timer-display');
+    if (timerDisp) timerDisp.textContent = '00:00';
+
+    if (voiceRecordingTimer) clearInterval(voiceRecordingTimer);
+    voiceRecordingTimer = setInterval(() => {
+      voiceRecordingSecs++;
+      const m = String(Math.floor(voiceRecordingSecs / 60)).padStart(2, '0');
+      const s = String(voiceRecordingSecs % 60).padStart(2, '0');
+      if (timerDisp) timerDisp.textContent = `${m}:${s}`;
+
+      if (voiceRecordingSecs >= 60) {
+        window.stopAndSendVoiceRecording();
+      }
+    }, 1000);
+
+    if (bar) {
+      bar.classList.remove('hidden');
+      bar.style.display = 'flex';
+    }
+    showToast('🎙️ 音声メッセージ録音中... (最大60秒)', 'info');
+  } catch (err) {
+    console.error("getUserMedia error:", err);
+    showToast('マイクの使用許可が必要です', 'error');
+  }
+};
+
+window.cancelVoiceRecording = function() {
+  if (voiceRecordingTimer) clearInterval(voiceRecordingTimer);
+  if (voiceRecorder && voiceRecorder.state !== 'inactive') {
+    voiceRecorder.stop();
+  }
+  if (voiceAudioStream) {
+    voiceAudioStream.getTracks().forEach(t => t.stop());
+    voiceAudioStream = null;
+  }
+  voiceAudioChunks = [];
+  const bar = document.getElementById('voice-rec-bar');
+  if (bar) {
+    bar.classList.add('hidden');
+    bar.style.display = 'none';
+  }
+  showToast('音声メッセージの録音をキャンセルしました', 'info');
+};
+
+window.stopAndSendVoiceRecording = function() {
+  if (!voiceRecorder || voiceRecorder.state === 'inactive') return;
+
+  if (voiceRecordingTimer) clearInterval(voiceRecordingTimer);
+
+  voiceRecorder.onstop = async () => {
+    if (voiceAudioStream) {
+      voiceAudioStream.getTracks().forEach(t => t.stop());
+      voiceAudioStream = null;
+    }
+
+    const bar = document.getElementById('voice-rec-bar');
+    if (bar) {
+      bar.classList.add('hidden');
+      bar.style.display = 'none';
+    }
+
+    if (voiceAudioChunks.length === 0) {
+      showToast('録音データがありませんでした', 'warning');
+      return;
+    }
+
+    const audioBlob = new Blob(voiceAudioChunks, { type: voiceRecorder.mimeType || 'audio/webm' });
+    const reader = new FileReader();
+
+    reader.onloadend = async () => {
+      const base64Data = reader.result;
+      const targetRoomId = currentRoomId || 'public_main';
+      const newMsgRef = push(ref(db, `rooms/${targetRoomId}/messages`));
+
+      const msgObj = {
+        userId: myUserId,
+        name: myName,
+        trip: myTrip,
+        avatar: myAvatar,
+        status: myStatus,
+        level: myLevel,
+        bubbleColor: myBubbleColor,
+        type: 'voice',
+        text: '🎙️ ボイスメッセージ (音声)',
+        fileUrl: base64Data,
+        audioUrl: base64Data,
+        audioDuration: voiceRecordingSecs,
+        timestamp: Date.now()
+      };
+
+      try {
+        await set(newMsgRef, msgObj);
+        playSound('send');
+        showToast('🎙️ ボイスメッセージを送信しました！', 'success');
+      } catch (err) {
+        console.error("Voice message send error:", err);
+        showToast('ボイスメッセージの送信に失敗しました', 'error');
+      }
+    };
+
+    reader.readAsDataURL(audioBlob);
+  };
+
+  voiceRecorder.stop();
+};
 
   const btnVcToggle = document.getElementById('btn-toggle-vc');
   const btnMicToggle = document.getElementById('btn-toggle-mic');
