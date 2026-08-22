@@ -3014,7 +3014,9 @@ function setupScreenShare() {
         };
 
       } catch (err) {
-        console.warn("Screen share cancel or error:", err);
+        if (err.name !== 'NotAllowedError') {
+          console.warn("Screen share error:", err);
+        }
         showToast('画面共有がキャンセルされました');
       }
     } else {

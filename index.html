@@ -996,7 +996,7 @@
         </div>
 
         <div class="input-group">
-          <label>選択肢 <span class="required">*</span> (最小2つ、最大6つ)</label>
+          <label>選択肢 <span class="required">*</span> (最小2つ、最大8つ)</label>
           <div id="poll-options-container" class="poll-options-inputs">
             <div class="poll-opt-row">
               <input type="text" class="poll-opt-input" placeholder="選択肢 1" maxlength="30">
@@ -1008,6 +1008,18 @@
           <button type="button" id="btn-add-poll-opt" class="btn-secondary btn-sm">
             <i class="fa-solid fa-plus"></i> 選択肢を追加
           </button>
+        </div>
+
+        <!-- ⏱️ 制限時間選択 (1分〜5分) -->
+        <div class="input-group" style="margin-top:12px;">
+          <label for="poll-duration"><i class="fa-solid fa-clock text-warning"></i> 制限時間 (時間経過で結果を自動発表)</label>
+          <select id="poll-duration" class="status-select">
+            <option value="1">⏱️ 1分間</option>
+            <option value="2">⏱️ 2分間</option>
+            <option value="3" selected>⏱️ 3分間</option>
+            <option value="4">⏱️ 4分間</option>
+            <option value="5">⏱️ 5分間</option>
+          </select>
         </div>
 
         <div id="poll-error-msg" class="error-banner hidden"></div>
@@ -1514,6 +1526,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Application Logic Script -->
-  <script type="module" src="app.js?v=7"></script>
+  <script type="module" src="app.js?v=8"></script>
 </body>
 </html>
