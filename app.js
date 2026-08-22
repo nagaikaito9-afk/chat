@@ -3147,10 +3147,22 @@ window.startMathQuizGame = () => {
 
 function setupMathQuizModal() {
   const modal = document.getElementById('math-quiz-modal');
+  const openBtn = document.getElementById('btn-open-math-quiz');
+
+  if (openBtn && modal) {
+    openBtn.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+    });
+  }
+
   if (!modal) return;
 
   modal.querySelectorAll('.modal-close').forEach(b => {
     b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
   });
 
   modal.querySelectorAll('.btn-math-level-opt').forEach(btn => {
