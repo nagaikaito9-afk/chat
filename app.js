@@ -2179,7 +2179,7 @@ function initFirebaseRealtimeSync() {
     renderSingleMessage(msgId, msgData);
 
     // クイズ回答判定
-    checkQuizAnswer(msgData);
+    handleRealtimeQuizAnswerCheck(msgData);
 
     const container = document.getElementById('messages-container');
     if (container && container.children.length > 60) {
@@ -3145,7 +3145,7 @@ window.startMathQuizGame = () => {
   if (modal) modal.classList.remove('hidden');
 };
 
-async function checkQuizAnswer(msgData) {
+async function handleRealtimeQuizAnswerCheck(msgData) {
   if (!msgData || !msgData.text || msgData.type === 'system' || msgData.type === 'game') return;
 
   try {
