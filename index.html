@@ -537,34 +537,6 @@
     </main>
   </div>
 
-  <!-- 🔑 運営パスワード入力モーダル -->
-  <div id="admin-auth-modal" class="modal-overlay hidden">
-    <div class="modal-card glass-panel animate-scale-up" style="max-width: 400px;">
-      <div class="modal-header">
-        <h3 class="text-danger"><i class="fa-solid fa-user-shield"></i> 運営専用認証</h3>
-        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body">
-        <div class="input-group">
-          <label for="admin-password-input">パスワードを入力 <span class="required">*</span></label>
-          <div class="trip-input-wrapper">
-            <input type="password" id="admin-password-input" placeholder="運営パスワードを入力" required autocomplete="off">
-            <button type="button" id="toggle-admin-pass-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
-          </div>
-        </div>
-        <div class="admin-password-callout" style="margin-top:12px; padding:10px 12px; background:rgba(255,51,102,0.1); border:1px solid rgba(255,51,102,0.3); border-radius:var(--radius-md); font-size:0.8rem; color:var(--text-primary);">
-          <i class="fa-solid fa-key text-warning"></i> <strong>運営パスワード:</strong><br>
-          <code style="display:inline-block; margin-top:4px; padding:4px 8px; background:rgba(0,0,0,0.4); border-radius:4px; font-family:monospace; color:var(--accent-primary); word-break:break-all;">Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei</code>
-        </div>
-        <div id="admin-auth-error" class="error-banner hidden" style="margin-top:8px;"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary modal-close">キャンセル</button>
-        <button id="btn-submit-admin-auth" class="btn-primary danger"><i class="fa-solid fa-lock-open"></i> 認証して管理画面を開く</button>
-      </div>
-    </div>
-  </div>
-
   <!-- 👑 運営管理画面（コントロールパネル）モーダル -->
   <div id="admin-panel-modal" class="modal-overlay hidden">
     <div class="modal-card glass-panel animate-scale-up" style="max-width: 650px;">
@@ -574,26 +546,11 @@
       </div>
       <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
         
-        <!-- 🔑 運営パスワード記載ボックス -->
-        <div class="admin-section-box" style="background: rgba(255, 51, 102, 0.08); border-color: rgba(255, 51, 102, 0.3);">
-          <h4><i class="fa-solid fa-key text-warning"></i> 運営専用パスワード一覧</h4>
-          <div style="font-size:0.82rem; line-height:1.6; color:var(--text-primary);">
-            <div style="margin-bottom:6px;">
-              🔑 <strong>運営認証パスワード:</strong><br>
-              <code style="display:inline-block; padding:4px 10px; background:rgba(0,0,0,0.4); border-radius:4px; font-family:monospace; color:var(--accent-primary); word-break:break-all;">Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei</code>
-            </div>
-            <div>
-              🤖 <strong>AI APIキー解除パスワード:</strong><br>
-              <code style="display:inline-block; padding:4px 10px; background:rgba(0,0,0,0.4); border-radius:4px; font-family:monospace; color:var(--warning-color); word-break:break-all;">hatosabure-Unei-API-key</code>
-            </div>
-          </div>
-        </div>
-
         <!-- 👑 運営権限ユーザー指名（製作者用） -->
         <div class="admin-section-box" style="background: rgba(0, 240, 255, 0.06); border-color: rgba(0, 240, 255, 0.25);">
           <h4><i class="fa-solid fa-crown text-warning"></i> 👑 運営権限ユーザー指名 (製作者専用)</h4>
           <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px;">
-            製作者「ただのネコ好き」が運営に選出したユーザーは、パスワード入力なしで自由・即時に運営画面を開けるようになります。
+            製作者「ただのネコ好き」のみが運営メンバーを指名・解除できます。指名されたメンバーは運営画面を直接開けます。
           </p>
           <div id="admin-delegation-list" style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto;">
             <!-- JS動的レンダリング -->
@@ -1526,6 +1483,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Application Logic Script -->
-  <script type="module" src="app.js?v=9"></script>
+  <script type="module" src="app.js?v=12"></script>
 </body>
 </html>

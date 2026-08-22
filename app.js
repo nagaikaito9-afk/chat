@@ -1008,71 +1008,29 @@ function initBanCheckListener() {
 // 👑 運営管理システム
 function setupAdminSystem() {
   const openAuthBtn = document.getElementById('btn-open-admin-auth');
-  const authModal = document.getElementById('admin-auth-modal');
-  const passInput = document.getElementById('admin-password-input');
-  const authSubmitBtn = document.getElementById('btn-submit-admin-auth');
-  const authError = document.getElementById('admin-auth-error');
-  const togglePassVis = document.getElementById('toggle-admin-pass-vis');
-
   const panelModal = document.getElementById('admin-panel-modal');
 
-  openAuthBtn.addEventListener('click', () => {
-    if (isAdminMode || isCreatorName(myName) || adminUsersSet.has(myUserId)) {
-      isAdminMode = true;
-      window.isAdminMode = true;
-      state.isAdminMode = true;
-      localStorage.setItem('cyberchat_is_admin', 'true');
-      openAuthBtn.classList.add('active');
-      openAuthBtn.innerHTML = '<i class="fa-solid fa-crown text-warning"></i> <span>運営（認証済み）</span>';
-      openAdminPanel();
-    } else {
-      passInput.value = '';
-      authError.classList.add('hidden');
-      authModal.classList.remove('hidden');
-      passInput.focus();
-    }
-  });
-
-  document.querySelectorAll('#admin-auth-modal .modal-close').forEach(b => {
-    b.addEventListener('click', () => authModal.classList.add('hidden'));
-  });
-
-  document.querySelectorAll('#admin-panel-modal .modal-close').forEach(b => {
-    b.addEventListener('click', () => panelModal.classList.add('hidden'));
-  });
-
-  if (togglePassVis) {
-    togglePassVis.addEventListener('click', () => {
-      passInput.type = passInput.type === 'password' ? 'text' : 'password';
+  if (openAuthBtn) {
+    openAuthBtn.addEventListener('click', () => {
+      if (isAdminMode || isCreatorUser(myUserId, myName) || adminUsersSet.has(myUserId)) {
+        isAdminMode = true;
+        window.isAdminMode = true;
+        state.isAdminMode = true;
+        localStorage.setItem('cyberchat_is_admin', 'true');
+        openAuthBtn.classList.add('active');
+        openAuthBtn.innerHTML = '<i class="fa-solid fa-crown text-warning"></i> <span>運営（認証済み）</span>';
+        openAdminPanel();
+      } else {
+        showToast('🔒 運営画面は「製作者」に指名された運営メンバーのみアクセス可能です。', 'warning');
+      }
     });
   }
 
-  const handleAuthSubmit = () => {
-    authError.classList.add('hidden');
-    const inputPass = passInput.value.trim();
-
-    if (inputPass === ADMIN_PASSWORD) {
-      isAdminMode = true;
-      window.isAdminMode = true;
-      state.isAdminMode = true;
-      localStorage.setItem('cyberchat_is_admin', 'true');
-      authModal.classList.add('hidden');
-      openAuthBtn.classList.add('active');
-      openAuthBtn.innerHTML = '<i class="fa-solid fa-crown text-warning"></i> <span>運営（認証済み）</span>';
-      showToast('👑 運営認証に成功しました！管理コントロールパネルを開きます。', 'success');
-      openAdminPanel();
-      if (typeof updateMyProfileUI === 'function') updateMyProfileUI();
-      if (typeof renderFriendsListUI === 'function') renderFriendsListUI();
-    } else {
-      authError.textContent = 'パスワードが正しくありません。';
-      authError.classList.remove('hidden');
-    }
-  };
-
-  authSubmitBtn.addEventListener('click', handleAuthSubmit);
-  passInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') handleAuthSubmit();
-  });
+  if (panelModal) {
+    panelModal.querySelectorAll('.modal-close').forEach(b => {
+      b.addEventListener('click', () => panelModal.classList.add('hidden'));
+    });
+  }
 
   document.getElementById('btn-admin-clear-messages').addEventListener('click', async () => {
     if (!confirm('【警告】このルームの全メッセージを消去します。よろしいですか？')) return;
@@ -1196,15 +1154,16 @@ function renderAdminUsersTable() {
   tbody.innerHTML = '';
 
   activeUsersMap.forEach((uData, uid) => {
+    const isTargetAdmin = adminUsersSet.has(uid) || isCreatorUser(uid, uData.name);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${renderAvatarHTML(uData.avatar || '🤖')} ${escapeHtml(uData.name || '')} ${uid === myUserId ? '<strong>(あなた)</strong>' : ''}</td>
+      <td>${renderAvatarHTML(uData.avatar || '🤖')} ${escapeHtml(uData.name || '')} ${uid === myUserId ? '<strong>(あなた)</strong>' : isTargetAdmin ? '<span class="admin-badge"><i class="fa-solid fa-crown text-warning"></i> 運営</span>' : ''}</td>
       <td><span class="trip-badge">${escapeHtml(uData.trip || '')}</span></td>
       <td><code>${uid.substring(0, 8)}...</code></td>
       <td>
-        ${uid !== myUserId ? `
+        ${uid !== myUserId && !isTargetAdmin ? `
           <button class="btn-secondary btn-sm danger" onclick="window.adminBanUser('${uid}', '${escapeHtml(uData.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>
-        ` : '<span style="opacity:0.5;">-</span>'}
+        ` : '<span style="opacity:0.6; font-size:0.75rem;">🛡️ BAN不可(運営)</span>'}
       </td>
     `;
     tbody.appendChild(tr);
@@ -1290,6 +1249,10 @@ async function renderAdminReportsUI() {
 }
 
 window.adminBanUser = async (uid, name) => {
+  if (adminUsersSet.has(uid) || isCreatorUser(uid, name)) {
+    showToast(`⚠️ 運営・製作者メンバー「${name}」をBAN（追放）することはできません。`, 'warning');
+    return;
+  }
   if (!confirm(`【確認】「${name}」をBAN（アクセス禁止）にしますか？`)) return;
   try {
     await set(globalRef(`banned_users/${uid}`), {
@@ -1314,6 +1277,24 @@ window.adminBanUser = async (uid, name) => {
 };
 
 window.adminBanByName = async (name) => {
+  if (isCreatorName(name)) {
+    showToast(`⚠️ 運営・製作者メンバー「${name}」を永久BANすることはできません。`, 'warning');
+    return;
+  }
+  let isTargetAdmin = false;
+  activeUsersMap.forEach((uData, uid) => {
+    if (uData.name && uData.name.trim().toLowerCase() === name.trim().toLowerCase()) {
+      if (adminUsersSet.has(uid) || isCreatorUser(uid, uData.name)) {
+        isTargetAdmin = true;
+      }
+    }
+  });
+
+  if (isTargetAdmin) {
+    showToast(`⚠️ 運営・製作者メンバー「${name}」を永久BANすることはできません。`, 'warning');
+    return;
+  }
+
   try {
     const key = sanitizeAccountKey(name);
     let targetUid = null;
@@ -2420,7 +2401,7 @@ function renderSingleMessage(msgId, msg) {
         ${!isSelf ? `<button onclick="window.sendFriendRequest('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請</button>` : ''}
         ${isCreatorUser(myUserId, myName) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${getUserEffects(msg.userId).trusted ? '信用解除' : '💎 信用付与'}</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
-        ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
+        ${isAdminMode && !isSelf && !adminUsersSet.has(msg.userId) && !isCreatorUser(msg.userId, msg.name) ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
       </div>
     `;
 
@@ -5157,37 +5138,74 @@ window.declineFriendRequest = async (fromUid) => {
 };
 window.rejectFriendRequest = window.declineFriendRequest;
 
+window.openFriendRequestsModal = () => {
+  const modal = document.getElementById('friend-request-modal');
+  if (modal) modal.classList.remove('hidden');
+};
+
 window.sendFriendRequestByName = async (accName) => {
   if (!accName) {
     showToast('アカウント名を入力してください', 'warning');
     return;
   }
-  try {
-    const snap = await get(ref(db, 'accounts'));
-    if (!snap.exists()) {
-      showToast('指定されたアカウントが見つかりませんでした', 'error');
-      return;
+  const trimmed = accName.trim();
+  if (!trimmed) return;
+
+  let foundUid = null;
+  let foundName = trimmed;
+
+  activeUsersMap.forEach((uData, uid) => {
+    if (uData.name && uData.name.trim().toLowerCase() === trimmed.toLowerCase()) {
+      foundUid = uid;
+      foundName = uData.name;
     }
-    let foundUid = null;
-    let foundName = accName;
-    Object.entries(snap.val()).forEach(([accKey, accData]) => {
-      if (accData.username && accData.username.toLowerCase() === accName.toLowerCase()) {
-        foundUid = accData.userId || accKey;
-        foundName = accData.username;
+  });
+
+  if (!foundUid) {
+    globalOnlineUsersMap.forEach((uData, uid) => {
+      if (uData.name && uData.name.trim().toLowerCase() === trimmed.toLowerCase()) {
+        foundUid = uid;
+        foundName = uData.name;
       }
     });
-    if (!foundUid) {
-      showToast(`「${accName}」が見つかりませんでした`, 'error');
-      return;
-    }
-    if (foundUid === myUserId) {
-      showToast('自分自身にフレンド申請は送れません', 'warning');
-      return;
-    }
-    await window.sendFriendRequest(foundUid, foundName);
-  } catch (e) {
-    showToast('フレンド申請処理に失敗しました', 'error');
   }
+
+  if (!foundUid) {
+    cachedAccountNamesMap.forEach((nameVal, uid) => {
+      if (nameVal && nameVal.trim().toLowerCase() === trimmed.toLowerCase()) {
+        foundUid = uid;
+        foundName = nameVal;
+      }
+    });
+  }
+
+  if (!foundUid) {
+    try {
+      const snap = await get(ref(db, 'accounts'));
+      if (snap.exists()) {
+        Object.entries(snap.val()).forEach(([accKey, accData]) => {
+          if (accData.username && accData.username.trim().toLowerCase() === trimmed.toLowerCase()) {
+            foundUid = accData.userId || accKey;
+            foundName = accData.username;
+          }
+        });
+      }
+    } catch (e) {
+      console.error("Search accounts error:", e);
+    }
+  }
+
+  if (!foundUid) {
+    showToast(`「${trimmed}」というユーザーは見つかりませんでした`, 'error');
+    return;
+  }
+
+  if (foundUid === myUserId) {
+    showToast('自分自身にフレンド申請は送れません', 'warning');
+    return;
+  }
+
+  await window.sendFriendRequest(foundUid, foundName);
 };
 
 function setupFriendRequestsModal() {
@@ -5197,7 +5215,7 @@ function setupFriendRequestsModal() {
   const inputSearch = document.getElementById('friend-search-username-input');
 
   if (btnOpen && modal) {
-    btnOpen.addEventListener('click', () => modal.classList.remove('hidden'));
+    btnOpen.addEventListener('click', () => window.openFriendRequestsModal());
   }
 
   if (modal) {
