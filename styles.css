@@ -4818,3 +4818,76 @@ body.device-pc .sidebar-close-btn {
     font-size: 1.08rem !important;
   }
 }
+
+/* ==========================================================================
+   🧮 Calculator Quiz Creator Keypad Styles
+   ========================================================================== */
+.calc-btn {
+  padding: 10px 4px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+.calc-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+.calc-btn:active {
+  transform: translateY(1px);
+}
+.calc-btn.num {
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.25);
+  color: #00f0ff;
+}
+.calc-btn.num:hover {
+  background: rgba(0, 240, 255, 0.2);
+}
+.calc-btn.op {
+  background: rgba(255, 184, 0, 0.12);
+  border-color: rgba(255, 184, 0, 0.35);
+  color: #ffb800;
+}
+.calc-btn.op:hover {
+  background: rgba(255, 184, 0, 0.25);
+}
+.calc-btn.spec {
+  background: rgba(112, 0, 255, 0.15);
+  border-color: rgba(112, 0, 255, 0.35);
+  color: #b870ff;
+}
+.calc-btn.spec:hover {
+  background: rgba(112, 0, 255, 0.3);
+}
+.calc-btn.del {
+  background: rgba(255, 51, 102, 0.18);
+  border-color: rgba(255, 51, 102, 0.4);
+  color: #ff3366;
+}
+.calc-btn.del:hover {
+  background: rgba(255, 51, 102, 0.35);
+}
+
+/* 📱 Compact Layout Refinement (全体的にコンパクト化) */
+.math-quiz-card {
+  max-width: 420px !important;
+  padding: 10px 14px !important;
+  margin: 6px 0 !important;
+  border-radius: 10px !important;
+}
+.math-quiz-question-box {
+  padding: 8px 10px !important;
+  margin: 6px 0 !important;
+}
+.math-quiz-question-text {
+  font-size: 1.12rem !important;
+}

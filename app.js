@@ -6494,4 +6494,108 @@ function setupDragAndDropFileUpload() {
   });
 }
 
+/* ==========================================================================
+   🧮 Calculator Custom Math Quiz Creation (電卓キーパッド式オリジナルクイズ出題)
+   ========================================================================== */
+window.openCustomQuizModal = () => {
+  const modal = document.getElementById('custom-quiz-modal');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.appendCalcSymbol = (sym) => {
+  const display = document.getElementById('quiz-calc-display');
+  if (display) {
+    display.value += sym;
+    display.focus();
+  }
+};
+
+window.backspaceCalcDisplay = () => {
+  const display = document.getElementById('quiz-calc-display');
+  if (display && display.value) {
+    display.value = display.value.slice(0, -1);
+    display.focus();
+  }
+};
+
+window.clearCalcDisplay = () => {
+  const display = document.getElementById('quiz-calc-display');
+  if (display) {
+    display.value = '';
+    display.focus();
+  }
+};
+
+window.publishCustomQuizFromCalc = async () => {
+  const display = document.getElementById('quiz-calc-display');
+  const answerInput = document.getElementById('quiz-calc-answer');
+  const levelSelect = document.getElementById('quiz-calc-level');
+
+  const question = display ? display.value.trim() : '';
+  const answer = answerInput ? answerInput.value.trim() : '';
+  const levelKey = levelSelect ? levelSelect.value : 'normal';
+
+  if (!question) {
+    showToast('問題文/数式を電卓キーパッドで入力してください', 'warning');
+    return;
+  }
+  if (!answer) {
+    showToast('正解の解答（文字/数字）を入力してください', 'warning');
+    return;
+  }
+
+  const levelMap = {
+    easy: { badge: '簡単', pts: 50, color: '#00ff88' },
+    normal: { badge: '普通', pts: 80, color: '#ffb800' },
+    hard: { badge: '難しい', pts: 120, color: '#ff3366' },
+    very_hard: { badge: 'すごく難しい', pts: 200, color: '#b870ff' },
+    ultra_hard: { badge: 'ものすごく難しい', pts: 350, color: '#00f0ff' }
+  };
+  const lvlInfo = levelMap[levelKey] || levelMap.normal;
+
+  const quizObj = {
+    id: 'quiz_' + Date.now(),
+    badge: lvlInfo.badge,
+    pts: lvlInfo.pts,
+    question: question,
+    answer: answer,
+    creatorUid: myUserId,
+    creatorName: myName,
+    createdAt: Date.now()
+  };
+
+  try {
+    const targetRoomId = currentRoomId || 'public_main';
+    await set(ref(db, `rooms/${targetRoomId}/active_math_quiz`), quizObj);
+
+    const quizCardHtml = `
+      <div class="math-quiz-card" style="max-width: 420px !important;">
+        <div class="math-quiz-header">
+          <span class="math-quiz-badge" style="color: ${lvlInfo.color} !important;"><i class="fa-solid fa-calculator"></i> 🧠 【出題クイズ】</span>
+          <span class="math-quiz-level">${lvlInfo.badge} (+${lvlInfo.pts} EXP)</span>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">出題者: <strong>${escapeHtml(myName)}</strong> さん</div>
+        <div class="math-quiz-question-box">
+          <div class="math-quiz-label">問題:</div>
+          <div class="math-quiz-question-text">${escapeHtml(question)}</div>
+        </div>
+        <div class="math-quiz-footer-hint">💡 チャット欄に正解を文字/数字で直接発言してください！</div>
+      </div>
+    `;
+
+    await sendSystemAnnouncementMessage(quizCardHtml);
+    playSound('fanfare');
+    showToast(`🧮 クイズ [${lvlInfo.badge}] をチャットに出題しました！`, 'success');
+
+    const modal = document.getElementById('custom-quiz-modal');
+    if (modal) modal.classList.add('hidden');
+
+    if (display) display.value = '';
+    if (answerInput) answerInput.value = '';
+  } catch (err) {
+    console.error("publishCustomQuizFromCalc error:", err);
+    showToast('クイズの出題に失敗しました', 'error');
+  }
+};
+
 
