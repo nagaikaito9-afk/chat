@@ -3113,7 +3113,6 @@ function setupStampsAndMinigames() {
 }
 
 // 🛡️ Anti-Spam Rate Limiter & Flood Prevention
-let lastMessageTime = 0;
 const MESSAGE_COOLDOWN_MS = 1200;
 
 function checkAntiSpam(text) {

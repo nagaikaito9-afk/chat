@@ -3842,11 +3842,12 @@ body.device-pc .sidebar-close-btn {
 }
 
 .auth-author-tag {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px auto 0 auto;
   padding: 8px 16px;
   font-size: 0.85rem;
   font-weight: 500;
@@ -3857,7 +3858,9 @@ body.device-pc .sidebar-close-btn {
   box-shadow: 0 0 12px rgba(0, 240, 255, 0.12);
   line-height: 1.5;
   text-align: center;
-  word-break: break-word;
+  word-break: keep-all;
+  max-width: 100%;
+  width: max-content;
 }
 
 .auth-tabs {
