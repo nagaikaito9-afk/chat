@@ -864,6 +864,7 @@ function initApp() {
   setupScreenShare();
   setupPaintModal();
   setupMathQuizModal();
+  setupCustomQuizModal();
   setupReplyBanner();
   setupAdminSystem();
   setupFriendModalControls();
@@ -3280,6 +3281,27 @@ function setupMathQuizModal() {
         showToast(`🧠 「${quizData.badge}」を出題しました！`, 'info');
       }
     });
+  });
+}
+
+function setupCustomQuizModal() {
+  const modal = document.getElementById('custom-quiz-modal');
+  const openBtn = document.getElementById('btn-open-custom-quiz');
+
+  if (openBtn && modal) {
+    openBtn.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+    });
+  }
+
+  if (!modal) return;
+
+  modal.querySelectorAll('.modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
   });
 }
 
