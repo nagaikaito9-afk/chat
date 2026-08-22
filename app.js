@@ -3737,7 +3737,6 @@ function setupVoiceChatAndRec() {
       mediaRecorder.stop();
     }
   }
-}
 
 /* ==========================================================================
    🎙️ Microphone Voice Message Recording (音声メッセージ機能)
