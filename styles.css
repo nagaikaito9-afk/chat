@@ -4892,3 +4892,64 @@ body.device-pc .sidebar-close-btn {
 .math-quiz-question-text {
   font-size: 1.12rem !important;
 }
+
+/* ==========================================================================
+   👤 ユーザー詳細プロフィール閲覧モーダル (.user-detail-card-wrapper)
+   ========================================================================== */
+.user-detail-card-wrapper {
+  background: rgba(15, 23, 42, 0.9) !important;
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(0, 240, 255, 0.3) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 240, 255, 0.2) !important;
+}
+
+.user-profile-avatar {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.user-profile-avatar-wrapper:hover .user-profile-avatar {
+  transform: scale(1.08) rotate(3deg);
+  box-shadow: 0 10px 25px rgba(0, 240, 255, 0.4) !important;
+}
+
+.udp-stat-card {
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.udp-stat-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-primary) !important;
+  background: rgba(0, 240, 255, 0.1) !important;
+}
+
+/* ==========================================================================
+   ⌨️ スピードタイピング対戦 (.typing-battle-card-wrapper)
+   ========================================================================== */
+.typing-battle-card-wrapper {
+  background: rgba(15, 23, 42, 0.92) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(0, 240, 255, 0.35) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 35px rgba(0, 240, 255, 0.25) !important;
+}
+
+.pc-only-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  animation: pulse 2s infinite;
+}
+
+.tb-word-box {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.typing-challenge-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.typing-challenge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 240, 255, 0.3) !important;
+}

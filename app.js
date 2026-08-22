@@ -39,10 +39,7 @@ window.startMathQuizGame = function() {
   if (modal) modal.classList.remove('hidden');
 };
 
-window.openCustomQuizModal = function() {
-  const modal = document.getElementById('custom-quiz-modal');
-  if (modal) modal.classList.remove('hidden');
-};
+
 
 let lastMessageTime = 0;
 
@@ -103,6 +100,7 @@ state.myName = myName;
 let myTrip = '◆(なし)';
 let myAvatar = localStorage.getItem('cyberchat_user_avatar') || '🤖';
 let myStatus = '💬 雑談歓迎';
+let myBio = localStorage.getItem('cyberchat_user_bio') || '';
 let myBubbleColor = localStorage.getItem('cyberchat_bubble_color') || '#00f0ff';
 let myLevel = parseInt(localStorage.getItem('cyberchat_user_level') || '1');
 let myExp = parseInt(localStorage.getItem('cyberchat_user_exp') || '0');
@@ -874,7 +872,7 @@ function initApp() {
   setupScreenShare();
   setupPaintModal();
   setupMathQuizModal();
-  setupCustomQuizModal();
+  setupTypingBattleModal();
   setupReplyBanner();
   setupAdminSystem();
   setupFriendModalControls();
@@ -910,6 +908,7 @@ async function registerOnlineUser() {
       name: myName,
       avatar: myAvatar,
       status: myStatus,
+      bio: myBio,
       trip: myTrip,
       level: myLevel,
       bubbleColor: myBubbleColor,
@@ -928,6 +927,7 @@ async function registerOnlineUser() {
       name: myName,
       avatar: myAvatar,
       status: myStatus,
+      bio: myBio,
       level: myLevel,
       bubbleColor: myBubbleColor,
       joinedMonth: joinedM,
@@ -1965,6 +1965,29 @@ function updateMyProfileUI() {
   const statusDisp = document.getElementById('my-status-display');
   if (statusDisp) statusDisp.textContent = myStatus;
 
+  const btnViewMyProfile = document.getElementById('btn-view-my-profile');
+  if (btnViewMyProfile) {
+    btnViewMyProfile.onclick = () => {
+      if (typeof window.openUserProfileModal === 'function') {
+        window.openUserProfileModal(myUserId);
+      }
+    };
+  }
+  if (avatarDisp) {
+    avatarDisp.onclick = () => {
+      if (typeof window.openUserProfileModal === 'function') {
+        window.openUserProfileModal(myUserId);
+      }
+    };
+  }
+  if (nameDisp) {
+    nameDisp.onclick = () => {
+      if (typeof window.openUserProfileModal === 'function') {
+        window.openUserProfileModal(myUserId);
+      }
+    };
+  }
+
   const joinPrev = document.getElementById('join-avatar-preview');
   if (joinPrev) joinPrev.innerHTML = renderAvatarHTML(myAvatar);
 
@@ -2434,6 +2457,7 @@ function renderSingleMessage(msgId, msg) {
         <i class="fa-solid fa-ellipsis-vertical"></i>
       </button>
       <div id="msg-menu-${msgId}" class="msg-dropdown-menu hidden animate-scale-up">
+        <button onclick="window.openUserProfileModal('${msg.userId}')"><i class="fa-solid fa-address-card text-info"></i> プロフィール</button>
         <button onclick="window.replyToMsg('${msgId}')"><i class="fa-solid fa-reply text-primary"></i> 返信</button>
         <button onclick="window.toggleStarMsg('${msgId}')"><i class="fa-solid fa-star ${isStarred ? 'text-warning' : ''}"></i> ${isStarred ? 'しおり解除' : 'しおり保存'}</button>
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button onclick="window.openEditMsgModal('${msgId}')"><i class="fa-solid fa-pen"></i> 編集</button>` : ''}
@@ -2459,8 +2483,8 @@ function renderSingleMessage(msgId, msg) {
 
     const metaHtml = `
       <div class="msg-meta">
-        <span class="msg-avatar-icon ${avatarGlowClass}">${renderAvatarHTML(msg.avatar || '🤖')}</span>
-        <span class="${senderClass}">${starBadge}${whisperHeader} ${escapeHtml(msg.name)}${roleBadgesHtml} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
+        <span class="msg-avatar-icon ${avatarGlowClass}" style="cursor:pointer;" onclick="window.openUserProfileModal('${msg.userId}')" title="プロフィールを見る">${renderAvatarHTML(msg.avatar || '🤖')}</span>
+        <span class="${senderClass}" style="cursor:pointer;" onclick="window.openUserProfileModal('${msg.userId}')" title="プロフィールを見る">${starBadge}${whisperHeader} ${escapeHtml(msg.name)}${roleBadgesHtml} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
         <span class="msg-time">${formatTime(msg.timestamp)}${readCountTag} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
     `;
@@ -3298,42 +3322,7 @@ function setupMathQuizModal() {
   });
 }
 
-function setupCustomQuizModal() {
-  const modal = document.getElementById('custom-quiz-modal');
-  const openBtn = document.getElementById('btn-open-custom-quiz');
-  const submitBtn = document.getElementById('btn-submit-custom-quiz');
 
-  if (openBtn && modal) {
-    openBtn.addEventListener('click', () => {
-      modal.classList.remove('hidden');
-      modal.style.display = 'flex';
-    });
-  }
-
-  if (submitBtn) {
-    submitBtn.addEventListener('click', () => {
-      if (typeof window.publishCustomQuizFromCalc === 'function') {
-        window.publishCustomQuizFromCalc();
-      }
-    });
-  }
-
-  if (!modal) return;
-
-  modal.querySelectorAll('.modal-close').forEach(b => {
-    b.addEventListener('click', () => {
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
-    });
-  });
-
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
-    }
-  });
-}
 
 // 🛡️ Anti-Spam Rate Limiter & Flood Prevention
 const MESSAGE_COOLDOWN_MS = 1200;
@@ -4623,6 +4612,7 @@ function setupProfileModal() {
   const saveBtn = document.getElementById('btn-save-profile');
   const usernameInput = document.getElementById('edit-username');
   const statusInput = document.getElementById('edit-status');
+  const bioInput = document.getElementById('edit-bio');
   const tripkeyInput = document.getElementById('edit-tripkey');
   const recEmailInput = document.getElementById('edit-recovery-email');
   const errorMsg = document.getElementById('edit-profile-error');
@@ -4630,6 +4620,7 @@ function setupProfileModal() {
   openBtn.addEventListener('click', () => {
     usernameInput.value = myName;
     statusInput.value = myStatus;
+    if (bioInput) bioInput.value = myBio;
     tripkeyInput.value = '';
     if (recEmailInput) recEmailInput.value = localStorage.getItem('cyberchat_recovery_email') || '';
     document.getElementById('edit-trip-preview-code').textContent = myTrip;
@@ -4645,6 +4636,7 @@ function setupProfileModal() {
     errorMsg.classList.add('hidden');
     const newName = usernameInput.value.trim();
     const newStatus = statusInput.value;
+    const newBio = bioInput ? bioInput.value.trim() : '';
     const newTripKey = tripkeyInput.value;
     const newRecEmail = recEmailInput ? recEmailInput.value.trim() : '';
 
@@ -4669,6 +4661,8 @@ function setupProfileModal() {
       const oldName = myName;
       myName = newName;
       myStatus = newStatus;
+      myBio = newBio;
+      localStorage.setItem('cyberchat_user_bio', newBio);
       if (newTripKey) myTrip = await generateTrip(newTripKey);
       if (newRecEmail) localStorage.setItem('cyberchat_recovery_email', newRecEmail);
 
@@ -4679,6 +4673,7 @@ function setupProfileModal() {
             username: myName,
             avatar: myAvatar,
             status: myStatus,
+            bio: myBio,
             recoveryEmail: newRecEmail,
             lastLoginAt: Date.now()
           });
@@ -6417,7 +6412,7 @@ function renderUnifiedSidebarUserList() {
     }
 
     li.innerHTML = `
-      <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+      <div style="display:flex; align-items:center; gap:8px; overflow:hidden; cursor:pointer;" onclick="window.openUserProfileModal('${u.userId}')" title="プロフィールを見る">
         <div class="avatar-sm">${renderAvatarHTML(u.avatar || '🤖')}</div>
         <div style="overflow:hidden;">
           <div style="font-weight:600; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
@@ -6691,107 +6686,520 @@ function setupDragAndDropFileUpload() {
 }
 
 /* ==========================================================================
-   🧮 Calculator Custom Math Quiz Creation (電卓キーパッド式オリジナルクイズ出題)
+   👤 ユーザー詳細プロフィール表示機能 (User Detail Profile Modal)
    ========================================================================== */
-window.openCustomQuizModal = () => {
-  const modal = document.getElementById('custom-quiz-modal');
-  if (modal) modal.classList.remove('hidden');
+window.openUserProfileModal = async function(userDataOrId) {
+  const modal = document.getElementById('user-detail-profile-modal');
+  if (!modal) return;
+
+  let targetUser = null;
+
+  if (typeof userDataOrId === 'string') {
+    const targetUid = userDataOrId;
+    if (targetUid === myUserId) {
+      targetUser = {
+        userId: myUserId,
+        name: myName,
+        avatar: myAvatar,
+        trip: myTrip,
+        status: myStatus,
+        bio: myBio,
+        level: myLevel,
+        exp: myExp
+      };
+    } else {
+      const onlineUser = (window.onlineUsersList || []).find(u => u.userId === targetUid);
+      if (onlineUser) {
+        targetUser = { ...onlineUser };
+      } else {
+        try {
+          const snapshot = await get(ref(db, `global_online_users/${targetUid}`));
+          if (snapshot && snapshot.exists()) {
+            targetUser = snapshot.val();
+          }
+        } catch (e) {
+          console.warn("Failed to fetch user profile:", e);
+        }
+      }
+    }
+
+    if (!targetUser) {
+      targetUser = {
+        userId: targetUid,
+        name: 'ユーザー',
+        avatar: '🤖',
+        trip: '◆------',
+        status: '💬 雑談歓迎',
+        bio: '自己紹介文はありません。',
+        level: 1,
+        exp: 0
+      };
+    }
+  } else if (typeof userDataOrId === 'object' && userDataOrId !== null) {
+    targetUser = userDataOrId;
+  }
+
+  if (!targetUser) return;
+
+  const isSelf = targetUser.userId === myUserId;
+
+  const avatarEl = document.getElementById('udp-avatar');
+  const nameEl = document.getElementById('udp-username');
+  const tripEl = document.getElementById('udp-trip');
+  const levelEl = document.getElementById('udp-level');
+  const rankBadgeEl = document.getElementById('udp-rank-badge');
+  const statusEl = document.getElementById('udp-status');
+  const bioEl = document.getElementById('udp-bio');
+  const expTextEl = document.getElementById('udp-exp-text');
+  const expFillEl = document.getElementById('udp-exp-bar-fill');
+  
+  const msgStatEl = document.getElementById('udp-stat-messages');
+  const quizStatEl = document.getElementById('udp-stat-quiz');
+  const friendStatEl = document.getElementById('udp-stat-friends');
+
+  const btnDm = document.getElementById('udp-btn-dm');
+  const btnFriend = document.getElementById('udp-btn-friend');
+  const btnEdit = document.getElementById('udp-btn-edit');
+
+  if (avatarEl) avatarEl.innerHTML = renderAvatarHTML(targetUser.avatar || '🤖');
+  if (nameEl) nameEl.textContent = targetUser.name || 'ユーザー';
+  if (tripEl) tripEl.textContent = targetUser.trip || '◆------';
+  
+  const userLevel = targetUser.level || 1;
+  if (levelEl) levelEl.textContent = `Lv.${userLevel}`;
+  if (statusEl) statusEl.textContent = targetUser.status || '💬 雑談歓迎';
+  if (bioEl) bioEl.textContent = targetUser.bio || (isSelf ? (myBio || '自己紹介文はまだ設定されていません。') : '自己紹介文はまだ設定されていません。');
+
+  const userExp = targetUser.exp || (isSelf ? myExp : 0);
+  const nextExp = getNextLevelExp(userLevel);
+  const pct = Math.min(100, Math.max(0, Math.floor((userExp / nextExp) * 100)));
+  if (expTextEl) expTextEl.textContent = `${userExp} / ${nextExp} EXP`;
+  if (expFillEl) expFillEl.style.width = `${pct}%`;
+
+  if (rankBadgeEl) {
+    if (userLevel >= 50) rankBadgeEl.textContent = '👑 チャット神';
+    else if (userLevel >= 30) rankBadgeEl.textContent = '🌟 エリートマスター';
+    else if (userLevel >= 20) rankBadgeEl.textContent = '⚡ 常連メンバー';
+    else if (userLevel >= 10) rankBadgeEl.textContent = '🔥 駆け出しチャッター';
+    else rankBadgeEl.textContent = '🔰 チャットビギナー';
+  }
+
+  if (msgStatEl) msgStatEl.textContent = targetUser.messagesCount || (isSelf ? (parseInt(localStorage.getItem('cyberchat_msg_count') || '12')) : '-');
+  if (quizStatEl) quizStatEl.textContent = targetUser.quizCount || (isSelf ? (parseInt(localStorage.getItem('cyberchat_quiz_win_count') || '3')) : '-');
+  if (friendStatEl) friendStatEl.textContent = targetUser.friendsCount || (isSelf ? friendsMap.size : '-');
+
+  if (isSelf) {
+    if (btnDm) btnDm.classList.add('hidden');
+    if (btnFriend) btnFriend.classList.add('hidden');
+    if (btnEdit) {
+      btnEdit.classList.remove('hidden');
+      btnEdit.onclick = () => {
+        modal.classList.add('hidden');
+        const editModal = document.getElementById('profile-modal');
+        if (editModal) editModal.classList.remove('hidden');
+      };
+    }
+  } else {
+    if (btnEdit) btnEdit.classList.add('hidden');
+    if (btnDm) {
+      btnDm.classList.remove('hidden');
+      btnDm.onclick = () => {
+        modal.classList.add('hidden');
+        if (typeof window.startWhisper === 'function') {
+          window.startWhisper(targetUser.userId, targetUser.name);
+        }
+      };
+    }
+    if (btnFriend) {
+      btnFriend.classList.remove('hidden');
+      btnFriend.onclick = () => {
+        if (typeof window.sendFriendRequest === 'function') {
+          window.sendFriendRequest(targetUser.userId, targetUser.name);
+        }
+      };
+    }
+  }
+
+  const closeBtns = modal.querySelectorAll('.modal-close');
+  closeBtns.forEach(btn => {
+    btn.onclick = () => modal.classList.add('hidden');
+  });
+
+  modal.classList.remove('hidden');
 };
 
-window.appendCalcSymbol = (sym) => {
-  const display = document.getElementById('quiz-calc-display');
-  if (display) {
-    display.value += sym;
-    display.focus();
+/* ==========================================================================
+   ⌨️ PC-Only Speed Typing Battle Engine (タイピング対戦機能)
+   ========================================================================== */
+
+// 💻 PCユーザー判定 (タッチデバイス・モバイルモード排他)
+function checkIsPCUser() {
+  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isSmallWidth = window.innerWidth < 768;
+  const isMobileMode = typeof deviceMode !== 'undefined' && deviceMode === 'mobile';
+  
+  if (isMobileMode || (hasTouch && isSmallWidth)) {
+    return false;
   }
+  return true;
+}
+
+// 📚 お題辞書データ
+const TYPING_DICTIONARIES = {
+  math: [
+    { jp: "三平方の定理", roma: "sanheihounoteiri" },
+    { jp: "二次関数", roma: "nijikansuu" },
+    { jp: "微分積分学", roma: "bibunsekibungaku" },
+    { jp: "ピタゴラスの定理", roma: "pitagorasunoteiri" },
+    { jp: "虚数単位", roma: "kyosuutani" },
+    { jp: "確率統計", roma: "kakuritutoukei" },
+    { jp: "黄金比", roma: "ougonhi" },
+    { jp: "素数判定", roma: "sosuhantei" },
+    { jp: "三角関数", roma: "sankakukansuu" },
+    { jp: "指数対数", roma: "sikutaitusu" },
+    { jp: "行列の計算", roma: "gyouretunokeisan" },
+    { jp: "円周率", roma: "ensyuuritu" }
+  ],
+  code: [
+    { jp: "JavaScript", roma: "javascript" },
+    { jp: "Web Application", roma: "webapplication" },
+    { jp: "Algorithm", roma: "algorithm" },
+    { jp: "Frontend Developer", roma: "frontenddeveloper" },
+    { jp: "Cyber Security", roma: "cybersecurity" },
+    { jp: "Realtime Communication", roma: "realtimecommunication" },
+    { jp: "Database Management", roma: "databasemanagement" },
+    { jp: "Object Oriented", roma: "objectoriented" },
+    { jp: "Async Function", roma: "asyncfunction" },
+    { jp: "Keyboard Shortcut", roma: "keyboardshortcut" }
+  ],
+  daily: [
+    { jp: "こんにちは！", roma: "konnichiha" },
+    { jp: "よろしくお願いします", roma: "yorosikuonegaisimasu" },
+    { jp: "リアルタイムチャット", roma: "realtimechat" },
+    { jp: "タイピングスピード対戦", roma: "typingspeedtaisen" },
+    { jp: "爆速レスポンス", roma: "bakusokuresuponsu" },
+    { jp: "今日も一日お疲れ様！", roma: "kyoumoitinitiotukaresama" },
+    { jp: "サイバー空間", roma: "saibaakuukan" },
+    { jp: "キーボード打鍵", roma: "kiiboododaken" },
+    { jp: "ハイハイスコア", roma: "haihaisukoa" },
+    { jp: "友達と一緒に遊ぼう", roma: "tomodatitoisshoniasobou" }
+  ],
+  quotes: [
+    { jp: "習うより慣れよ", roma: "narauyorinareyo" },
+    { jp: "継続は力なり", roma: "keizokuhachikaranari" },
+    { jp: "千里の道も一歩から", roma: "senrinomichimoippokara" },
+    { jp: "案ずるより生むが易し", roma: "anzuruyoriumugayasisi" },
+    { jp: "温故知新", roma: "onkochisin" },
+    { jp: "一期一会", roma: "ichigoichie" }
+  ]
 };
 
-window.backspaceCalcDisplay = () => {
-  const display = document.getElementById('quiz-calc-display');
-  if (display && display.value) {
-    display.value = display.value.slice(0, -1);
-    display.focus();
-  }
+// 🎮 タイピングゲーム状態変数
+let tbState = {
+  isPlaying: false,
+  category: 'daily',
+  timer: null,
+  timeLeft: 30,
+  wordsList: [],
+  wordIndex: 0,
+  currentWord: null,
+  typedRoma: '',
+  totalKeys: 0,
+  correctKeys: 0,
+  wrongKeys: 0,
+  combo: 0,
+  maxCombo: 0,
+  wpm: 0,
+  accuracy: 100,
+  rank: 'C'
 };
 
-window.clearCalcDisplay = () => {
-  const display = document.getElementById('quiz-calc-display');
-  if (display) {
-    display.value = '';
-    display.focus();
-  }
-};
+function setupTypingBattleModal() {
+  const modal = document.getElementById('typing-battle-modal');
+  const openBtn = document.getElementById('btn-open-typing-battle');
+  const startBtn = document.getElementById('tb-btn-start');
+  const retryBtn = document.getElementById('tb-btn-retry');
+  const publishBtn = document.getElementById('tb-btn-publish');
+  const hiddenInput = document.getElementById('tb-hidden-input');
 
-window.publishCustomQuizFromCalc = async () => {
-  const display = document.getElementById('quiz-calc-display');
-  const answerInput = document.getElementById('quiz-calc-answer');
-  const levelSelect = document.getElementById('quiz-calc-level');
+  if (!modal) return;
 
-  const question = display ? display.value.trim() : '';
-  const answer = answerInput ? answerInput.value.trim() : '';
-  const levelKey = levelSelect ? levelSelect.value : 'normal';
-
-  if (!question) {
-    showToast('問題文/数式を電卓キーパッドで入力してください', 'warning');
-    return;
-  }
-  if (!answer) {
-    showToast('正解の解答（文字/数字）を入力してください', 'warning');
-    return;
+  if (openBtn) {
+    openBtn.addEventListener('click', () => {
+      if (!checkIsPCUser()) {
+        showToast('💻 タイピング対戦はパソコン(物理キーボード)限定の機能です。PCからアクセスしてください。', 'warning');
+        return;
+      }
+      resetTypingGameUI();
+      modal.classList.remove('hidden');
+    });
   }
 
-  const levelMap = {
-    easy: { badge: '簡単', pts: 50, color: '#00ff88' },
-    normal: { badge: '普通', pts: 80, color: '#ffb800' },
-    hard: { badge: '難しい', pts: 120, color: '#ff3366' },
-    very_hard: { badge: 'すごく難しい', pts: 200, color: '#b870ff' },
-    ultra_hard: { badge: 'ものすごく難しい', pts: 350, color: '#00f0ff' }
+  modal.querySelectorAll('.modal-close').forEach(b => {
+    b.addEventListener('click', () => {
+      stopTypingGame();
+      modal.classList.add('hidden');
+    });
+  });
+
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      startTypingGame();
+    });
+  }
+
+  if (retryBtn) {
+    retryBtn.addEventListener('click', () => {
+      resetTypingGameUI();
+    });
+  }
+
+  if (publishBtn) {
+    publishBtn.addEventListener('click', async () => {
+      await publishTypingScoreToChat();
+      modal.classList.add('hidden');
+    });
+  }
+
+  if (hiddenInput) {
+    hiddenInput.addEventListener('input', (e) => {
+      if (!tbState.isPlaying) return;
+      handleTypingInput(e.target.value);
+    });
+
+    const playScreen = document.getElementById('tb-screen-play');
+    if (playScreen) {
+      playScreen.addEventListener('click', () => {
+        if (tbState.isPlaying) hiddenInput.focus();
+      });
+    }
+  }
+}
+
+function resetTypingGameUI() {
+  stopTypingGame();
+
+  document.getElementById('tb-screen-setup')?.classList.remove('hidden');
+  document.getElementById('tb-screen-play')?.classList.add('hidden');
+  document.getElementById('tb-screen-result')?.classList.add('hidden');
+}
+
+function startTypingGame() {
+  const catSelect = document.getElementById('tb-category-select');
+  const category = catSelect ? catSelect.value : 'daily';
+  
+  const rawList = TYPING_DICTIONARIES[category] || TYPING_DICTIONARIES.daily;
+  const wordsList = [...rawList].sort(() => Math.random() - 0.5);
+
+  tbState = {
+    isPlaying: true,
+    category: category,
+    timer: null,
+    timeLeft: 30,
+    wordsList: wordsList,
+    wordIndex: 0,
+    currentWord: wordsList[0],
+    typedRoma: '',
+    totalKeys: 0,
+    correctKeys: 0,
+    wrongKeys: 0,
+    combo: 0,
+    maxCombo: 0,
+    wpm: 0,
+    accuracy: 100,
+    rank: 'C'
   };
-  const lvlInfo = levelMap[levelKey] || levelMap.normal;
 
-  const quizObj = {
-    id: 'quiz_' + Date.now(),
-    badge: lvlInfo.badge,
-    pts: lvlInfo.pts,
-    question: question,
-    answer: answer,
-    acceptedAnswers: [answer, answer.toLowerCase(), answer.replace(/\s+/g, '')],
-    creatorUid: myUserId,
-    creatorName: myName,
-    createdAt: Date.now()
+  document.getElementById('tb-screen-setup')?.classList.add('hidden');
+  document.getElementById('tb-screen-result')?.classList.add('hidden');
+  document.getElementById('tb-screen-play')?.classList.remove('hidden');
+
+  const hiddenInput = document.getElementById('tb-hidden-input');
+  if (hiddenInput) {
+    hiddenInput.value = '';
+    hiddenInput.focus();
+  }
+
+  updateTypingWordDisplay();
+  updateTypingStatsDisplay();
+
+  tbState.timer = setInterval(() => {
+    tbState.timeLeft--;
+    if (tbState.timeLeft <= 0) {
+      tbState.timeLeft = 0;
+      finishTypingGame();
+    }
+    updateTypingStatsDisplay();
+  }, 1000);
+}
+
+function handleTypingInput(inputValue) {
+  if (!tbState.isPlaying || !tbState.currentWord) return;
+
+  const targetRoma = tbState.currentWord.roma.toLowerCase();
+  const inputLower = inputValue.toLowerCase();
+  const hiddenInput = document.getElementById('tb-hidden-input');
+
+  if (targetRoma.startsWith(inputLower)) {
+    const addedLen = inputLower.length - tbState.typedRoma.length;
+    if (addedLen > 0) {
+      tbState.correctKeys += addedLen;
+      tbState.totalKeys += addedLen;
+      tbState.combo += addedLen;
+      if (tbState.combo > tbState.maxCombo) tbState.maxCombo = tbState.combo;
+      playSound('type');
+    }
+    tbState.typedRoma = inputLower;
+
+    if (tbState.typedRoma === targetRoma) {
+      playSound('correct');
+      tbState.wordIndex++;
+      if (tbState.wordIndex >= tbState.wordsList.length) {
+        tbState.wordIndex = 0;
+      }
+      tbState.currentWord = tbState.wordsList[tbState.wordIndex];
+      tbState.typedRoma = '';
+      if (hiddenInput) hiddenInput.value = '';
+    }
+  } else {
+    tbState.wrongKeys++;
+    tbState.totalKeys++;
+    tbState.combo = 0;
+    playSound('error');
+    if (hiddenInput) hiddenInput.value = tbState.typedRoma;
+  }
+
+  updateTypingWordDisplay();
+  updateTypingStatsDisplay();
+}
+
+function updateTypingWordDisplay() {
+  const jpEl = document.getElementById('tb-word-jp');
+  const typedEl = document.getElementById('tb-roma-typed');
+  const untypedEl = document.getElementById('tb-roma-untyped');
+
+  if (!tbState.currentWord) return;
+
+  if (jpEl) jpEl.textContent = tbState.currentWord.jp;
+
+  const fullRoma = tbState.currentWord.roma.toLowerCase();
+  const typedLen = tbState.typedRoma.length;
+
+  if (typedEl) typedEl.textContent = fullRoma.slice(0, typedLen);
+  if (untypedEl) untypedEl.textContent = fullRoma.slice(typedLen);
+}
+
+function updateTypingStatsDisplay() {
+  const timeEl = document.getElementById('tb-time');
+  const wpmEl = document.getElementById('tb-wpm');
+  const accEl = document.getElementById('tb-acc');
+  const comboEl = document.getElementById('tb-combo');
+
+  if (timeEl) timeEl.textContent = `${tbState.timeLeft}s`;
+
+  const elapsedTime = Math.max(1, 30 - tbState.timeLeft);
+  const wpm = Math.floor((tbState.correctKeys / 5) / (elapsedTime / 60));
+  tbState.wpm = wpm;
+
+  if (wpmEl) wpmEl.textContent = wpm;
+
+  const acc = tbState.totalKeys > 0 ? Math.floor((tbState.correctKeys / tbState.totalKeys) * 100) : 100;
+  tbState.accuracy = acc;
+  if (accEl) accEl.textContent = `${acc}%`;
+
+  if (comboEl) comboEl.textContent = tbState.combo;
+}
+
+function stopTypingGame() {
+  if (tbState.timer) {
+    clearInterval(tbState.timer);
+    tbState.timer = null;
+  }
+  tbState.isPlaying = false;
+}
+
+function finishTypingGame() {
+  stopTypingGame();
+
+  const wpm = tbState.wpm;
+  let rank = 'C';
+  if (wpm >= 320) rank = '👑 S+';
+  else if (wpm >= 240) rank = '🌟 S';
+  else if (wpm >= 180) rank = '🔥 A';
+  else if (wpm >= 120) rank = '⚡ B';
+  else if (wpm >= 70) rank = '🟢 C';
+  else rank = '🔰 D';
+
+  tbState.rank = rank;
+
+  document.getElementById('tb-screen-play')?.classList.add('hidden');
+  document.getElementById('tb-screen-result')?.classList.remove('hidden');
+
+  const rankEl = document.getElementById('tb-result-rank');
+  const resWpmEl = document.getElementById('tb-res-wpm');
+  const resAccEl = document.getElementById('tb-res-acc');
+  const resComboEl = document.getElementById('tb-res-combo');
+
+  if (rankEl) rankEl.textContent = rank;
+  if (resWpmEl) resWpmEl.textContent = wpm;
+  if (resAccEl) resAccEl.textContent = `${tbState.accuracy}%`;
+  if (resComboEl) resComboEl.textContent = tbState.maxCombo;
+
+  const gainedExp = Math.max(10, Math.floor(wpm * 0.8));
+  gainExp(gainedExp, `タイピング対戦 (${rank})`);
+
+  playSound('fanfare');
+  showToast(`⌨️ ゲーム終了！スコア: ${wpm} WPM (${rank}) / +${gainedExp} EXP獲得！`, 'success');
+}
+
+async function publishTypingScoreToChat() {
+  if (!myUserId || !myName) return;
+
+  const categoryNames = {
+    math: '📐 数学用語コース',
+    code: '💻 プログラミングコース',
+    daily: '💬 日常会話コース',
+    quotes: '📜 名言格言コース'
   };
+  const catName = categoryNames[tbState.category] || '💬 チャットコース';
+
+  const challengeCardHtml = `
+    <div class="typing-challenge-card" style="max-width: 440px; background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(0,240,255,0.15)); border: 2px solid var(--accent-primary); border-radius: 16px; padding: 14px; box-shadow: 0 0 20px rgba(0,240,255,0.2);">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 8px; margin-bottom: 10px;">
+        <span style="font-weight: 800; font-size: 0.9rem; color: #00f0ff;"><i class="fa-solid fa-keyboard"></i> ⌨️ スピードタイピング挑戦状！</span>
+        <span style="font-size: 0.75rem; background: rgba(0,240,255,0.2); color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: 700;">${catName}</span>
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px;">
+        <strong>${escapeHtml(myName)}</strong> さんがタイピング記録を出しました！
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 12px;">
+        <div>
+          <div style="font-size: 0.7rem; color: var(--text-muted);">スコア (WPM)</div>
+          <div style="font-size: 1.15rem; font-weight: 800; color: #00f0ff;">${tbState.wpm}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.7rem; color: var(--text-muted);">ランク</div>
+          <div style="font-size: 1.15rem; font-weight: 800; color: #ffd700;">${tbState.rank}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.7rem; color: var(--text-muted);">正確率</div>
+          <div style="font-size: 1.15rem; font-weight: 800; color: #00ff88;">${tbState.accuracy}%</div>
+        </div>
+      </div>
+      <button type="button" onclick="const m=document.getElementById('typing-battle-modal'); if(m){ m.classList.remove('hidden'); if(!('ontouchstart' in window) && window.innerWidth >= 768){ const b=document.getElementById('tb-btn-start'); if(b) b.click(); }else{ showToast('💻 タイピング対戦はパソコン(物理キーボード)限定です', 'warning'); } }" class="btn-primary btn-block btn-sm" style="background: linear-gradient(135deg, #00f0ff, #7000ff); border: none; font-weight: 800; border-radius: 8px; cursor: pointer;">
+        ⚔️ この記録にチャレンジする！ (PC限定)
+      </button>
+    </div>
+  `;
 
   try {
-    await set(roomRef('active_math_quiz'), quizObj);
-
-    const quizCardHtml = `
-      <div class="math-quiz-card" style="max-width: 420px !important;">
-        <div class="math-quiz-header">
-          <span class="math-quiz-badge" style="color: ${lvlInfo.color} !important;"><i class="fa-solid fa-calculator"></i> 🧠 【出題クイズ】</span>
-          <span class="math-quiz-level">${lvlInfo.badge} (+${lvlInfo.pts} EXP)</span>
-        </div>
-        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">出題者: <strong>${escapeHtml(myName)}</strong> さん</div>
-        <div class="math-quiz-question-box">
-          <div class="math-quiz-label">問題:</div>
-          <div class="math-quiz-question-text">${escapeHtml(question)}</div>
-        </div>
-        <div class="math-quiz-footer-hint">💡 チャット欄に正解を文字/数字で直接発言してください！</div>
-      </div>
-    `;
-
-    await sendSystemAnnouncementMessage(quizCardHtml);
+    await sendSystemAnnouncementMessage(challengeCardHtml);
     playSound('fanfare');
-    showToast(`🧮 クイズ [${lvlInfo.badge}] をチャットに出題しました！`, 'success');
-
-    const modal = document.getElementById('custom-quiz-modal');
-    if (modal) modal.classList.add('hidden');
-
-    if (display) display.value = '';
-    if (answerInput) answerInput.value = '';
+    showToast('⌨️ チャットにタイピング記録を投稿しました！', 'success');
   } catch (err) {
-    console.error("publishCustomQuizFromCalc error:", err);
-    showToast('クイズの出題に失敗しました', 'error');
+    console.error("publishTypingScoreToChat error:", err);
+    showToast('投稿に失敗しました', 'error');
   }
-};
+}
 
 

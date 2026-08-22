@@ -195,17 +195,20 @@
       <!-- 自分のプロフィールカード -->
       <div class="my-profile-card">
         <div class="profile-card-top-row">
-          <div class="avatar-circle" id="my-avatar">🤖</div>
+          <div class="avatar-circle" id="my-avatar" style="cursor:pointer;" title="クリックで自分の詳細プロフィールを表示">🤖</div>
           <div class="profile-info">
             <div class="profile-name-row">
-              <span class="profile-name" id="my-name-display">ゲスト</span>
+              <span class="profile-name" id="my-name-display" style="cursor:pointer;" title="クリックで自分の詳細プロフィールを表示">ゲスト</span>
               <span class="level-badge-pill" id="my-level-display">Lv.1</span>
             </div>
             <div class="profile-status-badge" id="my-status-display">💬 雑談歓迎</div>
             <div class="profile-trip" id="my-trip-display">◆------</div>
           </div>
           <div class="profile-card-actions">
-            <button id="btn-open-edit-profile" class="btn-icon" title="プロフィール変更">
+            <button id="btn-view-my-profile" class="btn-icon" title="詳細プロフィールを見る">
+              <i class="fa-solid fa-id-card"></i>
+            </button>
+            <button id="btn-open-edit-profile" class="btn-icon" title="プロフィール編集">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
             <button id="btn-logout-account" class="btn-icon danger" title="ログアウト">
@@ -511,38 +514,16 @@
 
 
 
-        <!-- 🎙️ 音声録音コントロールバー -->
-        <div id="voice-rec-bar" class="voice-rec-bar hidden" style="display:none; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; background:rgba(255,51,102,0.15); border:1px solid rgba(255,51,102,0.3); border-radius:var(--radius-md); margin-bottom:8px;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="rec-dot pulse" style="width:12px; height:12px; background:#ff3366; border-radius:50%; display:inline-block;"></span>
-            <span style="font-weight:700; font-size:0.85rem; color:#ff4d79;">🎙️ 音声メッセージ録音中...</span>
-            <span id="voice-rec-timer-display" style="font-family:monospace; font-size:0.9rem; font-weight:700; color:#ffffff; background:rgba(0,0,0,0.4); padding:2px 8px; border-radius:4px;">00:00</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button type="button" onclick="window.cancelVoiceRecording()" class="btn-secondary btn-sm" style="background:rgba(255,255,255,0.1); color:#fff; border:none; padding:4px 10px; border-radius:4px; cursor:pointer;">
-              <i class="fa-solid fa-xmark"></i> キャンセル
-            </button>
-            <button type="button" onclick="window.stopAndSendVoiceRecording()" class="btn-primary btn-sm" style="background:linear-gradient(135deg, #ff3366, #ff0055); color:#fff; border:none; padding:4px 14px; border-radius:4px; font-weight:700; cursor:pointer;">
-              <i class="fa-solid fa-paper-plane"></i> 送信する
-            </button>
-          </div>
-        </div>
-
         <div class="chat-input-row">
           <div class="tool-buttons">
-            <!-- 🎙️ 音声メッセージ録音 ボタン -->
-            <button type="button" id="btn-toggle-voice-rec" onclick="window.toggleVoiceRecording()" class="btn-icon-tool" title="ボイスメッセージ・音声録音">
-              <i class="fa-solid fa-microphone text-danger"></i>
-            </button>
-
             <!-- 🧠 数学対戦クイズ ボタン -->
             <button type="button" id="btn-open-math-quiz" onclick="const m=document.getElementById('math-quiz-modal'); if(m){ m.classList.remove('hidden'); m.style.display='flex'; }" class="btn-icon-tool" title="数学スピードクイズ対戦を出題">
               <i class="fa-solid fa-brain text-warning"></i>
             </button>
 
-            <!-- 🧮 電卓キーパッド付き数学クイズ出題 ボタン -->
-            <button type="button" id="btn-open-custom-quiz" onclick="const m=document.getElementById('custom-quiz-modal'); if(m){ m.classList.remove('hidden'); m.style.display='flex'; }" class="btn-icon-tool" title="電卓キーパッドでオリジナル数学クイズを出題">
-              <i class="fa-solid fa-calculator text-success"></i>
+            <!-- ⌨️ タイピング対戦 ボタン (PC限定) -->
+            <button type="button" id="btn-open-typing-battle" class="btn-icon-tool" title="⌨️ スピードタイピング対戦 (パソコン限定)">
+              <i class="fa-solid fa-keyboard text-info"></i>
             </button>
 
             <button type="button" id="btn-emoji-toggle" class="btn-icon-tool" title="絵文字">
@@ -1154,6 +1135,11 @@
         </div>
 
         <div class="input-group">
+          <label for="edit-bio"><i class="fa-solid fa-address-card text-info"></i> 自己紹介文 (Bio)</label>
+          <textarea id="edit-bio" placeholder="趣味や好きなテーマなど、みんなに自己紹介しよう！ (最大200文字)" maxlength="200" rows="3" style="width:100%; resize:vertical; padding:10px; background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); border-radius:var(--radius-sm); color:#fff; font-family:inherit; font-size:0.9rem; margin-top:4px;"></textarea>
+        </div>
+
+        <div class="input-group">
           <label><i class="fa-solid fa-face-smile"></i> アイコンを変更 (全50種・GIF・5秒以内動画対応)</label>
           <div class="avatar-picker-tabs">
             <button type="button" class="avatar-tab-btn active" data-target="edit-tab-preset">アイコン50種</button>
@@ -1536,102 +1522,6 @@
     </div>
   </div>
 
-  <!-- 🧮 電卓式オリジナル数学クイズ出題 モーダル -->
-  <div id="custom-quiz-modal" class="modal-overlay hidden">
-    <div class="modal-card glass-panel animate-scale-up" style="max-width: 480px; width: 95%;">
-      <div class="modal-header" style="background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(0, 255, 136, 0.2));">
-        <h3><i class="fa-solid fa-calculator text-success"></i> 🧮 数学クイズ出題 (電卓キーパッド)</h3>
-        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-
-      <div class="modal-body" style="padding: 16px;">
-        <!-- 出題問題のディスプレイ画面 -->
-        <div class="input-group" style="margin-bottom: 12px;">
-          <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-secondary);">
-            <i class="fa-solid fa-display text-info"></i> 問題文 / 数式ディスプレイ (電卓操作で入力)
-          </label>
-          <div style="position: relative; margin-top: 4px;">
-            <input type="text" id="quiz-calc-display" placeholder="例: √144 + | -15 | × 3! = ?" style="width: 100%; font-size: 1.15rem; font-weight: 700; padding: 12px 14px; background: rgba(0,0,0,0.5); color: #00f0ff; border: 1px solid var(--accent-primary); border-radius: var(--radius-md); letter-spacing: 0.5px;">
-            <button type="button" onclick="window.clearCalcDisplay()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); padding: 4px 8px; font-size: 0.75rem; background: rgba(255,51,102,0.2); color: #ff3366; border: 1px solid rgba(255,51,102,0.4); border-radius: 4px; cursor: pointer;">全消去</button>
-          </div>
-        </div>
-
-        <!-- 電卓キーパッド Matrix -->
-        <div class="quiz-calc-keypad" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 14px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--glass-border);">
-          <!-- 行1: 特殊記号・ルート・階乗・絶対値 -->
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol('√')">√</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol('!')">!</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol('|')">|</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol('^')">^</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol('(')">(</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol(')')">)</button>
-
-          <!-- 行2: 順列・組合せ・変数・演算子 -->
-          <button type="button" class="calc-btn spec" onclick="window.appendCalcSymbol('P')">P</button>
-          <button type="button" class="calc-btn spec" onclick="window.appendCalcSymbol('C')">C</button>
-          <button type="button" class="calc-btn spec" onclick="window.appendCalcSymbol('x')">x</button>
-          <button type="button" class="calc-btn spec" onclick="window.appendCalcSymbol('y')">y</button>
-          <button type="button" class="calc-btn spec" onclick="window.appendCalcSymbol('π')">π</button>
-          <button type="button" class="calc-btn del" onclick="window.backspaceCalcDisplay()"><i class="fa-solid fa-backspace"></i></button>
-
-          <!-- 行3: 7 8 9 + × -->
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('7')">7</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('8')">8</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('9')">9</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol(' + ')">+</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol(' × ')">×</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol(' ÷ ')">÷</button>
-
-          <!-- 行4: 4 5 6 - / -->
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('4')">4</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('5')">5</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('6')">6</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol(' - ')">-</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol('/')">/</button>
-          <button type="button" class="calc-btn op" onclick="window.appendCalcSymbol(' = ?')">= ?</button>
-
-          <!-- 行5: 1 2 3 0 . , -->
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('1')">1</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('2')">2</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('3')">3</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('0')">0</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol('.')">.</button>
-          <button type="button" class="calc-btn num" onclick="window.appendCalcSymbol(',')">,</button>
-        </div>
-
-        <!-- 正解の解答入力 -->
-        <div class="input-group" style="margin-bottom: 12px;">
-          <label for="quiz-calc-answer" style="font-weight: 700; font-size: 0.85rem; color: var(--text-secondary);">
-            <i class="fa-solid fa-key text-warning"></i> 正解の解答 (チャットで判定する文字/数字)
-          </label>
-          <input type="text" id="quiz-calc-answer" placeholder="例: 135 (解答者がチャットで発言すべき文字)" style="width: 100%; font-size: 1rem; font-weight: 700; padding: 10px 12px; background: rgba(0,0,0,0.3); color: #00ff88; border: 1px solid rgba(0,255,136,0.4); border-radius: var(--radius-sm);">
-        </div>
-
-        <!-- 難易度選択 -->
-        <div class="input-group">
-          <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">
-            <i class="fa-solid fa-signal text-danger"></i> 難易度を選択
-          </label>
-          <select id="quiz-calc-level" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); background: rgba(0,0,0,0.4); color: #ffffff; border: 1px solid var(--glass-border); font-size: 0.9rem; font-weight: 600;">
-            <option value="easy">🟢 簡単 (足し算・引き算) [+50 EXP]</option>
-            <option value="normal" selected>🟡 普通 (掛け算・割り算) [+80 EXP]</option>
-            <option value="hard">🔴 難しい (四則演算の組み合わせ) [+120 EXP]</option>
-            <option value="very_hard">🟣 すごく難しい (√, !, 数列) [+200 EXP]</option>
-            <option value="ultra_hard">👑 ものすごく難しい (高校・大学超ムズ) [+350 EXP]</option>
-          </select>
-        </div>
-
-      </div>
-
-      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-        <button type="button" class="btn-secondary modal-close">キャンセル</button>
-        <button type="button" id="btn-submit-custom-quiz" onclick="window.publishCustomQuizFromCalc()" class="btn-primary" style="padding: 10px 24px; font-weight: 800; font-size: 0.95rem; background: linear-gradient(135deg, #00ff88, #00f0ff); color: #050b14; border: none; box-shadow: 0 0 14px rgba(0,255,136,0.4);">
-          <i class="fa-solid fa-paper-plane"></i> クイズをチャットに出題！
-        </button>
-      </div>
-    </div>
-  </div>
-
   <!-- ⚙️ 設定モーダル (音量 & 文字サイズ) -->
   <div id="settings-modal" class="modal-overlay hidden">
     <div class="modal-card glass-panel animate-scale-up" style="max-width: 440px;">
@@ -1656,6 +1546,200 @@
       </div>
       <div class="modal-footer">
         <button class="btn-primary modal-close">完了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👤 ユーザー詳細プロフィール閲覧モーダル -->
+  <div id="user-detail-profile-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up user-detail-card-wrapper" style="max-width: 500px; width: 95%; padding: 0; overflow: hidden; border-radius: 20px;">
+      <div class="user-profile-banner" style="height: 100px; background: linear-gradient(135deg, rgba(0,240,255,0.3), rgba(112,0,255,0.4), rgba(255,51,102,0.3)); position: relative; display: flex; justify-content: flex-end; padding: 12px;">
+        <button class="btn-icon modal-close user-profile-close-btn" style="background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="user-profile-body" style="padding: 0 24px 24px 24px; margin-top: -40px;">
+        <div class="user-profile-header-row" style="display: flex; gap: 16px; align-items: flex-end; margin-bottom: 16px;">
+          <div class="user-profile-avatar-wrapper" style="position: relative;">
+            <div id="udp-avatar" class="user-profile-avatar" style="width: 80px; height: 80px; border-radius: 50%; background: #1a233a; border: 4px solid #0f172a; display: flex; align-items: center; justify-content: center; font-size: 2.4rem; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.5);">🤖</div>
+            <span id="udp-online-status" class="online-indicator online" style="position: absolute; bottom: 4px; right: 4px; width: 14px; height: 14px; border-radius: 50%; background: #00ff88; border: 2px solid #0f172a;" title="オンライン"></span>
+          </div>
+          <div class="user-profile-main-info" style="flex: 1;">
+            <div class="user-profile-name-line" style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+              <h3 id="udp-username" class="user-profile-name" style="font-size: 1.4rem; font-weight: 800; color: #fff; margin: 0;">ユーザー名</h3>
+              <span id="udp-trip" class="user-profile-trip" style="font-family: monospace; font-size: 0.82rem; color: var(--accent-primary); background: rgba(0,240,255,0.1); padding: 2px 6px; border-radius: 4px;">◆------</span>
+            </div>
+            <div class="user-profile-badges" style="display: flex; gap: 6px; margin-top: 6px; align-items: center; flex-wrap: wrap;">
+              <span id="udp-level" class="level-badge-pill" style="font-weight: 800; font-size: 0.78rem;">Lv.1</span>
+              <span id="udp-rank-badge" class="rank-badge-pill" style="background: rgba(255,215,0,0.15); color: #ffd700; border: 1px solid rgba(255,215,0,0.3); padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">🔰 チャットビギナー</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="udp-status" class="user-profile-status-text" style="display: inline-block; padding: 6px 14px; background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); border-radius: 20px; font-size: 0.88rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px;">💬 雑談歓迎</div>
+
+        <!-- EXP進行バー -->
+        <div class="udp-exp-section" style="margin-bottom: 18px; background: rgba(0,0,0,0.25); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+          <div class="udp-exp-label" style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; color: var(--text-secondary);">
+            <span><i class="fa-solid fa-bolt text-warning"></i> レベル進捗 (EXP)</span>
+            <span id="udp-exp-text" style="color: #fff;">0 / 100 EXP</span>
+          </div>
+          <div class="exp-bar-track" style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+            <div id="udp-exp-bar-fill" class="exp-bar-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #00f0ff, #00ff88); transition: width 0.4s ease;"></div>
+          </div>
+        </div>
+
+        <!-- 自己紹介 (Bio) -->
+        <div class="udp-bio-section" style="margin-bottom: 18px; background: rgba(0,0,0,0.3); padding: 14px; border-radius: 12px; border: 1px solid var(--glass-border);">
+          <h4 class="udp-section-title" style="font-size: 0.85rem; font-weight: 700; color: var(--accent-primary); margin: 0 0 8px 0; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-quote-left"></i> 自己紹介 (Bio)
+          </h4>
+          <div id="udp-bio" class="udp-bio-content" style="font-size: 0.9rem; line-height: 1.5; color: #e2e8f0; white-space: pre-wrap; word-break: break-word;">自己紹介文はまだ設定されていません。</div>
+        </div>
+
+        <!-- 統計グリッド -->
+        <div class="udp-stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
+          <div class="udp-stat-card" style="background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); padding: 10px; border-radius: 10px; text-align: center;">
+            <i class="fa-solid fa-comment-dots text-primary" style="font-size: 1.1rem; margin-bottom: 4px;"></i>
+            <div id="udp-stat-messages" class="stat-val" style="font-size: 1.1rem; font-weight: 800; color: #fff;">0</div>
+            <div class="stat-lbl" style="font-size: 0.72rem; color: var(--text-secondary);">総発言数</div>
+          </div>
+          <div class="udp-stat-card" style="background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); padding: 10px; border-radius: 10px; text-align: center;">
+            <i class="fa-solid fa-brain text-warning" style="font-size: 1.1rem; margin-bottom: 4px;"></i>
+            <div id="udp-stat-quiz" class="stat-val" style="font-size: 1.1rem; font-weight: 800; color: #fff;">0</div>
+            <div class="stat-lbl" style="font-size: 0.72rem; color: var(--text-secondary);">クイズ正解数</div>
+          </div>
+          <div class="udp-stat-card" style="background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); padding: 10px; border-radius: 10px; text-align: center;">
+            <i class="fa-solid fa-user-group text-success" style="font-size: 1.1rem; margin-bottom: 4px;"></i>
+            <div id="udp-stat-friends" class="stat-val" style="font-size: 1.1rem; font-weight: 800; color: #fff;">0</div>
+            <div class="stat-lbl" style="font-size: 0.72rem; color: var(--text-secondary);">フレンド数</div>
+          </div>
+        </div>
+
+        <!-- アクション領域 -->
+        <div class="udp-actions" style="display: flex; gap: 10px;">
+          <button type="button" id="udp-btn-dm" class="btn-primary" style="flex: 1; padding: 10px; font-weight: 700; font-size: 0.88rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <i class="fa-solid fa-paper-plane"></i> 個人チャット(DM)
+          </button>
+          <button type="button" id="udp-btn-friend" class="btn-secondary" style="flex: 1; padding: 10px; font-weight: 700; font-size: 0.88rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <i class="fa-solid fa-user-plus"></i> フレンド申請
+          </button>
+          <button type="button" id="udp-btn-edit" class="btn-secondary hidden" style="flex: 1; padding: 10px; font-weight: 700; font-size: 0.88rem; background: rgba(0,240,255,0.15); color: #00f0ff; border-color: rgba(0,240,255,0.4); display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <i class="fa-solid fa-pen-to-square"></i> プロフィール編集
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⌨️ タイピング対戦モーダル (PC限定) -->
+  <div id="typing-battle-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up typing-battle-card-wrapper" style="max-width: 600px; width: 95%; padding: 24px; border-radius: 20px;">
+      <div class="modal-header" style="padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 1.25rem; font-weight: 800; color: #00f0ff; display: flex; align-items: center; gap: 8px; margin: 0;">
+          <i class="fa-solid fa-keyboard text-info"></i> ⌨️ スピードタイピング対戦 <span class="pc-only-badge" style="font-size: 0.7rem; background: rgba(0,240,255,0.15); color: #00f0ff; border: 1px solid rgba(0,240,255,0.3); padding: 2px 8px; border-radius: 12px; margin-left: 6px;">💻 PC限定</span>
+        </h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="modal-body" style="padding: 0;">
+        <!-- 1. ゲーム準備・難易度選択画面 -->
+        <div id="tb-screen-setup" class="tb-screen">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+              30秒間のスピードタイピング勝負！速さと正確さでハイスコアを目指してチャットに投稿しよう！
+            </p>
+
+            <div class="input-group" style="text-align: left; margin-bottom: 16px;">
+              <label style="font-weight: 700; font-size: 0.85rem; color: #00f0ff; margin-bottom: 6px; display: block;">
+                <i class="fa-solid fa-layer-group"></i> お題カテゴリーを選択
+              </label>
+              <select id="tb-category-select" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid var(--glass-border); font-size: 0.95rem; font-weight: 700;">
+                <option value="math">📐 数学用語・公式・単位コース</option>
+                <option value="code">💻 プログラミング＆サイバーコース</option>
+                <option value="daily" selected>💬 日常会話・チャット単語コース</option>
+                <option value="quotes">📜 日本の名言・格言コース</option>
+              </select>
+            </div>
+
+            <div style="background: rgba(0,240,255,0.06); border: 1px solid rgba(0,240,255,0.2); padding: 12px; border-radius: 12px; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
+              💡 <strong>操作方法:</strong> キーボードで画面に表示されるローマ字を打ってください。<br>半角英字入力（直接入力）に設定しておくとスムーズにプレイできます。
+            </div>
+
+            <button type="button" id="tb-btn-start" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1.1rem; font-weight: 800; background: linear-gradient(135deg, #00f0ff, #7000ff); border: none; box-shadow: 0 0 20px rgba(0,240,255,0.4); cursor: pointer;">
+              <i class="fa-solid fa-play"></i> タイピング対戦スタート！
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. ゲームプレイ画面 -->
+        <div id="tb-screen-play" class="tb-screen hidden">
+          <!-- リアルタイムステータスバー -->
+          <div class="tb-stats-bar" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 12px; border: 1px solid var(--glass-border); text-align: center;">
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);">残り時間</div>
+              <div id="tb-time" style="font-size: 1.3rem; font-weight: 800; color: #ff3366; font-family: monospace;">30s</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);">WPM (打鍵/分)</div>
+              <div id="tb-wpm" style="font-size: 1.3rem; font-weight: 800; color: #00f0ff; font-family: monospace;">0</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);">正確率</div>
+              <div id="tb-acc" style="font-size: 1.3rem; font-weight: 800; color: #00ff88; font-family: monospace;">100%</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);">コンボ</div>
+              <div id="tb-combo" style="font-size: 1.3rem; font-weight: 800; color: #ffb800; font-family: monospace;">0</div>
+            </div>
+          </div>
+
+          <!-- お題表示エリア -->
+          <div class="tb-word-box" style="background: rgba(0,0,0,0.5); border: 2px solid var(--accent-primary); border-radius: 16px; padding: 24px 16px; text-align: center; margin-bottom: 16px; box-shadow: 0 0 25px rgba(0,240,255,0.15); min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+            <div id="tb-word-jp" style="font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 10px;">日本語のお題</div>
+            
+            <div id="tb-word-romaji-display" style="font-size: 1.6rem; font-family: monospace; font-weight: 700; letter-spacing: 2px; line-height: 1.4;">
+              <span id="tb-roma-typed" style="color: #00f0ff; text-shadow: 0 0 10px #00f0ff;"></span><span id="tb-roma-untyped" style="color: #64748b;">romaji</span>
+            </div>
+          </div>
+
+          <!-- 隠し/入力用テキストエリア -->
+          <input type="text" id="tb-hidden-input" autocomplete="off" spellcheck="false" style="opacity: 0; position: absolute; left: -9999px;">
+
+          <div style="text-align: center; font-size: 0.8rem; color: var(--accent-primary); animation: pulse 2s infinite;">
+            ⌨️ キーボードを押して入力してください
+          </div>
+        </div>
+
+        <!-- 3. リザルト画面 -->
+        <div id="tb-screen-result" class="tb-screen hidden" style="text-align: center;">
+          <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">FINISH! 対戦結果</div>
+          
+          <div id="tb-result-rank" style="font-size: 3.5rem; font-weight: 900; color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.6); margin-bottom: 10px;">S RANK</div>
+
+          <div class="tb-result-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: rgba(0,0,0,0.3); padding: 14px; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 20px;">
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">スコア (WPM)</div>
+              <div id="tb-res-wpm" style="font-size: 1.3rem; font-weight: 800; color: #00f0ff;">0</div>
+            </div>
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">正確率</div>
+              <div id="tb-res-acc" style="font-size: 1.3rem; font-weight: 800; color: #00ff88;">100%</div>
+            </div>
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">最大コンボ</div>
+              <div id="tb-res-combo" style="font-size: 1.3rem; font-weight: 800; color: #ffb800;">0</div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button type="button" id="tb-btn-retry" class="btn-secondary" style="flex: 1; padding: 12px; font-weight: 700; cursor: pointer;">
+              <i class="fa-solid fa-rotate-right"></i> もう一度プレイ
+            </button>
+            <button type="button" id="tb-btn-publish" class="btn-primary" style="flex: 1; padding: 12px; font-weight: 800; background: linear-gradient(135deg, #00ff88, #00f0ff); color: #050b14; border: none; box-shadow: 0 0 15px rgba(0,255,136,0.4); cursor: pointer;">
+              <i class="fa-solid fa-paper-plane"></i> スコアをチャットに投稿！
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
