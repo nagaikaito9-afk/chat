@@ -3840,9 +3840,27 @@ function initRoomsRealtimeSync() {
     const publicCount = roomUserCounts['public_main'] || 0;
     const publicCountBadge = publicCount > 0 ? `<span class="room-user-count-badge">👤 ${publicCount}</span>` : '';
 
+    const adminCount = roomUserCounts['sys_admin'] || 0;
+    const adminCountBadge = adminCount > 0 ? `<span class="room-user-count-badge">👤 ${adminCount}</span>` : '';
+
+    const trustedCount = roomUserCounts['sys_trusted'] || 0;
+    const trustedCountBadge = trustedCount > 0 ? `<span class="room-user-count-badge">👤 ${trustedCount}</span>` : '';
+
+    const veteranCount = roomUserCounts['sys_veteran'] || 0;
+    const veteranCountBadge = veteranCount > 0 ? `<span class="room-user-count-badge">👤 ${veteranCount}</span>` : '';
+
     let html = `
       <button class="room-tab ${currentRoomId === 'public_main' ? 'active' : ''}" data-room="public_main" data-name="💬 雑談部屋" data-pr="誰でも自由に雑談できるメインの部屋です">
         <i class="fa-solid fa-comments"></i> 💬 雑談部屋${publicCountBadge}
+      </button>
+      <button class="room-tab ${currentRoomId === 'sys_admin' ? 'active' : ''}" data-room="sys_admin" data-name="👑 運営部屋" data-pr="運営メンバー・製作者のみが入れる特別限定ルームです">
+        <i class="fa-solid fa-crown text-warning"></i> 👑 運営部屋${adminCountBadge}
+      </button>
+      <button class="room-tab ${currentRoomId === 'sys_trusted' ? 'active' : ''}" data-room="sys_trusted" data-name="💎 信頼部屋" data-pr="信頼済みエフェクトがついている人限定の部屋です">
+        <i class="fa-solid fa-gem text-info"></i> 💎 信頼部屋${trustedCountBadge}
+      </button>
+      <button class="room-tab ${currentRoomId === 'sys_veteran' ? 'active' : ''}" data-room="sys_veteran" data-name="⭐ 古参部屋" data-pr="古参エフェクトがついている人限定の部屋です">
+        <i class="fa-solid fa-star text-warning"></i> ⭐ 古参部屋${veteranCountBadge}
       </button>
     `;
 
@@ -3850,7 +3868,7 @@ function initRoomsRealtimeSync() {
       if (!rData || !rData.name) return;
 
       const lastActive = rData.lastActivity || rData.createdAt || 0;
-      if (roomId !== 'public_main' && (now - lastActive > INACTIVE_LIMIT)) {
+      if (roomId !== 'public_main' && !roomId.startsWith('sys_') && (now - lastActive > INACTIVE_LIMIT)) {
         remove(ref(db, `rooms_meta/${roomId}`));
         remove(ref(db, `rooms/${roomId}`));
         if (currentRoomId === roomId) {
@@ -3888,6 +3906,21 @@ function initRoomsRealtimeSync() {
 
         if (roomId === 'public_main') {
           switchRoom('public_main', '💬 雑談部屋', '誰でも自由に雑談できるメインの部屋です');
+          return;
+        }
+
+        if (roomId === 'sys_admin') {
+          switchRoom('sys_admin', '👑 運営部屋', '運営メンバー・製作者のみが入れる特別限定ルームです');
+          return;
+        }
+
+        if (roomId === 'sys_trusted') {
+          switchRoom('sys_trusted', '💎 信頼部屋', '信頼済みエフェクトがついている人限定の部屋です');
+          return;
+        }
+
+        if (roomId === 'sys_veteran') {
+          switchRoom('sys_veteran', '⭐ 古参部屋', '古参エフェクトがついている人限定の部屋です');
           return;
         }
 
