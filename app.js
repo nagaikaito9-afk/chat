@@ -449,7 +449,22 @@ function renderAvatarHTML(avatar, customClass = '') {
 
 function isCreatorName(name) {
   if (!name || typeof name !== 'string') return false;
-  return name.includes('ただのネコ好き');
+  const n = name.toLowerCase();
+  return (
+    n.includes('ただのネコ好き') ||
+    n.includes('ネコ好き') ||
+    n.includes('製作者') ||
+    n.includes('作者') ||
+    n.includes('creator')
+  );
+}
+
+function isCreatorUser(uid = myUserId, name = myName) {
+  if (isCreatorName(name)) return true;
+  if (isCreatorName(myName)) return true;
+  if (isAdminMode) return true;
+  if (typeof adminUsersSet !== 'undefined' && (adminUsersSet.has(uid) || adminUsersSet.has(myUserId))) return true;
+  return false;
 }
 
 // 🌟 Level & EXP Helper Functions
@@ -2403,7 +2418,7 @@ function renderSingleMessage(msgId, msg) {
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
         ${!isSelf ? `<button onclick="window.sendFriendRequest('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請</button>` : ''}
-        ${isCreatorName(myName) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${getUserEffects(msg.userId).trusted ? '信用解除' : '💎 信用付与'}</button>` : ''}
+        ${isCreatorUser(myUserId, myName) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${getUserEffects(msg.userId).trusted ? '信用解除' : '💎 信用付与'}</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
         ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
       </div>
@@ -5650,7 +5665,7 @@ window.toggleTrustUser = async (targetUid, targetName) => {
 
 // ✨ エフェクト操作ハンドラー (信用済み / 宣伝部隊 / 初期メンバー)
 window.toggleUserEffect = async (targetUid, targetName, effectType) => {
-  if (effectType === 'trusted' && !isCreatorName(myName)) {
+  if (effectType === 'trusted' && !isCreatorUser(myUserId, myName)) {
     showToast('⚠️ 「信用済み」エフェクトの付与・解除は「製作者」のみ行えます。', 'warning');
     return;
   }
