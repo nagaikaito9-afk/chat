@@ -34,6 +34,11 @@ localStorage.setItem('cyberchat_user_id', myUserId);
 window.myUserId = myUserId;
 state.myUserId = myUserId;
 
+window.startMathQuizGame = function() {
+  const modal = document.getElementById('math-quiz-modal');
+  if (modal) modal.classList.remove('hidden');
+};
+
 window.openCustomQuizModal = function() {
   const modal = document.getElementById('custom-quiz-modal');
   if (modal) modal.classList.remove('hidden');

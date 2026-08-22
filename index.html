@@ -514,7 +514,7 @@
         <div class="chat-input-row">
           <div class="tool-buttons">
             <!-- 🧠 数学対戦クイズ ボタン -->
-            <button type="button" id="btn-open-math-quiz" onclick="window.startMathQuizGame()" class="btn-icon-tool" title="数学スピードクイズ対戦を出題">
+            <button type="button" id="btn-open-math-quiz" onclick="const m=document.getElementById('math-quiz-modal'); if(m) m.classList.remove('hidden');" class="btn-icon-tool" title="数学スピードクイズ対戦を出題">
               <i class="fa-solid fa-brain text-warning"></i>
             </button>
 
@@ -1642,6 +1642,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Application Logic Script -->
-  <script type="module" src="app.js?v=31"></script>
+  <script type="module" src="app.js?v=32"></script>
 </body>
 </html>
