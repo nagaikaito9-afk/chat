@@ -3451,17 +3451,6 @@ function setupChatControls() {
         gainExp(15, 'メッセージ送信');
       }
 
-      // 🧠 数学クイズ回答判定
-      const solvedQuiz = checkMathQuizAnswer(text);
-      if (solvedQuiz) {
-        setTimeout(async () => {
-          await sendSpecialMessage('game', `🎉 <strong>【正解発表！】</strong> <span style="color:var(--warning-color); font-weight:700;">${escapeHtml(myName)}</span> さんが数学クイズ [${solvedQuiz.badge}] に見事正解しました！<br>問題: <strong>${escapeHtml(solvedQuiz.question)}</strong><br>正解: <span class="game-card-val">【 ${escapeHtml(solvedQuiz.answer)} 】</span> (+${solvedQuiz.pts} EXP獲得！🎉)`);
-          playSound('fanfare');
-          gainExp(solvedQuiz.pts, `数学クイズ[${solvedQuiz.badge}]正解`);
-          showToast(`🎉 数学クイズ正解！ +${solvedQuiz.pts} EXP獲得！`, 'success');
-        }, 400);
-      }
-
       playSound('send');
     } catch (err) {
       console.error("Send message error:", err);
@@ -6782,3 +6771,95 @@ function renderWerewolfGameUI() {
     logBox.scrollTop = logBox.scrollHeight;
   }
 }
+
+window.startWerewolfRecruitment = async () => {
+  if (!currentRoomId) return;
+
+  const gameRef = ref(db, `rooms/${currentRoomId}/werewolf_game`);
+  const snap = await get(gameRef);
+  const gameData = snap.val() || {};
+
+  if (gameData.status === 'playing') {
+    showToast('現在ゲームが進行中のため、新しい募集を開始できません。ロビー画面を開きます。', 'info');
+    window.openWerewolfModal();
+    return;
+  }
+
+  const initialPlayers = {
+    [myUserId]: {
+      uid: myUserId,
+      name: myName,
+      avatar: myAvatar,
+      joinedAt: Date.now()
+    }
+  };
+
+  await set(gameRef, {
+    status: 'lobby',
+    hostUid: myUserId,
+    hostName: myName,
+    players: initialPlayers,
+    updatedAt: Date.now()
+  });
+
+  const recruitHtml = `
+    <div class="math-quiz-card" style="border-color: #ff3366 !important; background: linear-gradient(135deg, rgba(30,15,30,0.95), rgba(45,15,35,0.98)) !important; box-shadow: 0 0 16px rgba(255, 51, 102, 0.4) !important;">
+      <div class="math-quiz-header">
+        <span class="math-quiz-badge" style="color: #ff3366 !important;"><i class="fa-solid fa-wolf-pack-battalion"></i> 🐺 【人狼ゲーム参加者募集！】</span>
+        <span class="math-quiz-level" style="background: rgba(255, 51, 102, 0.2); color: #ff88a5;">GM: ${escapeHtml(myName)}</span>
+      </div>
+      <div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin: 8px 0; line-height: 1.5;">
+        <strong>${escapeHtml(myName)}</strong> さんがゲームマスターとして人狼ゲームを開始しました！<br>
+        <span style="color: #ffb800; font-size: 1.05rem;">「人狼ゲームをする人はこのボタンを押してください」</span>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+        <button type="button" onclick="window.joinWerewolfLobbyViaChat('${currentRoomId}')" style="padding: 10px 18px; font-weight: 800; font-size: 0.95rem; border-radius: 8px; background: linear-gradient(135deg, #ff3366, #e6005c); color: #ffffff; border: none; cursor: pointer; box-shadow: 0 0 12px rgba(255, 51, 102, 0.5); display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-user-plus"></i> 人狼ゲームに参加
+        </button>
+        <button type="button" onclick="window.openWerewolfModal()" style="padding: 10px 14px; font-weight: 600; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.1); color: #ffffff; border: 1px solid rgba(255,255,255,0.2); cursor: pointer;">
+          <i class="fa-solid fa-users"></i> 参加者確認・対戦画面
+        </button>
+      </div>
+    </div>
+  `;
+
+  await sendSystemAnnouncementMessage(recruitHtml);
+  showToast('🐺 人狼ゲームの参加者募集をチャットに投稿しました！ (あなたがGMです)', 'success');
+  window.openWerewolfModal();
+};
+
+window.joinWerewolfLobbyViaChat = async (roomId) => {
+  const targetRoomId = roomId || currentRoomId;
+  const gameRef = ref(db, `rooms/${targetRoomId}/werewolf_game`);
+  const snap = await get(gameRef);
+
+  if (!snap.exists()) {
+    showToast('募集中の人狼ゲームが見つかりません', 'error');
+    return;
+  }
+
+  const gameData = snap.val();
+  if (gameData.status === 'playing') {
+    showToast('現在ゲームが進行中のため、ロビーに参加できません（観覧モードになります）', 'warning');
+    window.openWerewolfModal();
+    return;
+  }
+
+  const players = gameData.players || {};
+  if (players[myUserId]) {
+    showToast('すでに人狼ゲームに参加しています！', 'info');
+  } else {
+    players[myUserId] = {
+      uid: myUserId,
+      name: myName,
+      avatar: myAvatar,
+      joinedAt: Date.now()
+    };
+    await set(ref(db, `rooms/${targetRoomId}/werewolf_game/players/${myUserId}`), players[myUserId]);
+    await sendSystemAnnouncementMessage(`🎉 <strong>[${escapeHtml(myName)}]</strong> さんが人狼ゲームに参加しました！ (現在 ${Object.keys(players).length} 名)`);
+    playSound('receive');
+    showToast('🎉 人狼ゲームのロビーに参加しました！', 'success');
+  }
+
+  window.openWerewolfModal();
+};
