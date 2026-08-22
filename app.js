@@ -6834,11 +6834,10 @@ window.openUserProfileModal = async function(userDataOrId) {
 
 // 💻 PCユーザー判定 (タッチデバイス・モバイルモード排他)
 function checkIsPCUser() {
-  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isSmallWidth = window.innerWidth < 768;
+  const isSmallWidth = window.innerWidth < 600;
   const isMobileMode = typeof deviceMode !== 'undefined' && deviceMode === 'mobile';
   
-  if (isMobileMode || (hasTouch && isSmallWidth)) {
+  if (isMobileMode || isSmallWidth) {
     return false;
   }
   return true;
@@ -6913,6 +6912,69 @@ let tbState = {
   accuracy: 100,
   rank: 'C'
 };
+
+// 🎹 キーボード入力の直接グローバルキャプチャ
+window.addEventListener('keydown', (e) => {
+  if (!tbState.isPlaying || !tbState.currentWord) return;
+
+  const modal = document.getElementById('typing-battle-modal');
+  if (!modal || modal.classList.contains('hidden')) return;
+
+  // システム用キーは除外
+  if (e.key === 'Tab' || e.key === 'Escape' || e.ctrlKey || e.altKey || e.metaKey) {
+    if (e.key === 'Escape') {
+      stopTypingGame();
+      modal.classList.add('hidden');
+    }
+    return;
+  }
+
+  if (e.key.length === 1) {
+    e.preventDefault();
+    processTypingKey(e.key.toLowerCase());
+  } else if (e.key === 'Backspace') {
+    e.preventDefault();
+    if (tbState.typedRoma.length > 0) {
+      tbState.typedRoma = tbState.typedRoma.slice(0, -1);
+      updateTypingWordDisplay();
+      updateTypingStatsDisplay();
+    }
+  }
+});
+
+function processTypingKey(keyChar) {
+  if (!tbState.isPlaying || !tbState.currentWord) return;
+
+  const targetRoma = tbState.currentWord.roma.toLowerCase();
+  const nextChar = targetRoma[tbState.typedRoma.length];
+
+  if (keyChar === nextChar) {
+    tbState.typedRoma += keyChar;
+    tbState.correctKeys++;
+    tbState.totalKeys++;
+    tbState.combo++;
+    if (tbState.combo > tbState.maxCombo) tbState.maxCombo = tbState.combo;
+    playSound('type');
+
+    if (tbState.typedRoma === targetRoma) {
+      playSound('correct');
+      tbState.wordIndex++;
+      if (tbState.wordIndex >= tbState.wordsList.length) {
+        tbState.wordIndex = 0;
+      }
+      tbState.currentWord = tbState.wordsList[tbState.wordIndex];
+      tbState.typedRoma = '';
+    }
+  } else {
+    tbState.wrongKeys++;
+    tbState.totalKeys++;
+    tbState.combo = 0;
+    playSound('error');
+  }
+
+  updateTypingWordDisplay();
+  updateTypingStatsDisplay();
+}
 
 function setupTypingBattleModal() {
   const modal = document.getElementById('typing-battle-modal');
