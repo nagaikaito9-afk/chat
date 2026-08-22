@@ -1984,6 +1984,32 @@ function setupRoomTabs() {
 async function switchRoom(newRoomId, roomTitle, roomPR = '') {
   if (currentRoomId === newRoomId) return;
 
+  // 🔒 入室権限セキュリティチェック
+  if (newRoomId === 'sys_admin') {
+    if (!isAdminMode && !adminUsersSet.has(myUserId) && !isCreatorUser(myUserId, myName)) {
+      showToast('🔒 「👑 運営部屋」は運営メンバー・製作者のみ入室可能です。', 'warning');
+      return;
+    }
+  }
+
+  if (newRoomId === 'sys_trusted') {
+    const eff = getUserEffects(myUserId);
+    const hasTrust = (eff && eff.trusted) || trustedUsersSet.has(myUserId) || isAdminMode || isCreatorUser(myUserId, myName);
+    if (!hasTrust) {
+      showToast('🔒 「💎 信頼部屋」は「信頼済み」エフェクトがついている人のみ入室可能です。', 'warning');
+      return;
+    }
+  }
+
+  if (newRoomId === 'sys_veteran') {
+    const eff = getUserEffects(myUserId);
+    const hasVeteran = (eff && eff.initial) || isVeteranUser(myUserId) || isAdminMode || isCreatorUser(myUserId, myName);
+    if (!hasVeteran) {
+      showToast('🔒 「⭐ 古参部屋」は「古参」エフェクトがついている人のみ入室可能です。', 'warning');
+      return;
+    }
+  }
+
   try {
     await sendSystemMessage(`🚪 ${myName} が退室しました`);
     await remove(roomRef(`active_users/${myUserId}`));
@@ -1999,6 +2025,9 @@ async function switchRoom(newRoomId, roomTitle, roomPR = '') {
     let iconHtml = '<i class="fa-solid fa-comments"></i>';
     if (newRoomId === 'public_bug_report') iconHtml = '<i class="fa-solid fa-bug text-danger"></i>';
     else if (newRoomId === 'public_feature_request') iconHtml = '<i class="fa-solid fa-lightbulb text-warning"></i>';
+    else if (newRoomId === 'sys_admin') iconHtml = '<i class="fa-solid fa-crown text-warning"></i>';
+    else if (newRoomId === 'sys_trusted') iconHtml = '<i class="fa-solid fa-gem text-info"></i>';
+    else if (newRoomId === 'sys_veteran') iconHtml = '<i class="fa-solid fa-star text-warning"></i>';
 
     if (roomTitle.includes('<i')) {
       titleEl.innerHTML = roomTitle;
