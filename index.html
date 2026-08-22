@@ -519,7 +519,7 @@
             </button>
 
             <!-- 🧮 電卓キーパッド付き数学クイズ出題 ボタン -->
-            <button type="button" id="btn-open-custom-quiz" onclick="window.openCustomQuizModal()" class="btn-icon-tool" title="電卓キーパッドでオリジナル数学クイズを出題">
+            <button type="button" id="btn-open-custom-quiz" onclick="const m=document.getElementById('custom-quiz-modal'); if(m) m.classList.remove('hidden');" class="btn-icon-tool" title="電卓キーパッドでオリジナル数学クイズを出題">
               <i class="fa-solid fa-calculator text-success"></i>
             </button>
 
@@ -1642,6 +1642,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Application Logic Script -->
-  <script type="module" src="app.js?v=30"></script>
+  <script type="module" src="app.js?v=31"></script>
 </body>
 </html>

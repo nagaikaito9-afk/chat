@@ -34,6 +34,11 @@ localStorage.setItem('cyberchat_user_id', myUserId);
 window.myUserId = myUserId;
 state.myUserId = myUserId;
 
+window.openCustomQuizModal = function() {
+  const modal = document.getElementById('custom-quiz-modal');
+  if (modal) modal.classList.remove('hidden');
+};
+
 let lastMessageTime = 0;
 
 // 🐱 作者「ただのネコ好き」の学年動的計算（11月10日の誕生日で進級）
