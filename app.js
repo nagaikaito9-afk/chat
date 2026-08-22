@@ -862,6 +862,7 @@ function initApp() {
   setupBgmPlayer();
   setupScreenShare();
   setupPaintModal();
+  setupMathQuizModal();
   setupReplyBanner();
   setupAdminSystem();
   setupWerewolfGameControls();
@@ -3139,6 +3140,33 @@ function setupStampsAndMinigames() {
   }
 }
 
+window.startMathQuizGame = () => {
+  const modal = document.getElementById('math-quiz-modal');
+  if (modal) modal.classList.remove('hidden');
+};
+
+function setupMathQuizModal() {
+  const modal = document.getElementById('math-quiz-modal');
+  if (!modal) return;
+
+  modal.querySelectorAll('.modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+
+  modal.querySelectorAll('.btn-math-level-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const levelKey = btn.dataset.level || 'easy';
+      const quizData = generateMathQuiz(levelKey);
+      modal.classList.add('hidden');
+
+      if (quizData) {
+        sendSpecialMessage('game', `🧠 <strong>【数学対戦クイズ出題！】</strong><br>難易度: <strong>${quizData.badge}</strong> (${quizData.levelName})<br>問題: <span class="game-card-val" style="font-size:1.15rem; font-weight:700; color:var(--accent-primary);">${escapeHtml(quizData.question)}</span><br><span style="font-size:0.8rem; color:var(--text-muted);">※チャットで半角数字または数値を送信して正解を競おう！ (正解で +${quizData.pts} EXP)</span>`);
+        showToast(`🧠 「${quizData.badge}」を出題しました！`, 'info');
+      }
+    });
+  });
+}
+
 // 🛡️ Anti-Spam Rate Limiter & Flood Prevention
 const MESSAGE_COOLDOWN_MS = 1200;
 
@@ -3295,6 +3323,17 @@ function setupChatControls() {
       if (now - lastExpMsgTime > 3000) {
         lastExpMsgTime = now;
         gainExp(15, 'メッセージ送信');
+      }
+
+      // 🧠 数学クイズ回答判定
+      const solvedQuiz = checkMathQuizAnswer(text);
+      if (solvedQuiz) {
+        setTimeout(async () => {
+          await sendSpecialMessage('game', `🎉 <strong>【正解発表！】</strong> <span style="color:var(--warning-color); font-weight:700;">${escapeHtml(myName)}</span> さんが数学クイズ [${solvedQuiz.badge}] に見事正解しました！<br>問題: <strong>${escapeHtml(solvedQuiz.question)}</strong><br>正解: <span class="game-card-val">【 ${escapeHtml(solvedQuiz.answer)} 】</span> (+${solvedQuiz.pts} EXP獲得！🎉)`);
+          playSound('fanfare');
+          gainExp(solvedQuiz.pts, `数学クイズ[${solvedQuiz.badge}]正解`);
+          showToast(`🎉 数学クイズ正解！ +${solvedQuiz.pts} EXP獲得！`, 'success');
+        }, 400);
       }
 
       playSound('send');

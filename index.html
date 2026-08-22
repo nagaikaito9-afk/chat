@@ -1024,6 +1024,48 @@
         <button id="btn-submit-recover" class="btn-primary"><i class="fa-solid fa-key"></i> 照会・復元する</button>
       </div>
     </div>
+  <!-- 🧠 数学クイズ難易度選択モーダル -->
+  <div id="math-quiz-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 480px;">
+      <div class="modal-header" style="background: rgba(255, 184, 0, 0.15);">
+        <h3><i class="fa-solid fa-brain text-warning"></i> 🧠 数学クイズレベル選択</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.95rem; font-weight:700; color:var(--text-primary); text-align:center; margin-bottom:14px;">
+          レベルを選択してください
+        </p>
+        <div class="math-quiz-level-grid" style="display:flex; flex-direction:column; gap:10px;">
+          <button type="button" class="btn-math-level-opt" data-level="easy" style="padding:12px 14px; text-align:left; background:rgba(0,255,136,0.1); border:1px solid rgba(0,255,136,0.3); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s ease;">
+            <div style="font-weight:700; font-size:0.95rem; color:#00ff88;">🟢 簡単</div>
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">足し算、引き算 (EXP +20pt)</div>
+          </button>
+
+          <button type="button" class="btn-math-level-opt" data-level="normal" style="padding:12px 14px; text-align:left; background:rgba(255,184,0,0.1); border:1px solid rgba(255,184,0,0.3); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s ease;">
+            <div style="font-weight:700; font-size:0.95rem; color:#ffb800;">🟡 普通</div>
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">掛け算、あまりなしの割り算 (EXP +35pt)</div>
+          </button>
+
+          <button type="button" class="btn-math-level-opt" data-level="hard" style="padding:12px 14px; text-align:left; background:rgba(255,51,102,0.1); border:1px solid rgba(255,51,102,0.3); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s ease;">
+            <div style="font-weight:700; font-size:0.95rem; color:#ff3366;">🔴 難しい</div>
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">割り算、掛け算、足し算、引き算の組み合わせ (EXP +50pt)</div>
+          </button>
+
+          <button type="button" class="btn-math-level-opt" data-level="very_hard" style="padding:12px 14px; text-align:left; background:rgba(180,70,255,0.12); border:1px solid rgba(180,70,255,0.35); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s ease;">
+            <div style="font-weight:700; font-size:0.95rem; color:#c084fc;">🟣 すごく難しい</div>
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">xを求めたり√や!が使用される数列 (EXP +80pt)</div>
+          </button>
+
+          <button type="button" class="btn-math-level-opt" data-level="super_hard" style="padding:12px 14px; text-align:left; background:rgba(0,240,255,0.12); border:1px solid rgba(0,240,255,0.35); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s ease;">
+            <div style="font-weight:700; font-size:0.95rem; color:#00f0ff;">👑 ものすごく難しい</div>
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">x,yを求める連立方程式、小数・分数(〇/〇)、絶対値など大学・高校レベルの超ムズ数学問題 (EXP +120pt)</div>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">閉じる</button>
+      </div>
+    </div>
   </div>
 
   <!-- プロフィール変更モーダル -->
@@ -1492,6 +1534,6 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Application Logic Script -->
-  <script type="module" src="app.js?v=15"></script>
+  <script type="module" src="app.js?v=16"></script>
 </body>
 </html>
