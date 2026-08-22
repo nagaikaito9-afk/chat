@@ -855,6 +855,7 @@ function initApp() {
   setupStampsAndMinigames();
   setupTopicModal();
   setupPollModal();
+  setupSettingsModal();
   setupProfileModal();
   setupEditMsgModal();
   setupImageModal();
@@ -1985,6 +1986,13 @@ function setupRoomTabs() {
 async function switchRoom(newRoomId, roomTitle, roomPR = '') {
   if (currentRoomId === newRoomId) return;
 
+  // 🔒 人狼ゲーム途中退室防止セキュリティガード
+  if (isCurrentRoomWerewolfGamePlayingAndParticipant()) {
+    showToast('🔒 人狼ゲーム進行中は部屋を移動できません！(全員が /LeaveRoom と入力すると中断できます)', 'warning');
+    playSound('error');
+    return;
+  }
+
   // 🔒 入室権限セキュリティチェック
   if (newRoomId === 'sys_admin') {
     if (!isAdminMode && !adminUsersSet.has(myUserId) && !isCreatorUser(myUserId, myName)) {
@@ -2180,6 +2188,8 @@ function initFirebaseRealtimeSync() {
 
     // クイズ回答判定
     handleRealtimeQuizAnswerCheck(msgData);
+    // 人狼ゲーム/LeaveRoomコマンド判定
+    checkLeaveRoomCommand(msgData);
 
     const container = document.getElementById('messages-container');
     if (container && container.children.length > 60) {
@@ -2466,18 +2476,16 @@ function renderSingleMessage(msgId, msg) {
 
     let contentHtml = '';
     const bubbleClass = `msg-bubble ${msg.whisperTo ? 'whisper' : ''}`;
-    const customBubbleStyle = msg.bubbleColor ? `style="background: ${msg.bubbleColor} !important; color: ${getContrastTextColor(msg.bubbleColor)} !important;"` : '';
-
     if (msg.deleted) {
-      contentHtml = `<div class="${bubbleClass}" ${customBubbleStyle} style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</div>`;
+      contentHtml = `<div class="${bubbleClass}" style="opacity:0.6; font-style:italic;">(このメッセージは削除されました)</div>`;
     } else if (msg.type === 'stamp') {
-      contentHtml = `<div class="${bubbleClass}" ${customBubbleStyle}>${quoteCardHtml}<div class="stamp-card-img">${escapeHtml(msg.text)}</div></div>`;
+      contentHtml = `<div class="${bubbleClass}">${quoteCardHtml}<div class="stamp-card-img">${escapeHtml(msg.text)}</div></div>`;
     } else if (msg.type === 'game' || msg.type === 'rps') {
-      contentHtml = `<div class="${bubbleClass}" ${customBubbleStyle}>${quoteCardHtml}${msg.text}</div>`;
+      contentHtml = `<div class="${bubbleClass}">${quoteCardHtml}${msg.text}</div>`;
     } else if (msg.type === 'image') {
       const fileName = msg.fileName || 'image.png';
       contentHtml = `
-        <div class="${bubbleClass}" ${customBubbleStyle}>
+        <div class="${bubbleClass}">
           ${quoteCardHtml}
           ${msg.text ? `<p>${formatMessageText(msg.text)}</p>` : ''}
           <div class="msg-media-box">
@@ -3145,6 +3153,25 @@ window.startMathQuizGame = () => {
   if (modal) modal.classList.remove('hidden');
 };
 
+async function sendSystemAnnouncementMessage(text) {
+  try {
+    const newMsgRef = push(roomRef('messages'));
+    const msgObj = {
+      userId: 'system_bot',
+      name: '📢 システムアナウンス',
+      trip: '◆SYSTEM',
+      avatar: '🤖',
+      level: 99,
+      type: 'game',
+      text: text,
+      timestamp: Date.now()
+    };
+    await set(newMsgRef, msgObj);
+  } catch (err) {
+    console.error("sendSystemAnnouncementMessage error:", err);
+  }
+}
+
 async function handleRealtimeQuizAnswerCheck(msgData) {
   if (!msgData || !msgData.text || msgData.type === 'system' || msgData.type === 'game') return;
 
@@ -3189,7 +3216,7 @@ async function handleRealtimeQuizAnswerCheck(msgData) {
         </div>
       `;
 
-      await sendSpecialMessage('game', announceHtml, true);
+      await sendSystemAnnouncementMessage(announceHtml);
 
       if (msgData.userId === myUserId) {
         playSound('fanfare');
@@ -4295,11 +4322,29 @@ function setupPollModal() {
    ⚙️ Settings & Poll Timer & Result Announcement System
    ========================================================================== */
 
+window.openSettingsModal = () => {
+  const modal = document.getElementById('settings-modal');
+  if (modal) modal.classList.remove('hidden');
+};
+
 function setupSettingsModal() {
   const btnOpen = document.getElementById('btn-open-settings');
   const modal = document.getElementById('settings-modal');
   const volumeInput = document.getElementById('settings-volume-input');
   const volumeValText = document.getElementById('settings-volume-val');
+
+  if (btnOpen && modal) {
+    btnOpen.addEventListener('click', () => window.openSettingsModal());
+  }
+
+  if (modal) {
+    modal.querySelectorAll('.modal-close').forEach(b => {
+      b.addEventListener('click', () => modal.classList.add('hidden'));
+    });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  }
 
   if (volumeInput && volumeValText) {
     const currentVolInt = Math.round(soundVolume * 100);
@@ -4326,16 +4371,6 @@ function setupSettingsModal() {
       showToast(`文字の大きさを「${btn.textContent}」に変更しました`);
     });
   });
-
-  if (btnOpen && modal) {
-    btnOpen.addEventListener('click', () => modal.classList.remove('hidden'));
-    modal.querySelectorAll('.modal-close').forEach(b => {
-      b.addEventListener('click', () => modal.classList.add('hidden'));
-    });
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.classList.add('hidden');
-    });
-  }
 }
 
 let activePollMessageId = null;
@@ -4415,40 +4450,12 @@ function setupProfileModal() {
   const statusInput = document.getElementById('edit-status');
   const tripkeyInput = document.getElementById('edit-tripkey');
   const recEmailInput = document.getElementById('edit-recovery-email');
-  const bubbleColorInput = document.getElementById('edit-bubble-color');
-  const bubblePreview = document.getElementById('edit-bubble-preview');
   const errorMsg = document.getElementById('edit-profile-error');
-
-  const updateBubblePreview = (color) => {
-    if (!bubblePreview) return;
-    const txtColor = getContrastTextColor(color);
-    bubblePreview.style.backgroundColor = color;
-    bubblePreview.style.color = txtColor;
-    bubblePreview.textContent = `💬 吹き出しカラープレビュー (${color})`;
-  };
-
-  if (bubbleColorInput) {
-    bubbleColorInput.value = myBubbleColor;
-    updateBubblePreview(myBubbleColor);
-    bubbleColorInput.addEventListener('input', (e) => updateBubblePreview(e.target.value));
-  }
-
-  document.querySelectorAll('.bubble-preset-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const c = btn.dataset.color;
-      if (bubbleColorInput) bubbleColorInput.value = c;
-      updateBubblePreview(c);
-    });
-  });
 
   openBtn.addEventListener('click', () => {
     usernameInput.value = myName;
     statusInput.value = myStatus;
     tripkeyInput.value = '';
-    if (bubbleColorInput) {
-      bubbleColorInput.value = myBubbleColor;
-      updateBubblePreview(myBubbleColor);
-    }
     if (recEmailInput) recEmailInput.value = localStorage.getItem('cyberchat_recovery_email') || '';
     document.getElementById('edit-trip-preview-code').textContent = myTrip;
     errorMsg.classList.add('hidden');
@@ -4487,10 +4494,6 @@ function setupProfileModal() {
       const oldName = myName;
       myName = newName;
       myStatus = newStatus;
-      if (bubbleColorInput) {
-        myBubbleColor = bubbleColorInput.value;
-        localStorage.setItem('cyberchat_bubble_color', myBubbleColor);
-      }
       if (newTripKey) myTrip = await generateTrip(newTripKey);
       if (newRecEmail) localStorage.setItem('cyberchat_recovery_email', newRecEmail);
 
@@ -4501,7 +4504,6 @@ function setupProfileModal() {
             username: myName,
             avatar: myAvatar,
             status: myStatus,
-            bubbleColor: myBubbleColor,
             recoveryEmail: newRecEmail,
             lastLoginAt: Date.now()
           });
@@ -6559,4 +6561,272 @@ function setupDragAndDropFileUpload() {
       handleFileSelection(file);
     }
   });
+}
+
+/* ==========================================================================
+   🐺 Multiplayer Werewolf Game System (人狼ゲーム)
+   - Realtime Firebase Sync
+   - Mid-Game Room Switch Guard
+   - Emergency Unanimous /LeaveRoom Abort
+   - Spectator Mode for New Entrants
+   ========================================================================== */
+
+let currentWerewolfGameState = null;
+let unsubscribeWerewolfGameSync = null;
+
+function isCurrentRoomWerewolfGamePlayingAndParticipant() {
+  if (!currentWerewolfGameState) return false;
+  if (currentWerewolfGameState.status !== 'playing') return false;
+  const players = currentWerewolfGameState.players || {};
+  return !!players[myUserId];
+}
+
+function initWerewolfGameRealtimeSync() {
+  if (unsubscribeWerewolfGameSync) unsubscribeWerewolfGameSync();
+
+  const gameRef = ref(db, `rooms/${currentRoomId}/werewolf_game`);
+  unsubscribeWerewolfGameSync = onValue(gameRef, (snapshot) => {
+    currentWerewolfGameState = snapshot.val() || null;
+    renderWerewolfGameUI();
+  });
+}
+
+window.openWerewolfModal = () => {
+  const modal = document.getElementById('werewolf-modal');
+  if (modal) modal.classList.remove('hidden');
+  initWerewolfGameRealtimeSync();
+};
+
+async function checkLeaveRoomCommand(msgData) {
+  if (!msgData || !msgData.text) return;
+  const trimmed = msgData.text.trim().toLowerCase();
+  if (trimmed !== '/leaveroom') return;
+
+  const gameRef = ref(db, `rooms/${currentRoomId}/werewolf_game`);
+  const snap = await get(gameRef);
+  if (!snap.exists()) return;
+
+  const gameData = snap.val();
+  if (!gameData || gameData.status !== 'playing') return;
+
+  const players = gameData.players || {};
+  if (!players[msgData.userId]) return;
+
+  const leaveRequests = gameData.leaveRequests || {};
+  leaveRequests[msgData.userId] = true;
+
+  const totalPlayers = Object.keys(players).length;
+  const currentReqCount = Object.keys(leaveRequests).length;
+
+  await update(ref(db, `rooms/${currentRoomId}/werewolf_game/leaveRequests`), {
+    [msgData.userId]: true
+  });
+
+  if (currentReqCount >= totalPlayers) {
+    await update(gameRef, {
+      status: 'finished',
+      cancelled: true
+    });
+
+    await sendSystemAnnouncementMessage(`🚨 <strong>【緊急中断】</strong> 全員の <code>/LeaveRoom</code> 同意により、人狼ゲームが途中で終了しました。部屋移動のロックが解除されました。`);
+    showToast('🚨 全員の同意により人狼ゲームが中断されました', 'info');
+  } else {
+    await sendSystemAnnouncementMessage(`⚠️ <strong>[${escapeHtml(msgData.name || '参加者')}]</strong> さんが <code>/LeaveRoom</code> を送信しました。(中断同意状況: ${currentReqCount} / ${totalPlayers} 人)`);
+  }
+}
+
+function setupWerewolfGameControls() {
+  const joinBtn = document.getElementById('btn-werewolf-toggle-join');
+  const startBtn = document.getElementById('btn-werewolf-start-game');
+
+  if (joinBtn) {
+    joinBtn.addEventListener('click', async () => {
+      if (!currentRoomId) return;
+      const gameRef = ref(db, `rooms/${currentRoomId}/werewolf_game`);
+      const snap = await get(gameRef);
+      const gameData = snap.val() || { status: 'lobby', players: {} };
+
+      if (gameData.status === 'playing') {
+        showToast('現在ゲームが進行中のため、ロビーに参加できません（観覧モードになります）', 'warning');
+        return;
+      }
+
+      const players = gameData.players || {};
+      if (players[myUserId]) {
+        delete players[myUserId];
+        showToast('人狼ゲームの参加をキャンセルしました', 'info');
+      } else {
+        players[myUserId] = {
+          uid: myUserId,
+          name: myName,
+          avatar: myAvatar,
+          joinedAt: Date.now()
+        };
+        showToast('人狼ゲームに参加登録しました！', 'success');
+      }
+
+      await set(gameRef, {
+        status: 'lobby',
+        players: players,
+        updatedAt: Date.now()
+      });
+    });
+  }
+
+  if (startBtn) {
+    startBtn.addEventListener('click', async () => {
+      const gameRef = ref(db, `rooms/${currentRoomId}/werewolf_game`);
+      const snap = await get(gameRef);
+      const gameData = snap.val() || { status: 'lobby', players: {} };
+      const players = gameData.players || {};
+      const uids = Object.keys(players);
+
+      if (uids.length < 1) {
+        showToast('参加者がいません。「参加する」ボタンを押してください。', 'warning');
+        return;
+      }
+
+      const roles = ['werewolf', 'seer', 'bodyguard', 'madman', 'villager', 'villager', 'villager'];
+      const shuffledUids = [...uids].sort(() => Math.random() - 0.5);
+
+      const assignedPlayers = {};
+      shuffledUids.forEach((uid, idx) => {
+        const role = roles[idx % roles.length];
+        assignedPlayers[uid] = {
+          ...players[uid],
+          role: role,
+          isAlive: true
+        };
+      });
+
+      const newGameState = {
+        status: 'playing',
+        phase: 'night',
+        dayCount: 1,
+        phaseEndTime: Date.now() + 30000,
+        players: assignedPlayers,
+        nightActions: {},
+        votes: {},
+        leaveRequests: {},
+        logs: [`🐺 【人狼ゲーム開始】 1日目の夜が始まりました。恐ろしい人狼が目を覚まします...`],
+        startedAt: Date.now()
+      };
+
+      await set(gameRef, newGameState);
+      await sendSystemAnnouncementMessage(`🐺 <strong>【オンライン人狼ゲーム開始！】</strong><br>参加者: ${uids.length}名<br>※現在この部屋ではゲーム進行中のため部屋移動がロックされます。<br>※退室したい場合はチャットで <code>/LeaveRoom</code> と入力してください。`);
+      playSound('fanfare');
+    });
+  }
+}
+
+function renderWerewolfGameUI() {
+  const modal = document.getElementById('werewolf-modal');
+  if (!modal) return;
+
+  const gameData = currentWerewolfGameState;
+  const lobbyScreen = document.getElementById('werewolf-screen-lobby');
+  const playScreen = document.getElementById('werewolf-screen-play');
+  const specBanner = document.getElementById('werewolf-spectator-banner');
+  const leaveroomBar = document.getElementById('werewolf-leaveroom-status-bar');
+  const leaveroomCountEl = document.getElementById('werewolf-leaveroom-count');
+
+  if (!gameData || gameData.status === 'finished' || gameData.status === 'lobby') {
+    if (lobbyScreen) lobbyScreen.classList.remove('hidden');
+    if (playScreen) playScreen.classList.add('hidden');
+    if (specBanner) specBanner.classList.add('hidden');
+    if (leaveroomBar) leaveroomBar.classList.add('hidden');
+
+    const players = (gameData && gameData.players) ? gameData.players : {};
+    const countEl = document.getElementById('werewolf-player-count');
+    if (countEl) countEl.textContent = Object.keys(players).length;
+
+    const lobbyUl = document.getElementById('werewolf-lobby-players-ul');
+    if (lobbyUl) {
+      lobbyUl.innerHTML = '';
+      Object.values(players).forEach(p => {
+        const li = document.createElement('li');
+        li.style.cssText = 'padding:8px; background:rgba(255,255,255,0.05); border-radius:6px; display:flex; align-items:center; gap:6px; font-size:0.85rem;';
+        li.innerHTML = `<span style="font-size:1.2rem;">${renderAvatarHTML(p.avatar)}</span> <span style="font-weight:600;">${escapeHtml(p.name)}</span>`;
+        lobbyUl.appendChild(li);
+      });
+    }
+
+    const joinBtn = document.getElementById('btn-werewolf-toggle-join');
+    if (joinBtn) {
+      if (players[myUserId]) {
+        joinBtn.textContent = '❌ キャンセル';
+        joinBtn.className = 'btn-secondary btn-sm danger';
+      } else {
+        joinBtn.textContent = '⭕ 参加する';
+        joinBtn.className = 'btn-primary btn-sm';
+      }
+    }
+    return;
+  }
+
+  // If status === 'playing'
+  if (lobbyScreen) lobbyScreen.classList.add('hidden');
+  if (playScreen) playScreen.classList.remove('hidden');
+
+  const players = gameData.players || {};
+  const isParticipant = !!players[myUserId];
+
+  if (isParticipant) {
+    if (specBanner) specBanner.classList.add('hidden');
+  } else {
+    // 👁️ Spectator Mode!
+    if (specBanner) specBanner.classList.remove('hidden');
+  }
+
+  const leaveRequests = gameData.leaveRequests || {};
+  const reqCount = Object.keys(leaveRequests).length;
+  const totalCount = Object.keys(players).length;
+  if (leaveroomBar && leaveroomCountEl) {
+    leaveroomBar.classList.remove('hidden');
+    leaveroomCountEl.textContent = `${reqCount} / ${totalCount} 人`;
+  }
+
+  const phaseTitle = document.getElementById('werewolf-phase-title');
+  if (phaseTitle) {
+    const pName = gameData.phase === 'night' ? '🌙 夜のフェーズ' : (gameData.phase === 'day_voting' ? '⚖️ 昼の投票フェーズ' : '☀️ 昼の議論フェーズ');
+    phaseTitle.textContent = `${pName} (${gameData.dayCount || 1}日目)`;
+  }
+
+  const myPlayerData = players[myUserId];
+  const roleNameEl = document.getElementById('werewolf-my-role-name');
+  const roleDescEl = document.getElementById('werewolf-my-role-desc');
+
+  if (myPlayerData) {
+    const rMap = {
+      werewolf: { name: '🐺 人狼', desc: '夜に村人を襲撃します。仲間の人狼と協力して生き残ろう！' },
+      seer: { name: '🔮 占い師', desc: '夜に指定したプレイヤーが人狼か人間かを占うことができます。' },
+      bodyguard: { name: '🛡️ 狩人', desc: '夜に1名のプレイヤーを守り、人狼の襲撃を防ぎます。' },
+      madman: { name: '狂人', desc: '人間ですが人狼側の勝利を目指す混乱の協力者です。' },
+      villager: { name: '👨‍🌾 市民', desc: '特殊能力はありません。昼の議論と投票で人狼を追放しよう！' }
+    };
+    const rInfo = rMap[myPlayerData.role] || rMap.villager;
+    if (roleNameEl) roleNameEl.textContent = rInfo.name;
+    if (roleDescEl) roleDescEl.textContent = rInfo.desc;
+  } else {
+    if (roleNameEl) roleNameEl.textContent = '👁️ 観覧者 (スペクテイター)';
+    if (roleDescEl) roleDescEl.textContent = 'あなたは観覧者です。ゲーム参加者の攻防をお楽しみください。';
+  }
+
+  const statusGrid = document.getElementById('werewolf-players-status-grid');
+  if (statusGrid) {
+    statusGrid.innerHTML = '';
+    Object.values(players).forEach(p => {
+      const div = document.createElement('div');
+      const isDead = p.isAlive === false;
+      div.style.cssText = `padding:8px 10px; border-radius:6px; font-size:0.82rem; display:flex; align-items:center; gap:6px; background:${isDead ? 'rgba(255,0,0,0.15)' : 'rgba(255,255,255,0.05)'}; border:1px solid ${isDead ? 'rgba(255,0,0,0.3)' : 'var(--glass-border)'}; opacity:${isDead ? '0.6' : '1'};`;
+      div.innerHTML = `<span>${renderAvatarHTML(p.avatar)}</span> <span style="font-weight:600;">${escapeHtml(p.name)}</span> ${isDead ? '<span style="color:#ff3366; font-size:0.75rem; font-weight:700;">[犠牲]</span>' : '<span style="color:#00ff88; font-size:0.75rem; font-weight:700;">[生存]</span>'}`;
+      statusGrid.appendChild(div);
+    });
+  }
+
+  const logBox = document.getElementById('werewolf-game-log-box');
+  if (logBox && gameData.logs) {
+    logBox.innerHTML = gameData.logs.map(l => `<div style="margin-bottom:4px;">${l}</div>`).join('');
+    logBox.scrollTop = logBox.scrollHeight;
+  }
 }
