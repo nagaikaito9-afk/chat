@@ -5076,55 +5076,7 @@ class WerewolfGameEngine {
   }
 }
 
-const werewolfEngine = new WerewolfGameEngine();
 
-window.openWerewolfModal = () => {
-  const modal = document.getElementById('werewolf-game-modal');
-  if (modal) {
-    werewolfEngine.initLobby();
-    modal.classList.remove('hidden');
-  }
-};
-
-function setupWerewolfGameControls() {
-  const btnStart = document.getElementById('btn-start-werewolf-game');
-  if (btnStart) btnStart.addEventListener('click', () => werewolfEngine.startNewGame());
-
-  const btnConfirmRole = document.getElementById('btn-confirm-role');
-  if (btnConfirmRole) btnConfirmRole.addEventListener('click', () => werewolfEngine.startNightPhase());
-
-  const btnNightSubmit = document.getElementById('btn-submit-night-action');
-  if (btnNightSubmit) btnNightSubmit.addEventListener('click', () => werewolfEngine.submitNightAction());
-
-  const btnWfSendChat = document.getElementById('btn-wf-send-chat');
-  if (btnWfSendChat) btnWfSendChat.addEventListener('click', () => werewolfEngine.sendUserWfChat());
-
-  const wfChatInput = document.getElementById('wf-chat-input');
-  if (wfChatInput) {
-    wfChatInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') werewolfEngine.sendUserWfChat();
-    });
-  }
-
-  const btnSkipDisc = document.getElementById('btn-wf-skip-discussion');
-  if (btnSkipDisc) btnSkipDisc.addEventListener('click', () => werewolfEngine.skipDiscussionToVote());
-
-  const btnSubmitVote = document.getElementById('btn-submit-vote');
-  if (btnSubmitVote) btnSubmitVote.addEventListener('click', () => werewolfEngine.resolveVotes());
-
-  const btnPlayAgain = document.getElementById('btn-wf-play-again');
-  if (btnPlayAgain) btnPlayAgain.addEventListener('click', () => werewolfEngine.initLobby());
-
-  const btnShareChat = document.getElementById('btn-wf-share-chat');
-  if (btnShareChat) btnShareChat.addEventListener('click', () => werewolfEngine.shareResultToMainChat());
-
-  const btnCloseWf = document.getElementById('btn-close-werewolf');
-  if (btnCloseWf) {
-    btnCloseWf.addEventListener('click', () => {
-      document.getElementById('werewolf-game-modal').classList.add('hidden');
-    });
-  }
-}
 
 /* ==========================================================================
    🤝 Friend System Logic & Controls
