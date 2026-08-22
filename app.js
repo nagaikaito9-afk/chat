@@ -3167,7 +3167,29 @@ async function handleRealtimeQuizAnswerCheck(msgData) {
       await remove(roomRef('active_math_quiz'));
       state.activeMathQuiz = null;
 
-      await sendSpecialMessage('game', `🎉 <strong>【正解発表！】</strong> <span style="color:var(--warning-color); font-weight:700;">${escapeHtml(msgData.name || 'ゲスト')}</span> さんが数学クイズ [${quizData.badge}] に見事正解しました！<br>問題: <strong>${escapeHtml(quizData.question)}</strong><br>正解: <span class="game-card-val">【 ${escapeHtml(quizData.answer)} 】</span> (+${quizData.pts} EXP獲得！🎉)`);
+      const announceHtml = `
+        <div class="math-quiz-card" style="border-color: #00ff88 !important; box-shadow: 0 0 16px rgba(0, 255, 136, 0.4) !important;">
+          <div class="math-quiz-header">
+            <span class="math-quiz-badge" style="color: #00ff88 !important;">🎉 【正解発表！】</span>
+            <span class="math-quiz-level">${quizData.badge}</span>
+          </div>
+          <div style="font-size: 1rem; font-weight: 700; color: #ffffff; margin: 6px 0;">
+            <span style="color: #ffb800; font-weight: 800;">${escapeHtml(msgData.name || 'ゲスト')}</span> さんが見事正解しました！
+          </div>
+          <div class="math-quiz-question-box" style="border-left-color: #00ff88 !important;">
+            <div class="math-quiz-label">問題:</div>
+            <div class="math-quiz-question-text" style="color: #ffffff !important; font-size: 1.1rem !important;">${escapeHtml(quizData.question)}</div>
+            <div style="margin-top: 6px; font-size: 1.1rem; font-weight: 800; color: #00ff88;">
+              正解: 【 ${escapeHtml(quizData.answer)} 】
+            </div>
+          </div>
+          <div class="math-quiz-footer-hint" style="color: #00ff88 !important; font-weight: 700;">
+            🎉 勝者報酬: +${quizData.pts} EXP獲得！
+          </div>
+        </div>
+      `;
+
+      await sendSpecialMessage('game', announceHtml, true);
 
       if (msgData.userId === myUserId) {
         playSound('fanfare');
@@ -3176,7 +3198,7 @@ async function handleRealtimeQuizAnswerCheck(msgData) {
       }
     }
   } catch (err) {
-    console.error("checkQuizAnswer error:", err);
+    console.error("handleRealtimeQuizAnswerCheck error:", err);
   }
 }
 
@@ -3268,9 +3290,9 @@ function checkAntiSpam(text) {
   return true;
 }
 
-async function sendSpecialMessage(msgType, text) {
+async function sendSpecialMessage(msgType, text, bypassCooldown = false) {
   if (isSendingSpecial) return;
-  if (!checkAntiSpam(text)) return;
+  if (!bypassCooldown && !checkAntiSpam(text)) return;
   isSendingSpecial = true;
   try {
     const newMsgRef = push(roomRef('messages'));
