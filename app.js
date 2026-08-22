@@ -4994,6 +4994,7 @@ function renderFriendRequestsUI() {
     `;
     reqUl.appendChild(li);
   });
+  if (typeof renderUnifiedSidebarUserList === 'function') renderUnifiedSidebarUserList();
 }
 
 function renderFriendsListUI() {
@@ -5062,6 +5063,7 @@ function renderFriendsListUI() {
       modalUl.appendChild(mLi);
     }
   });
+  if (typeof renderUnifiedSidebarUserList === 'function') renderUnifiedSidebarUserList();
 }
 
 window.removeFriend = async (targetUid, targetName) => {
@@ -5958,15 +5960,21 @@ function renderUnifiedSidebarUserList() {
     });
   } else if (activeSidebarTab === 'friends') {
     if (titleEl) {
-      titleEl.innerHTML = `<i class="fa-solid fa-user-group text-warning"></i> フレンド <button type="button" id="btn-open-friend-requests" class="btn-primary btn-sm" style="margin-left:6px; padding:2px 8px; font-size:0.75rem;"><i class="fa-solid fa-user-plus"></i> フレンド申請</button>`;
-      const openReqBtn = document.getElementById('btn-open-friend-requests');
-      if (openReqBtn) {
-        openReqBtn.onclick = () => {
-          const modal = document.getElementById('friend-request-modal');
-          if (modal) modal.classList.remove('hidden');
-        };
-      }
+      titleEl.innerHTML = '<i class="fa-solid fa-user-group text-warning"></i> フレンド & 届いた申請';
     }
+
+    if (friendRequestsMap && friendRequestsMap.size > 0) {
+      friendRequestsMap.forEach((req, fromUid) => {
+        usersToRender.push({
+          userId: fromUid,
+          name: req.fromName || 'ユーザー',
+          avatar: req.fromAvatar || '🤖',
+          isRequest: true,
+          timestamp: req.timestamp || Date.now()
+        });
+      });
+    }
+
     friendsMap.forEach((f, fUid) => {
       const isOnline = globalOnlineUsersMap.has(fUid);
       const liveUser = globalOnlineUsersMap.get(fUid) || activeUsersMap.get(fUid);
@@ -5977,7 +5985,8 @@ function renderUnifiedSidebarUserList() {
         userId: fUid,
         name: displayName,
         avatar: displayAvatar,
-        isOnline: isOnline
+        isOnline: isOnline,
+        isRequest: false
       });
     });
   } else if (activeSidebarTab === 'admins') {
@@ -6032,6 +6041,31 @@ function renderUnifiedSidebarUserList() {
     li.style.alignItems = 'center';
     li.style.justifyContent = 'space-between';
     li.style.borderRadius = 'var(--radius-md)';
+
+    if (u.isRequest) {
+      li.style.background = 'rgba(255, 184, 0, 0.12)';
+      li.style.border = '1px solid rgba(255, 184, 0, 0.3)';
+
+      li.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+          <div class="avatar-sm">${renderAvatarHTML(u.avatar || '🤖')}</div>
+          <div style="overflow:hidden;">
+            <div style="font-weight:600; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(u.name)}
+            </div>
+            <div style="font-size:0.72rem; color:var(--warning-color); font-weight:700;">
+              📩 申請が届いています
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:4px; flex-shrink:0;">
+          <button class="btn-primary btn-sm" onclick="window.acceptFriendRequest('${u.userId}', '${escapeHtml(u.name)}', '${escapeHtml(u.avatar)}')" title="承認"><i class="fa-solid fa-check"></i> 承認</button>
+          <button class="btn-secondary btn-sm danger" onclick="window.declineFriendRequest('${u.userId}')" title="拒否"><i class="fa-solid fa-xmark"></i> 拒否</button>
+        </div>
+      `;
+      ul.appendChild(li);
+      return;
+    }
 
     let badges = '';
     if (u.isAdmin) badges += '<span class="admin-badge"><i class="fa-solid fa-crown text-warning"></i> 運営</span> ';
