@@ -3064,45 +3064,50 @@ function setupStampsAndMinigames() {
   const soundboardBtn = document.getElementById('btn-soundboard-toggle');
   const soundboardPicker = document.getElementById('soundboard-picker');
 
-  stampBtn.addEventListener('click', () => {
-    soundboardPicker.classList.add('hidden');
-    stampPicker.classList.toggle('hidden');
-  });
-
-  soundboardBtn.addEventListener('click', () => {
-    stampPicker.classList.add('hidden');
-    soundboardPicker.classList.toggle('hidden');
-  });
-
-  document.querySelectorAll('.stamp-btn[data-stamp]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const stampText = btn.dataset.stamp;
-      stampPicker.classList.add('hidden');
-      sendSpecialMessage('stamp', stampText);
+  if (stampBtn && stampPicker) {
+    stampBtn.addEventListener('click', () => {
+      if (soundboardPicker) soundboardPicker.classList.add('hidden');
+      stampPicker.classList.toggle('hidden');
     });
-  });
+  }
 
-  document.getElementById('btn-game-dice').addEventListener('click', () => {
-    const roll = Math.floor(Math.random() * 100) + 1;
-    sendSpecialMessage('game', `<i class="fa-solid fa-dice"></i> さいころを振った！ <span class="game-card-val">【出目: ${roll} / 100】</span>`);
-  });
+  if (soundboardBtn && soundboardPicker) {
+    soundboardBtn.addEventListener('click', () => {
+      if (stampPicker) stampPicker.classList.add('hidden');
+      soundboardPicker.classList.toggle('hidden');
+    });
+  }
 
-  document.getElementById('btn-game-omikuji').addEventListener('click', () => {
-    const fortunes = [
-      '✨ 大吉 ✨ 願望は叶うでしょう！',
-      '🌟 中吉 🌟 良いことが起きる予感！',
-      '😊 吉 今日は穏やかな一日。',
-      '👍 小吉 コツコツ努力が実を結ぶ！',
-      '🍀 末吉 幸運のヒントはすぐそばに。'
-    ];
-    const fortune = fortunes[Math.floor(Math.random() * fortunes.length)];
-    sendSpecialMessage('game', `<i class="fa-solid fa-torii-gate text-success"></i> 今日の運勢おみくじ <span class="game-card-val">${fortune}</span>`);
-  });
+  const diceBtn = document.getElementById('btn-game-dice');
+  if (diceBtn) {
+    diceBtn.addEventListener('click', () => {
+      const roll = Math.floor(Math.random() * 100) + 1;
+      sendSpecialMessage('game', `<i class="fa-solid fa-dice"></i> さいころを振った！ <span class="game-card-val">【出目: ${roll} / 100】</span>`);
+    });
+  }
 
-  document.getElementById('btn-game-coin').addEventListener('click', () => {
-    const isHeads = Math.random() < 0.5;
-    sendSpecialMessage('game', `<i class="fa-solid fa-coins"></i> コイントス！ <span class="game-card-val">結果: 【${isHeads ? '表 (Heads)' : '裏 (Tails)'}】</span>`);
-  });
+  const omikujiBtn = document.getElementById('btn-game-omikuji');
+  if (omikujiBtn) {
+    omikujiBtn.addEventListener('click', () => {
+      const fortunes = [
+        '✨ 大吉 ✨ 願望は叶うでしょう！',
+        '🌟 中吉 🌟 良いことが起きる予感！',
+        '😊 吉 今日は穏やかな一日。',
+        '👍 小吉 コツコツ努力が実を結ぶ！',
+        '🍀 末吉 幸運のヒントはすぐそばに。'
+      ];
+      const fortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+      sendSpecialMessage('game', `<i class="fa-solid fa-torii-gate text-success"></i> 今日の運勢おみくじ <span class="game-card-val">${fortune}</span>`);
+    });
+  }
+
+  const coinBtn = document.getElementById('btn-game-coin');
+  if (coinBtn) {
+    coinBtn.addEventListener('click', () => {
+      const isHeads = Math.random() < 0.5;
+      sendSpecialMessage('game', `<i class="fa-solid fa-coins"></i> コイントス！ <span class="game-card-val">結果: 【${isHeads ? '表 (Heads)' : '裏 (Tails)'}】</span>`);
+    });
+  }
 }
 
 // 🛡️ Anti-Spam Rate Limiter & Flood Prevention
@@ -3273,19 +3278,24 @@ function setupChatControls() {
     }
   }
 
-  messagesBox.addEventListener('scroll', () => {
-    isScrolledToBottom = messagesBox.scrollHeight - messagesBox.scrollTop - messagesBox.clientHeight <= 80;
-    if (isScrolledToBottom) {
+  if (messagesBox) {
+    messagesBox.addEventListener('scroll', () => {
+      isScrolledToBottom = messagesBox.scrollHeight - messagesBox.scrollTop - messagesBox.clientHeight <= 80;
+      if (isScrolledToBottom) {
+        unreadMessagesCount = 0;
+        updateScrollBottomButton();
+      }
+    });
+  }
+
+  const btnScrollBottom = document.getElementById('btn-scroll-bottom');
+  if (btnScrollBottom && messagesBox) {
+    btnScrollBottom.addEventListener('click', () => {
+      messagesBox.scrollTop = messagesBox.scrollHeight;
       unreadMessagesCount = 0;
       updateScrollBottomButton();
-    }
-  });
-
-  document.getElementById('btn-scroll-bottom').addEventListener('click', () => {
-    messagesBox.scrollTop = messagesBox.scrollHeight;
-    unreadMessagesCount = 0;
-    updateScrollBottomButton();
-  });
+    });
+  }
 
   document.querySelectorAll('.pill-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -3305,12 +3315,14 @@ function setupChatControls() {
   }
 
   const soundBtn = document.getElementById('btn-toggle-sound');
-  soundBtn.addEventListener('click', () => {
-    soundEnabled = !soundEnabled;
-    soundBtn.classList.toggle('active', soundEnabled);
-    soundBtn.innerHTML = soundEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
-    showToast(`通知音を ${soundEnabled ? 'ON' : 'OFF'} に設定しました`);
-  });
+  if (soundBtn) {
+    soundBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundBtn.classList.toggle('active', soundEnabled);
+      soundBtn.innerHTML = soundEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
+      showToast(`通知音を ${soundEnabled ? 'ON' : 'OFF'} に設定しました`);
+    });
+  }
 
   const sidebar = document.getElementById('sidebar');
   const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
@@ -3320,13 +3332,15 @@ function setupChatControls() {
 
   const emojiBtn = document.getElementById('btn-emoji-toggle');
   const emojiPicker = document.getElementById('emoji-picker');
-  emojiBtn.addEventListener('click', () => emojiPicker.classList.toggle('hidden'));
+  if (emojiBtn && emojiPicker) {
+    emojiBtn.addEventListener('click', () => emojiPicker.classList.toggle('hidden'));
+  }
 
   document.querySelectorAll('.emoji-grid span').forEach(span => {
     span.addEventListener('click', () => {
-      textInput.value += span.textContent;
-      emojiPicker.classList.add('hidden');
-      textInput.focus();
+      if (textInput) textInput.value += span.textContent;
+      if (emojiPicker) emojiPicker.classList.add('hidden');
+      if (textInput) textInput.focus();
     });
   });
 }
