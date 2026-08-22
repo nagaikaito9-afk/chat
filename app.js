@@ -34,6 +34,56 @@ localStorage.setItem('cyberchat_user_id', myUserId);
 window.myUserId = myUserId;
 state.myUserId = myUserId;
 
+// 🐱 作者「ただのネコ好き」の学年動的計算（11月10日の誕生日で進級）
+function getCreatorGradeStr(date = new Date()) {
+  const currentYear = date.getFullYear();
+  const currentMonth = date.getMonth(); // 0-indexed: 10 is 11月
+  const currentDate = date.getDate();
+
+  // 2015年11月10日生まれ基準（毎年11月10日に学年が繰り上がる）
+  let age = currentYear - 2015;
+  if (currentMonth < 10 || (currentMonth === 10 && currentDate < 10)) {
+    age--;
+  }
+
+  if (age <= 5) return '未就学';
+  if (age === 6) return '小1';
+  if (age === 7) return '小2';
+  if (age === 8) return '小3';
+  if (age === 9) return '小4';
+  if (age === 10) return '小5';
+  if (age === 11) return '小6';
+  if (age === 12) return '中1';
+  if (age === 13) return '中2';
+  if (age === 14) return '中3';
+  if (age === 15) return '高1';
+  if (age === 16) return '高2';
+  if (age === 17) return '高3';
+  if (age === 18) return '大1';
+  if (age === 19) return '大2';
+  if (age === 20) return '大3';
+  if (age === 21) return '大4';
+  return `${age}歳`;
+}
+
+function updateCreatorGradeUI() {
+  const gradeStr = getCreatorGradeStr();
+  const gradeElem = document.getElementById('creator-grade');
+  if (gradeElem) {
+    gradeElem.textContent = gradeStr;
+  }
+  const noticeElem = document.getElementById('site-creator-notice');
+  if (noticeElem) {
+    noticeElem.innerHTML = `<i class="fa-solid fa-cat"></i> このサイトは「ただのネコ好き」(${gradeStr})が作ったチャットサイトです。`;
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', updateCreatorGradeUI);
+} else {
+  updateCreatorGradeUI();
+}
+
 let myName = '';
 window.myName = myName;
 state.myName = myName;
