@@ -5517,6 +5517,14 @@ function initGlobalFriendDmListener() {
       }
     }
   });
+function refreshAllUserViews() {
+  if (typeof updateMyProfileUI === 'function') updateMyProfileUI();
+  if (typeof renderFriendsListUI === 'function') renderFriendsListUI();
+  if (typeof renderUnifiedSidebarUserList === 'function') renderUnifiedSidebarUserList();
+  const modal = document.getElementById('creator-effects-modal');
+  if (modal && !modal.classList.contains('hidden')) {
+    if (typeof renderCreatorEffectsListUI === 'function') renderCreatorEffectsListUI();
+  }
 }
 
 function initUserEffectsListener() {
