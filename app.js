@@ -3297,21 +3297,37 @@ function setupMathQuizModal() {
 function setupCustomQuizModal() {
   const modal = document.getElementById('custom-quiz-modal');
   const openBtn = document.getElementById('btn-open-custom-quiz');
+  const submitBtn = document.getElementById('btn-submit-custom-quiz');
 
   if (openBtn && modal) {
     openBtn.addEventListener('click', () => {
       modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    });
+  }
+
+  if (submitBtn) {
+    submitBtn.addEventListener('click', () => {
+      if (typeof window.publishCustomQuizFromCalc === 'function') {
+        window.publishCustomQuizFromCalc();
+      }
     });
   }
 
   if (!modal) return;
 
   modal.querySelectorAll('.modal-close').forEach(b => {
-    b.addEventListener('click', () => modal.classList.add('hidden'));
+    b.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    });
   });
 
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.classList.add('hidden');
+    if (e.target === modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
   });
 }
 
