@@ -6591,14 +6591,14 @@ window.publishCustomQuizFromCalc = async () => {
     pts: lvlInfo.pts,
     question: question,
     answer: answer,
+    acceptedAnswers: [answer, answer.toLowerCase(), answer.replace(/\s+/g, '')],
     creatorUid: myUserId,
     creatorName: myName,
     createdAt: Date.now()
   };
 
   try {
-    const targetRoomId = currentRoomId || 'public_main';
-    await set(ref(db, `rooms/${targetRoomId}/active_math_quiz`), quizObj);
+    await set(roomRef('active_math_quiz'), quizObj);
 
     const quizCardHtml = `
       <div class="math-quiz-card" style="max-width: 420px !important;">
