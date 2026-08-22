@@ -26,8 +26,6 @@
   <div class="bg-glow bg-glow-1"></div>
   <div class="bg-glow bg-glow-2"></div>
 
-  <!-- リモート音声格納要素 -->
-  <div id="remote-audio-container" class="hidden"></div>
 
   <!-- 画面共有ライブ表示ビューポート -->
   <div id="screen-share-overlay" class="screen-share-box glass-panel hidden">
@@ -307,17 +305,10 @@
             <i class="fa-solid fa-music"></i>
           </button>
 
-          <!-- ボイスチャット参加ボタン -->
-          <button id="btn-toggle-vc" class="btn-vc" title="ボイスチャットに参加/退出">
-            <i class="fa-solid fa-microphone"></i>
-            <span>ボイスチャット</span>
-          </button>
-          <button id="btn-toggle-mic" class="btn-icon hidden" title="マイク ミュート/解除">
-            <i class="fa-solid fa-microphone-slash"></i>
-          </button>
 
-          <button id="btn-toggle-sound" class="btn-icon active" title="通知音 ON/OFF">
-            <i class="fa-solid fa-volume-high"></i>
+          <!-- ⚙️ 設定ボタン (効果音の音量・文字の大きさ) -->
+          <button id="btn-open-settings" class="btn-icon" title="⚙️ 設定 (音量・文字サイズ)">
+            <i class="fa-solid fa-gear"></i>
           </button>
 
           <!-- 🌐 50か国語自動翻訳切り替えボタン -->
@@ -487,22 +478,10 @@
         </div>
       </div>
 
-      <!-- ボイス録音中プレビューバー -->
-      <div id="voice-rec-preview" class="attachment-preview-bar voice-rec-bar hidden">
-        <div class="rec-dot pulse"></div>
-        <div class="preview-info">
-          <span class="preview-title">ボイスメッセージ録音中...</span>
-          <span class="preview-hint" id="voice-rec-time">00:00</span>
-        </div>
-        <button id="btn-cancel-voice" class="btn-secondary btn-sm"><i class="fa-solid fa-trash"></i> キャンセル</button>
-        <button id="btn-send-voice" class="btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i> 録音を送信</button>
-      </div>
 
       <!-- Quick Snippets ショートカットバー -->
       <div class="snippets-bar">
-        <span class="snippet-tag snippet-werewolf" onclick="window.openWerewolfModal()">🐺 人狼ゲーム</span>
         <span class="snippet-tag" onclick="window.startMathQuizGame()">🧠 数学クイズ</span>
-        <span class="snippet-tag" onclick="window.startRpsBattle()">✌️ じゃんけん勝負</span>
         <span class="snippet-tag" onclick="window.insertSnippet('草ww')">草ww</span>
         <span class="snippet-tag" onclick="window.insertSnippet('88888👏')">88888👏</span>
         <span class="snippet-tag" onclick="window.insertSnippet('なるほど！')">なるほど！</span>
@@ -521,86 +500,27 @@
           </div>
         </div>
 
-        <!-- スタンプパレット -->
-        <div id="stamp-picker" class="stamp-picker-popup hidden">
-          <div class="stamp-grid">
-            <button class="stamp-btn" data-stamp="おはよー！☀️">おはよー！☀️</button>
-            <button class="stamp-btn" data-stamp="お疲れ様！🍵">お疲れ様！🍵</button>
-            <button class="stamp-btn" data-stamp="神✨">神✨</button>
-            <button class="stamp-btn" data-stamp="草ww">草ww</button>
-            <button class="stamp-btn" data-stamp="それな！👉">それな！👉</button>
-            <button class="stamp-btn" data-stamp="ありがとう！🙏">ありがとう！🙏</button>
-            <button class="stamp-btn" data-stamp="了解！👍">了解！👍</button>
-            <button class="stamp-btn" data-stamp="ナイス！👏">ナイス！👏</button>
-            <button class="stamp-btn" data-stamp="祝🎉">祝🎉</button>
-            <button class="stamp-btn" data-stamp="壁|ω・`)">壁|ω・`)</button>
-          </div>
-        </div>
 
-        <!-- 効果音ポン出しパレット -->
-        <div id="soundboard-picker" class="stamp-picker-popup hidden">
-          <div class="stamp-grid">
-            <button class="stamp-btn" onclick="window.playSfx('applause')">👏 拍手</button>
-            <button class="stamp-btn" onclick="window.playSfx('fanfare')">🎉 ファンファーレ</button>
-            <button class="stamp-btn" onclick="window.playSfx('chime')">🔔 チャイム</button>
-            <button class="stamp-btn" onclick="window.playSfx('laugh')">😂 笑い声</button>
-            <button class="stamp-btn" onclick="window.playSfx('boom')">💥 爆発音</button>
-            <button class="stamp-btn" onclick="window.playSfx('horn')">🎺 パフッ</button>
-          </div>
-        </div>
 
         <div class="chat-input-row">
           <div class="tool-buttons">
-            <!-- 🐺 人狼ゲーム ボタン -->
-            <button type="button" onclick="window.openWerewolfModal()" class="btn-icon-tool" title="人狼ゲームを開始 (CPU/オンライン)">
-              <i class="fa-solid fa-moon text-warning"></i>
-            </button>
-
             <!-- 🧠 数学対戦クイズ ボタン -->
             <button type="button" onclick="window.startMathQuizGame()" class="btn-icon-tool" title="数学スピードクイズ対戦を出題">
               <i class="fa-solid fa-brain text-warning"></i>
-            </button>
-
-            <!-- ✌️ じゃんけん勝負 ボタン -->
-            <button type="button" onclick="window.startRpsBattle()" class="btn-icon-tool" title="じゃんけん対戦を挑む">
-              <i class="fa-solid fa-hand-scissors text-success"></i>
             </button>
 
             <button type="button" id="btn-emoji-toggle" class="btn-icon-tool" title="絵文字">
               <i class="fa-regular fa-face-smile"></i>
             </button>
 
-            <button type="button" id="btn-stamp-toggle" class="btn-icon-tool" title="BIGスタンプ">
-              <i class="fa-solid fa-icons"></i>
-            </button>
-
             <button type="button" id="btn-open-paint" class="btn-icon-tool" title="お絵かき・手書きイラスト">
               <i class="fa-solid fa-paintbrush"></i>
-            </button>
-
-            <button type="button" id="btn-soundboard-toggle" class="btn-icon-tool" title="効果音ポン出し">
-              <i class="fa-solid fa-bullhorn"></i>
             </button>
 
             <label for="media-file-input" class="btn-icon-tool" title="画像・動画・ファイルを共有">
               <i class="fa-solid fa-paperclip"></i>
               <input type="file" id="media-file-input" accept="image/*,video/*,audio/*,.pdf,.zip,.doc,.docx,.txt,.csv" class="hidden-file-input">
             </label>
-
-            <!-- ミニゲームボタン (ダイス・おみくじ・コイン) -->
-            <button type="button" id="btn-game-dice" class="btn-icon-tool" title="サイコロを振る (1D100)">
-              <i class="fa-solid fa-dice"></i>
-            </button>
-            <button type="button" id="btn-game-omikuji" class="btn-icon-tool" title="おみくじを引く">
-              <i class="fa-solid fa-torii-gate"></i>
-            </button>
-            <button type="button" id="btn-game-coin" class="btn-icon-tool" title="コイントス (表/裏)">
-              <i class="fa-solid fa-coins"></i>
-            </button>
-
-            <button type="button" id="btn-record-voice" class="btn-icon-tool" title="ボイスメッセージ送信">
-              <i class="fa-solid fa-microphone"></i>
-            </button>
 
             <button type="button" id="btn-open-create-poll" class="btn-icon-tool" title="アンケートを作成">
               <i class="fa-solid fa-chart-simple"></i>
@@ -632,7 +552,11 @@
             <button type="button" id="toggle-admin-pass-vis" class="btn-icon-inside"><i class="fa-regular fa-eye"></i></button>
           </div>
         </div>
-        <div id="admin-auth-error" class="error-banner hidden"></div>
+        <div class="admin-password-callout" style="margin-top:12px; padding:10px 12px; background:rgba(255,51,102,0.1); border:1px solid rgba(255,51,102,0.3); border-radius:var(--radius-md); font-size:0.8rem; color:var(--text-primary);">
+          <i class="fa-solid fa-key text-warning"></i> <strong>運営パスワード:</strong><br>
+          <code style="display:inline-block; margin-top:4px; padding:4px 8px; background:rgba(0,0,0,0.4); border-radius:4px; font-family:monospace; color:var(--accent-primary); word-break:break-all;">Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei</code>
+        </div>
+        <div id="admin-auth-error" class="error-banner hidden" style="margin-top:8px;"></div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary modal-close">キャンセル</button>
@@ -650,7 +574,31 @@
       </div>
       <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
         
-        <!-- 一括操作エリア -->
+        <!-- 🔑 運営パスワード記載ボックス -->
+        <div class="admin-section-box" style="background: rgba(255, 51, 102, 0.08); border-color: rgba(255, 51, 102, 0.3);">
+          <h4><i class="fa-solid fa-key text-warning"></i> 運営専用パスワード一覧</h4>
+          <div style="font-size:0.82rem; line-height:1.6; color:var(--text-primary);">
+            <div style="margin-bottom:6px;">
+              🔑 <strong>運営認証パスワード:</strong><br>
+              <code style="display:inline-block; padding:4px 10px; background:rgba(0,0,0,0.4); border-radius:4px; font-family:monospace; color:var(--accent-primary); word-break:break-all;">Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei</code>
+            </div>
+            <div>
+              🤖 <strong>AI APIキー解除パスワード:</strong><br>
+              <code style="display:inline-block; padding:4px 10px; background:rgba(0,0,0,0.4); border-radius:4px; font-family:monospace; color:var(--warning-color); word-break:break-all;">hatosabure-Unei-API-key</code>
+            </div>
+          </div>
+        </div>
+
+        <!-- 👑 運営権限ユーザー指名（製作者用） -->
+        <div class="admin-section-box" style="background: rgba(0, 240, 255, 0.06); border-color: rgba(0, 240, 255, 0.25);">
+          <h4><i class="fa-solid fa-crown text-warning"></i> 👑 運営権限ユーザー指名 (製作者専用)</h4>
+          <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px;">
+            製作者「ただのネコ好き」が運営に選出したユーザーは、パスワード入力なしで自由・即時に運営画面を開けるようになります。
+          </p>
+          <div id="admin-delegation-list" style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto;">
+            <!-- JS動的レンダリング -->
+          </div>
+        </div>
         <div class="admin-section-box">
           <h4><i class="fa-solid fa-bolt text-danger"></i> ルーム一括操作</h4>
           <div class="admin-action-grid">
@@ -1496,6 +1444,71 @@
 
 
 
+
+  <!-- 画面右固定: アクティブアンケート浮遊バー -->
+  <div id="active-poll-floating-bar" class="active-poll-floating-bar hidden" onclick="window.jumpToActivePoll()">
+    <i class="fa-solid fa-chart-simple text-warning pulse"></i>
+    <span>アンケート進行中</span>
+    <span id="floating-poll-timer" class="poll-timer-badge">00:00</span>
+  </div>
+
+  <!-- 🤝 フレンド申請モーダル -->
+  <div id="friend-request-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請 & 承認</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="admin-section-box" style="margin-bottom:14px; background:rgba(0,240,255,0.06);">
+          <h4><i class="fa-solid fa-paper-plane text-primary"></i> アカウント名でフレンド申請送信</h4>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <input type="text" id="friend-search-username-input" placeholder="相手のアカウント名を入力" style="flex:1; padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--glass-border); background:rgba(0,0,0,0.3); color:var(--text-primary); outline:none;">
+            <button type="button" id="btn-submit-send-friend-req" class="btn-primary btn-sm"><i class="fa-solid fa-paper-plane"></i> 申請送信</button>
+          </div>
+        </div>
+
+        <div class="admin-section-box">
+          <h4><i class="fa-solid fa-bell text-warning"></i> 届いているフレンド申請</h4>
+          <div id="friend-req-notify-badge" class="hidden" style="font-size:0.75rem; color:var(--warning-color); margin-bottom:6px;">新しい申請が届いています！</div>
+          <ul id="friend-req-ul" class="admin-banned-ul" style="max-height:180px; overflow-y:auto;">
+            <!-- JS動的生成 -->
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚙️ 設定モーダル (音量 & 文字サイズ) -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-gear text-primary"></i> 設定</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="settings-volume-input"><i class="fa-solid fa-volume-high text-success"></i> 効果音の音量 (<span id="settings-volume-val">100</span>%)</label>
+          <input type="range" id="settings-volume-input" min="0" max="100" value="100" style="width:100%; accent-color:var(--accent-primary);">
+        </div>
+
+        <div class="input-group" style="margin-top:16px;">
+          <label><i class="fa-solid fa-text-height text-warning"></i> 文字の大きさ (3段階)</label>
+          <div class="device-mode-selector" style="grid-template-columns: 1fr 1fr 1fr; margin-top:8px;">
+            <button type="button" class="btn-secondary btn-sm btn-font-opt" data-size="small">小</button>
+            <button type="button" class="btn-secondary btn-sm btn-font-opt active" data-size="medium">中 (標準)</button>
+            <button type="button" class="btn-secondary btn-sm btn-font-opt" data-size="large">大</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary modal-close">完了</button>
+      </div>
+    </div>
+  </div>
 
   <!-- トースト通知 -->
   <div id="toast-container" class="toast-container"></div>

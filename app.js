@@ -200,8 +200,18 @@ function globalRef(subPath) {
 
 // Web Audio API Synthesizer (SE & Soundboard)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let soundVolume = parseFloat(localStorage.getItem('cyberchat_sound_volume') || '1.0');
+let currentFontSize = localStorage.getItem('cyberchat_font_size') || 'medium';
+
+function applyFontSize(size) {
+  currentFontSize = size;
+  localStorage.setItem('cyberchat_font_size', size);
+  document.documentElement.setAttribute('data-font-size', size);
+}
+applyFontSize(currentFontSize);
+
 function playSound(type) {
-  if (!soundEnabled) return;
+  if (!soundEnabled || soundVolume <= 0) return;
   try {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const osc = audioCtx.createOscillator();
@@ -210,11 +220,14 @@ function playSound(type) {
     gain.connect(audioCtx.destination);
     const now = audioCtx.currentTime;
 
+    const baseVol = type === 'send' ? 0.15 : 0.12;
+    const masterVol = baseVol * soundVolume;
+
     if (type === 'send') {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(440, now);
       osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
-      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.setValueAtTime(masterVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
       osc.start(now);
       osc.stop(now + 0.12);
@@ -222,7 +235,7 @@ function playSound(type) {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(587.33, now);
       osc.frequency.setValueAtTime(880, now + 0.08);
-      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.setValueAtTime(masterVol, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
       osc.start(now);
       osc.stop(now + 0.18);
@@ -987,7 +1000,13 @@ function setupAdminSystem() {
   const panelModal = document.getElementById('admin-panel-modal');
 
   openAuthBtn.addEventListener('click', () => {
-    if (isAdminMode) {
+    if (isAdminMode || isCreatorName(myName) || adminUsersSet.has(myUserId)) {
+      isAdminMode = true;
+      window.isAdminMode = true;
+      state.isAdminMode = true;
+      localStorage.setItem('cyberchat_is_admin', 'true');
+      openAuthBtn.classList.add('active');
+      openAuthBtn.innerHTML = '<i class="fa-solid fa-crown text-warning"></i> <span>運営（認証済み）</span>';
       openAdminPanel();
     } else {
       passInput.value = '';
@@ -1070,9 +1089,9 @@ function setupAdminSystem() {
     const text = input.value.trim();
     if (!text) return;
 
-    await sendSpecialMessage('game', `📢 【運営公式アナウンス】\n${text}`);
+    await sendSystemMessage(`📢 【運営公式アナウンス】\n${text}`);
     input.value = '';
-    showToast('全体アナウンスを放送しました！', 'success');
+    showToast('全体公式アナウンスを放送しました！', 'success');
   });
 
   // 🔑 Admin AI API Key Management (Unlock with "hatosabure-Unei-API-key")
@@ -1151,6 +1170,7 @@ function openAdminPanel() {
   renderAdminUsersTable();
   renderAdminBannedUsersUI();
   renderAdminReportsUI();
+  renderAdminDelegationListUI();
   document.getElementById('admin-panel-modal').classList.remove('hidden');
 }
 
@@ -1682,6 +1702,9 @@ async function completeUserLogin() {
   updateMyProfileUI();
   initFirebaseRealtimeSync();
   initFriendListeners();
+  initAdminUsersListener();
+  setupSettingsModal();
+  setupFriendRequestsModal();
 
   cleanupInactiveAccounts();
 }
@@ -2378,7 +2401,7 @@ function renderSingleMessage(msgId, msg) {
         ${(isSelf || isAdminMode) && !msg.deleted ? `<button class="danger" onclick="window.deleteMsg('${msgId}')"><i class="fa-solid fa-trash"></i> 削除</button>` : ''}
         ${!isSelf ? `<button onclick="window.startWhisper('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-lock"></i> 内緒話</button>` : ''}
         ${!isSelf ? `<button onclick="window.sendFriendRequest('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-plus text-primary"></i> フレンド申請</button>` : ''}
-        ${(isCreatorName(myName) || (typeof friendsMap !== 'undefined' && friendsMap.has(msg.userId))) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${getUserEffects(msg.userId).trusted ? '信用解除' : '💎 信用付与'}</button>` : ''}
+        ${isCreatorName(myName) && !isSelf ? `<button onclick="window.toggleTrustUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-gem text-info"></i> ${getUserEffects(msg.userId).trusted ? '信用解除' : '💎 信用付与'}</button>` : ''}
         ${!isSelf ? `<button class="danger" onclick="window.ignoreUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-user-slash"></i> 無視する</button>` : ''}
         ${isAdminMode && !isSelf ? `<button class="danger" onclick="window.adminBanUser('${msg.userId}', '${escapeHtml(msg.name)}')"><i class="fa-solid fa-ban"></i> BAN・追放</button>` : ''}
       </div>
@@ -2391,11 +2414,15 @@ function renderSingleMessage(msgId, msg) {
     const senderClass = getUserNameClass(msg.userId, msg.name);
     const avatarGlowClass = getUserAvatarGlowClass(msg.userId, msg.name, msg.level || 1, msg.joinedMonth || '', msg.isVeteran || false);
 
+    const readsObj = msg.reads || {};
+    const readUsersCount = Object.keys(readsObj).filter(uid => uid !== msg.userId).length;
+    const readCountTag = readUsersCount > 0 ? `<span class="read-count-tag"><i class="fa-solid fa-check-double text-success"></i> 既読 ${readUsersCount}</span>` : '';
+
     const metaHtml = `
       <div class="msg-meta">
         <span class="msg-avatar-icon ${avatarGlowClass}">${renderAvatarHTML(msg.avatar || '🤖')}</span>
         <span class="${senderClass}">${starBadge}${whisperHeader} ${escapeHtml(msg.name)}${roleBadgesHtml} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
-        <span class="msg-time">${formatTime(msg.timestamp)} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
+        <span class="msg-time">${formatTime(msg.timestamp)}${readCountTag} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
     `;
 
@@ -2498,6 +2525,10 @@ function renderSingleMessage(msgId, msg) {
 
   applyFilterAndSearchToNode(msgWrapper, msg);
   container.appendChild(msgWrapper);
+
+  if (myUserId && msg.userId !== myUserId && (!msg.reads || !msg.reads[myUserId])) {
+    set(ref(db, `rooms/${currentRoomId}/messages/${msgId}/reads/${myUserId}`), Date.now()).catch(() => {});
+  }
 
   const messagesBox = document.getElementById('chat-messages');
   if (isSelf || isScrolledToBottom) {
@@ -2613,6 +2644,14 @@ function updateMessageUI(msgId, msgData) {
 
   const wrapper = document.getElementById(`msg-${msgId}`);
   if (!wrapper) return;
+
+  const timeEl = wrapper.querySelector('.msg-time');
+  if (timeEl) {
+    const readsObj = msgData.reads || {};
+    const readUsersCount = Object.keys(readsObj).filter(uid => uid !== msgData.userId).length;
+    const readCountTag = readUsersCount > 0 ? `<span class="read-count-tag"><i class="fa-solid fa-check-double text-success"></i> 既読 ${readUsersCount}</span>` : '';
+    timeEl.innerHTML = `${formatTime(msgData.timestamp)}${readCountTag} ${msgData.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}`;
+  }
 
   if (msgData.type === 'poll') {
     const bubble = wrapper.querySelector('.msg-bubble');
@@ -2910,12 +2949,12 @@ function setupScreenShare() {
 
     isExpanded = !isExpanded;
     if (isExpanded) {
-      appContainer.classList.add('screen-share-expanded');
+      box.classList.add('expanded');
       btnExpand.innerHTML = '<i class="fa-solid fa-compress"></i>';
       btnExpand.title = '小画面に戻す';
-      showToast('大画面（シアターモード）に切り替えました。右側でチャットができます！');
+      showToast('大画面（シアターモード）に切り替えました！');
     } else {
-      appContainer.classList.remove('screen-share-expanded');
+      box.classList.remove('expanded');
       btnExpand.innerHTML = '<i class="fa-solid fa-expand"></i>';
       btnExpand.title = '大画面切り替え';
       showToast('小画面（左下）に戻しました');
@@ -3002,7 +3041,7 @@ function setupScreenShare() {
   function stopScreenShare() {
     isScreenSharing = false;
     isExpanded = false;
-    appContainer.classList.remove('screen-share-expanded');
+    if (box) box.classList.remove('expanded');
     if (screenFrameInterval) clearInterval(screenFrameInterval);
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());
@@ -3963,6 +4002,7 @@ function setupPollModal() {
   const optionsContainer = document.getElementById('poll-options-container');
   const submitBtn = document.getElementById('btn-submit-poll');
   const errorMsg = document.getElementById('poll-error-msg');
+  const durationSelect = document.getElementById('poll-duration');
 
   openBtn.addEventListener('click', () => modal.classList.remove('hidden'));
   document.querySelectorAll('#poll-modal .modal-close').forEach(btn => {
@@ -3971,8 +4011,8 @@ function setupPollModal() {
 
   addOptBtn.addEventListener('click', () => {
     const currentOpts = optionsContainer.querySelectorAll('.poll-opt-row').length;
-    if (currentOpts >= 6) {
-      showToast('選択肢は最大6個までです', 'error');
+    if (currentOpts >= 8) {
+      showToast('選択肢は最大8個までです', 'error');
       return;
     }
     const row = document.createElement('div');
@@ -3986,6 +4026,8 @@ function setupPollModal() {
     const question = document.getElementById('poll-question').value.trim();
     const optInputs = optionsContainer.querySelectorAll('.poll-opt-input');
     const options = Array.from(optInputs).map(i => i.value.trim()).filter(val => val !== '');
+    const durationMinutes = parseInt(durationSelect ? durationSelect.value : '3', 10) || 3;
+    const expiresAt = Date.now() + durationMinutes * 60 * 1000;
 
     if (!question || options.length < 2) {
       errorMsg.textContent = '質問と少なくとも2つの選択肢を入力してください。';
@@ -4002,7 +4044,14 @@ function setupPollModal() {
         trip: myTrip,
         avatar: myAvatar,
         type: 'poll',
-        poll: { question: question, options: options, votes: {} },
+        poll: {
+          question: question,
+          options: options,
+          durationMinutes: durationMinutes,
+          expiresAt: expiresAt,
+          votes: {},
+          isFinished: false
+        },
         timestamp: Date.now()
       };
       if (whisperTargetId) msgObj.whisperTo = whisperTargetId;
@@ -4017,7 +4066,7 @@ function setupPollModal() {
       await set(newMsgRef, msgObj);
       modal.classList.add('hidden');
       cancelReply();
-      showToast('アンケートを投稿しました', 'success');
+      showToast(`アンケート（制限時間: ${durationMinutes}分）を投稿しました！`, 'success');
       playSound('send');
     } catch (err) {
       errorMsg.textContent = 'アンケートの投稿に失敗しました。';
@@ -4027,6 +4076,122 @@ function setupPollModal() {
     }
   });
 }
+
+/* ==========================================================================
+   ⚙️ Settings & Poll Timer & Result Announcement System
+   ========================================================================== */
+
+function setupSettingsModal() {
+  const btnOpen = document.getElementById('btn-open-settings');
+  const modal = document.getElementById('settings-modal');
+  const volumeInput = document.getElementById('settings-volume-input');
+  const volumeValText = document.getElementById('settings-volume-val');
+
+  if (volumeInput && volumeValText) {
+    const currentVolInt = Math.round(soundVolume * 100);
+    volumeInput.value = currentVolInt;
+    volumeValText.textContent = currentVolInt;
+
+    volumeInput.addEventListener('input', (e) => {
+      const valInt = parseInt(e.target.value, 10);
+      volumeValText.textContent = valInt;
+      soundVolume = valInt / 100;
+      soundEnabled = soundVolume > 0;
+      localStorage.setItem('cyberchat_sound_volume', soundVolume.toString());
+    });
+  }
+
+  document.querySelectorAll('.btn-font-opt').forEach(btn => {
+    if (btn.dataset.size === currentFontSize) btn.classList.add('active');
+    else btn.classList.remove('active');
+
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.btn-font-opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFontSize(btn.dataset.size);
+      showToast(`文字の大きさを「${btn.textContent}」に変更しました`);
+    });
+  });
+
+  if (btnOpen && modal) {
+    btnOpen.addEventListener('click', () => modal.classList.remove('hidden'));
+    modal.querySelectorAll('.modal-close').forEach(b => {
+      b.addEventListener('click', () => modal.classList.add('hidden'));
+    });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  }
+}
+
+let activePollMessageId = null;
+
+function checkActivePolls() {
+  const now = Date.now();
+  let foundActive = null;
+
+  allMessages.forEach((msg, mId) => {
+    if (msg.type === 'poll' && msg.poll && msg.poll.expiresAt && !msg.poll.isFinished) {
+      if (now >= msg.poll.expiresAt) {
+        finishPollAndAnnounce(mId, msg.poll);
+      } else if (!foundActive || msg.poll.expiresAt < foundActive.poll.expiresAt) {
+        foundActive = { mId, poll: msg.poll };
+      }
+    }
+  });
+
+  const bar = document.getElementById('active-poll-floating-bar');
+  const timerEl = document.getElementById('floating-poll-timer');
+
+  if (foundActive && bar && timerEl) {
+    activePollMessageId = foundActive.mId;
+    const remainSec = Math.max(0, Math.floor((foundActive.poll.expiresAt - now) / 1000));
+    const m = String(Math.floor(remainSec / 60)).padStart(2, '0');
+    const s = String(remainSec % 60).padStart(2, '0');
+    timerEl.textContent = `${m}:${s}`;
+    bar.classList.remove('hidden');
+  } else if (bar) {
+    bar.classList.add('hidden');
+    activePollMessageId = null;
+  }
+}
+
+window.jumpToActivePoll = () => {
+  if (activePollMessageId) {
+    window.scrollToMsg(activePollMessageId);
+  }
+};
+
+async function finishPollAndAnnounce(msgId, pollData) {
+  if (pollData._announcing) return;
+  pollData._announcing = true;
+  pollData.isFinished = true;
+
+  try {
+    await update(ref(db, `rooms/${currentRoomId}/messages/${msgId}/poll`), { isFinished: true });
+
+    const options = pollData.options || [];
+    const votes = pollData.votes || {};
+    const counts = options.map((opt, i) => {
+      const count = Object.values(votes).filter(v => v === i).length;
+      return { opt, count };
+    });
+
+    counts.sort((a, b) => b.count - a.count);
+
+    let resultText = `🎉 【アンケート結果発表】 「${pollData.question}」\n`;
+    if (counts.length > 0) {
+      resultText += `🥇 1位: 「${counts[0].opt}」 (${counts[0].count}票)\n`;
+    }
+    resultText += `📊 集計結果: ` + counts.map(c => `「${c.opt}」: ${c.count}票`).join('、 ');
+
+    sendSystemMessage(resultText);
+  } catch (err) {
+    console.error("Poll finish error:", err);
+  }
+}
+
+setInterval(checkActivePolls, 1000);
 
 function setupProfileModal() {
   const modal = document.getElementById('profile-modal');
@@ -4957,6 +5122,79 @@ window.declineFriendRequest = async (fromUid) => {
     showToast('処理に失敗しました', 'error');
   }
 };
+window.rejectFriendRequest = window.declineFriendRequest;
+
+window.sendFriendRequestByName = async (accName) => {
+  if (!accName) {
+    showToast('アカウント名を入力してください', 'warning');
+    return;
+  }
+  try {
+    const snap = await get(ref(db, 'accounts'));
+    if (!snap.exists()) {
+      showToast('指定されたアカウントが見つかりませんでした', 'error');
+      return;
+    }
+    let foundUid = null;
+    let foundName = accName;
+    Object.entries(snap.val()).forEach(([accKey, accData]) => {
+      if (accData.username && accData.username.toLowerCase() === accName.toLowerCase()) {
+        foundUid = accData.userId || accKey;
+        foundName = accData.username;
+      }
+    });
+    if (!foundUid) {
+      showToast(`「${accName}」が見つかりませんでした`, 'error');
+      return;
+    }
+    if (foundUid === myUserId) {
+      showToast('自分自身にフレンド申請は送れません', 'warning');
+      return;
+    }
+    await window.sendFriendRequest(foundUid, foundName);
+  } catch (e) {
+    showToast('フレンド申請処理に失敗しました', 'error');
+  }
+};
+
+function setupFriendRequestsModal() {
+  const modal = document.getElementById('friend-request-modal');
+  const btnOpen = document.getElementById('btn-open-friend-requests');
+  const btnSubmit = document.getElementById('btn-submit-send-friend-req');
+  const inputSearch = document.getElementById('friend-search-username-input');
+
+  if (btnOpen && modal) {
+    btnOpen.addEventListener('click', () => modal.classList.remove('hidden'));
+  }
+
+  if (modal) {
+    modal.querySelectorAll('.modal-close').forEach(b => {
+      b.addEventListener('click', () => modal.classList.add('hidden'));
+    });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  }
+
+  if (btnSubmit && inputSearch) {
+    btnSubmit.addEventListener('click', () => {
+      const val = inputSearch.value.trim();
+      if (val) {
+        window.sendFriendRequestByName(val);
+        inputSearch.value = '';
+      }
+    });
+    inputSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const val = inputSearch.value.trim();
+        if (val) {
+          window.sendFriendRequestByName(val);
+          inputSearch.value = '';
+        }
+      }
+    });
+  }
+}
 
 function setupFriendModalControls() {
   const btnOpen = document.getElementById('btn-open-friend-modal');
@@ -5299,14 +5537,82 @@ function initUserEffectsListener() {
   });
 }
 
-function refreshAllUserViews() {
-  if (typeof updateMyProfileUI === 'function') updateMyProfileUI();
-  if (typeof renderFriendsListUI === 'function') renderFriendsListUI();
-  if (typeof renderOnlineUsersUI === 'function') renderOnlineUsersUI();
-  const modal = document.getElementById('creator-effects-modal');
-  if (modal && !modal.classList.contains('hidden')) {
-    renderCreatorEffectsListUI();
+function initAdminUsersListener() {
+  const adminUsersRef = ref(db, 'admin_users');
+  onValue(adminUsersRef, (snapshot) => {
+    adminUsersSet.clear();
+    if (snapshot.exists()) {
+      Object.keys(snapshot.val()).forEach(uid => adminUsersSet.add(uid));
+    }
+    if (adminUsersSet.has(myUserId) || isCreatorName(myName)) {
+      isAdminMode = true;
+      window.isAdminMode = true;
+      state.isAdminMode = true;
+      localStorage.setItem('cyberchat_is_admin', 'true');
+      const openAuthBtn = document.getElementById('btn-open-admin-auth');
+      if (openAuthBtn) {
+        openAuthBtn.classList.add('active');
+        openAuthBtn.innerHTML = '<i class="fa-solid fa-crown text-warning"></i> <span>運営（認証済み）</span>';
+      }
+    }
+    renderAdminDelegationListUI();
+  });
+}
+
+window.toggleAdminUser = async (targetUid, targetName) => {
+  if (!isCreatorName(myName)) {
+    showToast('⚠️ 運営権限の指名・解除は「製作者」のみ行えます。', 'warning');
+    return;
   }
+  const isCurrentAdmin = adminUsersSet.has(targetUid);
+  try {
+    if (isCurrentAdmin) {
+      await remove(ref(db, `admin_users/${targetUid}`));
+      showToast(`「${targetName}」の運営権限を解除しました。`, 'info');
+    } else {
+      await set(ref(db, `admin_users/${targetUid}`), {
+        name: targetName,
+        grantedAt: Date.now(),
+        grantedBy: myName
+      });
+      showToast(`👑 「${targetName}」を運営メンバーに指名しました！`, 'success');
+    }
+  } catch (err) {
+    showToast('運営権限の更新に失敗しました', 'error');
+  }
+};
+
+function renderAdminDelegationListUI() {
+  const container = document.getElementById('admin-delegation-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const isCreator = isCreatorName(myName);
+  if (!isCreator) {
+    container.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem;">※運営権限の指名・解除操作は「製作者」のみ実行可能です</div>';
+    return;
+  }
+
+  if (activeUsersMap.size <= 1) {
+    container.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem;">現在他に参加ユーザーはいません</div>';
+    return;
+  }
+
+  activeUsersMap.forEach((uData, uid) => {
+    if (uid === myUserId) return;
+    const isAdmin = adminUsersSet.has(uid);
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:rgba(0,0,0,0.3); border-radius:6px; font-size:0.82rem;';
+    div.innerHTML = `
+      <div>
+        <strong>${escapeHtml(uData.name || 'ゲスト')}</strong> ${isAdmin ? '<span class="admin-badge"><i class="fa-solid fa-crown text-warning"></i> 運営</span>' : ''}
+      </div>
+      <button type="button" class="btn-secondary btn-sm ${isAdmin ? 'danger' : 'primary'}" onclick="window.toggleAdminUser('${uid}', '${escapeHtml(uData.name)}')">
+        ${isAdmin ? '<i class="fa-solid fa-user-minus"></i> 運営解除' : '<i class="fa-solid fa-crown"></i> 👑 運営に指名'}
+      </button>
+    `;
+    container.appendChild(div);
+  });
 }
 
 // 💎 信用ステータス互換切替ハンドラー
@@ -5316,6 +5622,10 @@ window.toggleTrustUser = async (targetUid, targetName) => {
 
 // ✨ エフェクト操作ハンドラー (信用済み / 宣伝部隊 / 初期メンバー)
 window.toggleUserEffect = async (targetUid, targetName, effectType) => {
+  if (effectType === 'trusted' && !isCreatorName(myName)) {
+    showToast('⚠️ 「信用済み」エフェクトの付与・解除は「製作者」のみ行えます。', 'warning');
+    return;
+  }
   const currentEff = getUserEffects(targetUid);
   const newEffState = !currentEff[effectType];
   
@@ -5586,7 +5896,16 @@ function renderUnifiedSidebarUserList() {
       });
     });
   } else if (activeSidebarTab === 'friends') {
-    if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-group text-warning"></i> フレンドリスト';
+    if (titleEl) {
+      titleEl.innerHTML = `<i class="fa-solid fa-user-group text-warning"></i> フレンド <button type="button" id="btn-open-friend-requests" class="btn-primary btn-sm" style="margin-left:6px; padding:2px 8px; font-size:0.75rem;"><i class="fa-solid fa-user-plus"></i> フレンド申請</button>`;
+      const openReqBtn = document.getElementById('btn-open-friend-requests');
+      if (openReqBtn) {
+        openReqBtn.onclick = () => {
+          const modal = document.getElementById('friend-request-modal');
+          if (modal) modal.classList.remove('hidden');
+        };
+      }
+    }
     friendsMap.forEach((f, fUid) => {
       const isOnline = globalOnlineUsersMap.has(fUid);
       const liveUser = globalOnlineUsersMap.get(fUid) || activeUsersMap.get(fUid);
@@ -5643,6 +5962,7 @@ function renderUnifiedSidebarUserList() {
 
   usersToRender.forEach(u => {
     const isSelf = u.userId === myUserId;
+    const isFriend = friendsMap.has(u.userId);
     const li = document.createElement('li');
     li.className = 'online-user-item glass-panel';
     li.style.margin = '4px 0';
@@ -5660,6 +5980,11 @@ function renderUnifiedSidebarUserList() {
     let actionBtns = '';
     if (activeSidebarTab === 'ignored') {
       actionBtns = `<button class="btn-secondary btn-sm" onclick="window.unignoreUser('${u.userId}')" title="無視解除"><i class="fa-solid fa-user-check"></i> 解除</button>`;
+    } else if (activeSidebarTab === 'friends' || isFriend) {
+      actionBtns = `
+        <button class="btn-icon btn-sm" onclick="window.startWhisper('${u.userId}', '${escapeHtml(u.name)}')" title="内緒話"><i class="fa-solid fa-lock text-primary"></i></button>
+        ${!isSelf ? `<button class="btn-icon danger btn-sm" onclick="window.removeFriend('${u.userId}', '${escapeHtml(u.name)}')" title="フレンド削除"><i class="fa-solid fa-user-minus"></i></button>` : ''}
+      `;
     } else if (!isSelf) {
       actionBtns = `
         <button class="btn-icon btn-sm" onclick="window.startWhisper('${u.userId}', '${escapeHtml(u.name)}')" title="内緒話"><i class="fa-solid fa-lock text-primary"></i></button>
