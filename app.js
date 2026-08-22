@@ -3145,6 +3145,41 @@ window.startMathQuizGame = () => {
   if (modal) modal.classList.remove('hidden');
 };
 
+async function checkQuizAnswer(msgData) {
+  if (!msgData || !msgData.text || msgData.type === 'system' || msgData.type === 'game') return;
+
+  try {
+    const snap = await get(roomRef('active_math_quiz'));
+    if (!snap.exists()) return;
+
+    const quizData = snap.val();
+    if (!quizData || !quizData.answer) return;
+
+    const userText = msgData.text.trim().toLowerCase();
+    const accepted = quizData.acceptedAnswers || [quizData.answer];
+
+    const isMatch = accepted.some(ans => {
+      const aStr = ans.toString().toLowerCase();
+      return aStr === userText || aStr === userText.replace(/\s+/g, '');
+    });
+
+    if (isMatch) {
+      await remove(roomRef('active_math_quiz'));
+      state.activeMathQuiz = null;
+
+      await sendSpecialMessage('game', `🎉 <strong>【正解発表！】</strong> <span style="color:var(--warning-color); font-weight:700;">${escapeHtml(msgData.name || 'ゲスト')}</span> さんが数学クイズ [${quizData.badge}] に見事正解しました！<br>問題: <strong>${escapeHtml(quizData.question)}</strong><br>正解: <span class="game-card-val">【 ${escapeHtml(quizData.answer)} 】</span> (+${quizData.pts} EXP獲得！🎉)`);
+
+      if (msgData.userId === myUserId) {
+        playSound('fanfare');
+        gainExp(quizData.pts, `数学クイズ[${quizData.badge}]正解`);
+        showToast(`🎉 数学クイズ正解！ +${quizData.pts} EXP獲得！`, 'success');
+      }
+    }
+  } catch (err) {
+    console.error("checkQuizAnswer error:", err);
+  }
+}
+
 function setupMathQuizModal() {
   const modal = document.getElementById('math-quiz-modal');
   const openBtn = document.getElementById('btn-open-math-quiz');
@@ -3166,13 +3201,43 @@ function setupMathQuizModal() {
   });
 
   modal.querySelectorAll('.btn-math-level-opt').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const levelKey = btn.dataset.level || 'easy';
       const quizData = generateMathQuiz(levelKey);
       modal.classList.add('hidden');
 
       if (quizData) {
-        sendSpecialMessage('game', `🧠 <strong>【数学対戦クイズ出題！】</strong><br>難易度: <strong>${quizData.badge}</strong> (${quizData.levelName})<br>問題: <span class="game-card-val" style="font-size:1.15rem; font-weight:700; color:var(--accent-primary);">${escapeHtml(quizData.question)}</span><br><span style="font-size:0.8rem; color:var(--text-muted);">※チャットで半角数字または数値を送信して正解を競おう！ (正解で +${quizData.pts} EXP)</span>`);
+        try {
+          await set(roomRef('active_math_quiz'), {
+            question: quizData.question,
+            answer: quizData.answer,
+            acceptedAnswers: quizData.acceptedAnswers,
+            levelName: quizData.levelName,
+            badge: quizData.badge,
+            pts: quizData.pts,
+            askedBy: myName,
+            askedAt: Date.now()
+          });
+        } catch (e) {
+          console.error("Set active_math_quiz error:", e);
+        }
+
+        const quizCardHtml = `
+          <div class="math-quiz-card">
+            <div class="math-quiz-header">
+              <span class="math-quiz-badge">🧠 数学対戦クイズ出題！</span>
+              <span class="math-quiz-level">${quizData.badge}</span>
+            </div>
+            <div class="math-quiz-question-box">
+              <div class="math-quiz-label">問題:</div>
+              <div class="math-quiz-question-text">${escapeHtml(quizData.question)}</div>
+            </div>
+            <div class="math-quiz-footer-hint">
+              ※チャットに半角数字・数値で正解を送信して競おう！ (+${quizData.pts} EXP)
+            </div>
+          </div>
+        `;
+        sendSpecialMessage('game', quizCardHtml);
         showToast(`🧠 「${quizData.badge}」を出題しました！`, 'info');
       }
     });

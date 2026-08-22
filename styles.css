@@ -4737,3 +4737,84 @@ body.device-pc .sidebar-close-btn {
 [data-font-size="small"] .msg-bubble { font-size: 0.82rem; }
 [data-font-size="medium"] .msg-bubble { font-size: 0.92rem; }
 [data-font-size="large"] .msg-bubble { font-size: 1.05rem; }
+
+/* 🧠 数学クイズレスポンシブカード (スマホ表示最適化) */
+.math-quiz-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.98)) !important;
+  border: 2px solid rgba(255, 184, 0, 0.7) !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  margin: 4px 0 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(255, 184, 0, 0.25) !important;
+  max-width: 100% !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  text-align: left !important;
+}
+
+.math-quiz-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.math-quiz-badge {
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  color: #ffb800 !important;
+}
+
+.math-quiz-level {
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  padding: 2px 8px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  color: #ffffff !important;
+}
+
+.math-quiz-question-box {
+  background: rgba(0, 0, 0, 0.45) !important;
+  border-left: 4px solid #00f0ff !important;
+  padding: 10px 12px !important;
+  border-radius: 6px !important;
+  margin: 8px 0 !important;
+}
+
+.math-quiz-label {
+  font-size: 0.75rem !important;
+  color: #94a3b8 !important;
+  font-weight: 600 !important;
+  margin-bottom: 2px !important;
+}
+
+.math-quiz-question-text {
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  color: #00f0ff !important;
+  line-height: 1.4 !important;
+  word-break: break-word !important;
+  letter-spacing: 0.5px !important;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.5) !important;
+}
+
+.math-quiz-footer-hint {
+  font-size: 0.75rem !important;
+  color: #cbd5e1 !important;
+  margin-top: 6px !important;
+}
+
+@media (max-width: 600px) {
+  .math-quiz-card {
+    padding: 10px 10px !important;
+  }
+  .math-quiz-question-text {
+    font-size: 1.08rem !important;
+  }
+}
