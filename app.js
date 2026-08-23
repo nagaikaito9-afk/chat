@@ -53,6 +53,8 @@ let myStatus = '💬 雑談歓迎';
 let myBubbleColor = localStorage.getItem('cyberchat_bubble_color') || '#00f0ff';
 let myLevel = parseInt(localStorage.getItem('cyberchat_user_level') || '1');
 let myExp = parseInt(localStorage.getItem('cyberchat_user_exp') || '0');
+let myCreatedAt = parseInt(localStorage.getItem('cyberchat_created_at') || '0') || Date.now();
+let myLoginStreak = parseInt(localStorage.getItem('cyberchat_login_streak') || '1');
 let lastExpMsgTime = 0;
 
 let currentRoomId = 'public_main';
@@ -471,6 +473,14 @@ function gainExp(amount, reason = '') {
   localStorage.setItem('cyberchat_user_level', myLevel);
   localStorage.setItem('cyberchat_user_exp', myExp);
 
+  const savedKey = localStorage.getItem('cyberchat_account_key');
+  if (savedKey) {
+    update(globalRef(`accounts/${savedKey}`), {
+      level: myLevel,
+      exp: myExp
+    }).catch(e => console.warn("Failed to sync level/exp to DB:", e));
+  }
+
   if (didLevelUp) {
     playSound('fanfare');
     if (myLevel >= 50) {
@@ -483,6 +493,72 @@ function gainExp(amount, reason = '') {
   }
 
   updateMyProfileUI();
+  registerOnlineUser();
+}
+
+async function grantExpToAllOnlineUsers(amount, senderName = myName) {
+  if (!isCreatorUser() && !isCreatorName(myName) && !isAdminMode) {
+    showToast('🔒 この操作は製作者・運営権限ユーザーのみ実行可能です。', 'error');
+    return;
+  }
+  const expNum = parseInt(amount);
+  if (isNaN(expNum) || expNum < 1 || expNum > 10000) {
+    showToast('⚠️ EXPは 1 〜 10,000 の範囲で指定してください。', 'warning');
+    return;
+  }
+
+  try {
+    const grantData = {
+      amount: expNum,
+      senderName: senderName || myName || '製作者',
+      timestamp: Date.now(),
+      grantId: 'exp_' + Math.random().toString(36).substring(2, 10)
+    };
+    await push(globalRef('global_exp_grants'), grantData);
+    await sendSystemMessage(`🎁 【運営特別ボーナス】製作者「${senderName || myName || '製作者'}」がオンライン全員に +${expNum} EXP を配りました！`);
+    showToast(`🎉 オンライン全員（自分含む）に ${expNum} EXP を付与しました！`, 'success');
+  } catch (err) {
+    console.error("EXP grant error:", err);
+    showToast(`EXP配布エラー: ${err.message}`, 'error');
+  }
+}
+window.grantExpToAllOnlineUsers = grantExpToAllOnlineUsers;
+
+let unsubscribeExpGrants = null;
+const processedExpGrantIdsSet = new Set();
+const sessionStartTime = Date.now();
+
+function initExpGrantsListener() {
+  if (unsubscribeExpGrants) unsubscribeExpGrants();
+  
+  const grantsQuery = query(globalRef('global_exp_grants'), limitToLast(5));
+  unsubscribeExpGrants = onChildAdded(grantsQuery, (snapshot) => {
+    if (!snapshot.exists()) return;
+    const grant = snapshot.val();
+    if (!grant || !grant.grantId || !grant.amount) return;
+
+    if (grant.timestamp && grant.timestamp < sessionStartTime - 15000) {
+      processedExpGrantIdsSet.add(grant.grantId);
+      return;
+    }
+
+    if (processedExpGrantIdsSet.has(grant.grantId)) return;
+    processedExpGrantIdsSet.add(grant.grantId);
+
+    const amount = parseInt(grant.amount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    gainExp(amount, `製作者「${grant.senderName || '製作者'}」からの特別プレゼント`);
+    showToast(`🎁 製作者「${grant.senderName || '製作者'}」から +${amount} EXP が届きました！`, 'info');
+  });
+}
+
+function getRegistrationDays(createdAt = myCreatedAt) {
+  if (!createdAt) return 1;
+  const now = Date.now();
+  const diffMs = Math.max(0, now - parseInt(createdAt));
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+  return days;
 }
 
 function checkDailyLoginBonus() {
@@ -498,14 +574,27 @@ function checkDailyLoginBonus() {
     } else {
       streak = 1;
     }
+    myLoginStreak = streak;
     localStorage.setItem('cyberchat_login_streak', streak);
+
+    const savedKey = localStorage.getItem('cyberchat_account_key');
+    if (savedKey) {
+      update(globalRef(`accounts/${savedKey}`), {
+        lastLoginDate: todayStr,
+        loginStreak: streak
+      }).catch(e => console.warn("Failed to sync login streak to DB:", e));
+    }
 
     const bonusExp = 100 + (streak - 1) * 20;
     setTimeout(() => {
       showToast(`📅 デイリーログインボーナス！ ${streak}日連続ログイン中 (+${bonusExp} EXP)`, 'info');
       gainExp(bonusExp, `ログイン${streak}日連続`);
     }, 1500);
+  } else {
+    myLoginStreak = parseInt(localStorage.getItem('cyberchat_login_streak') || '1');
   }
+
+  updateMyProfileUI();
 }
 
 function isVeteranUser(uid, joinedMonth = '') {
@@ -858,6 +947,8 @@ async function registerOnlineUser() {
       status: myStatus,
       trip: myTrip,
       level: myLevel,
+      createdAt: myCreatedAt,
+      loginStreak: myLoginStreak,
       bubbleColor: myBubbleColor,
       joinedMonth: joinedM,
       isVeteran: isVet,
@@ -875,6 +966,8 @@ async function registerOnlineUser() {
       avatar: myAvatar,
       status: myStatus,
       level: myLevel,
+      createdAt: myCreatedAt,
+      loginStreak: myLoginStreak,
       bubbleColor: myBubbleColor,
       joinedMonth: joinedM,
       isVeteran: isVet,
@@ -1026,6 +1119,15 @@ function setupAdminSystem() {
     input.value = '';
     showToast('全体公式アナウンスを放送しました！', 'success');
   });
+
+  const btnGiveExp = document.getElementById('btn-admin-give-exp');
+  if (btnGiveExp) {
+    btnGiveExp.addEventListener('click', async () => {
+      const input = document.getElementById('admin-exp-amount-input');
+      const val = input ? input.value : '500';
+      await grantExpToAllOnlineUsers(val);
+    });
+  }
 
   // 🔑 Admin AI API Key Management (Unlock with "hatosabure-Unei-API-key")
   const API_UNLOCK_PASSWORD = "hatosabure-Unei-API-key";
@@ -1404,13 +1506,44 @@ function setupAuthForms() {
       myBubbleColor = accData.bubbleColor || localStorage.getItem('cyberchat_bubble_color') || '#00f0ff';
       myTrip = await generateTrip(accName);
 
+      if (accData.level !== undefined && accData.level !== null) {
+        myLevel = parseInt(accData.level);
+      }
+      if (accData.exp !== undefined && accData.exp !== null) {
+        myExp = parseInt(accData.exp);
+      }
+
+      if (accData.createdAt) {
+        myCreatedAt = accData.createdAt;
+      } else if (!localStorage.getItem('cyberchat_created_at')) {
+        myCreatedAt = Date.now();
+      } else {
+        myCreatedAt = parseInt(localStorage.getItem('cyberchat_created_at'));
+      }
+
+      if (accData.loginStreak !== undefined) {
+        myLoginStreak = parseInt(accData.loginStreak);
+      } else {
+        myLoginStreak = parseInt(localStorage.getItem('cyberchat_login_streak') || '1');
+      }
+
       localStorage.setItem('cyberchat_user_id', myUserId);
       localStorage.setItem('cyberchat_account_key', key);
       localStorage.setItem('cyberchat_account_name', myName);
       localStorage.setItem('cyberchat_bubble_color', myBubbleColor);
+      localStorage.setItem('cyberchat_user_level', myLevel);
+      localStorage.setItem('cyberchat_user_exp', myExp);
+      localStorage.setItem('cyberchat_created_at', myCreatedAt);
+      localStorage.setItem('cyberchat_login_streak', myLoginStreak);
 
       try {
-        await update(globalRef(`accounts/${key}`), { lastLoginAt: Date.now() });
+        await update(globalRef(`accounts/${key}`), { 
+          lastLoginAt: Date.now(),
+          level: myLevel,
+          exp: myExp,
+          createdAt: myCreatedAt,
+          loginStreak: myLoginStreak
+        });
       } catch (e) {}
 
       await completeUserLogin();
@@ -1486,6 +1619,9 @@ function setupAuthForms() {
 
       const currentMonthStr = new Date().toISOString().substring(0, 7); // e.g. 2026-08
 
+      myCreatedAt = Date.now();
+      myLoginStreak = 1;
+
       await set(globalRef(`accounts/${key}`), {
         userId: myUserId,
         username: myName,
@@ -1494,13 +1630,22 @@ function setupAuthForms() {
         recoveryEmail: recEmail,
         avatar: myAvatar,
         status: myStatus,
-        createdAt: Date.now(),
+        level: myLevel,
+        exp: myExp,
+        createdAt: myCreatedAt,
+        loginStreak: myLoginStreak,
+        lastLoginDate: new Date().toISOString().split('T')[0],
         joinedMonth: currentMonthStr
       });
 
       localStorage.setItem('cyberchat_user_id', myUserId);
       localStorage.setItem('cyberchat_account_key', key);
       localStorage.setItem('cyberchat_account_name', myName);
+      localStorage.setItem('cyberchat_user_level', myLevel);
+      localStorage.setItem('cyberchat_user_exp', myExp);
+      localStorage.setItem('cyberchat_created_at', myCreatedAt);
+      localStorage.setItem('cyberchat_login_streak', myLoginStreak);
+      localStorage.setItem('cyberchat_last_login_date', new Date().toISOString().split('T')[0]);
       if (recEmail) localStorage.setItem('cyberchat_recovery_email', recEmail);
       localStorage.setItem('cyberchat_is_veteran', 'true');
       localStorage.setItem('cyberchat_joined_month', currentMonthStr);
@@ -1627,10 +1772,40 @@ async function checkSavedSession() {
         myStatus = accData.status || '💬 雑談歓迎';
         myBubbleColor = accData.bubbleColor || localStorage.getItem('cyberchat_bubble_color') || '#00f0ff';
         myTrip = await generateTrip(myName);
+        if (accData.level !== undefined && accData.level !== null) {
+          myLevel = parseInt(accData.level);
+        }
+        if (accData.exp !== undefined && accData.exp !== null) {
+          myExp = parseInt(accData.exp);
+        }
+        if (accData.createdAt) {
+          myCreatedAt = accData.createdAt;
+        } else if (!localStorage.getItem('cyberchat_created_at')) {
+          myCreatedAt = Date.now();
+        } else {
+          myCreatedAt = parseInt(localStorage.getItem('cyberchat_created_at'));
+        }
+
+        if (accData.loginStreak !== undefined) {
+          myLoginStreak = parseInt(accData.loginStreak);
+        } else {
+          myLoginStreak = parseInt(localStorage.getItem('cyberchat_login_streak') || '1');
+        }
+
         localStorage.setItem('cyberchat_bubble_color', myBubbleColor);
+        localStorage.setItem('cyberchat_user_level', myLevel);
+        localStorage.setItem('cyberchat_user_exp', myExp);
+        localStorage.setItem('cyberchat_created_at', myCreatedAt);
+        localStorage.setItem('cyberchat_login_streak', myLoginStreak);
 
         try {
-          await update(globalRef(`accounts/${savedKey}`), { lastLoginAt: Date.now() });
+          await update(globalRef(`accounts/${savedKey}`), { 
+            lastLoginAt: Date.now(),
+            level: myLevel,
+            exp: myExp,
+            createdAt: myCreatedAt,
+            loginStreak: myLoginStreak
+          });
         } catch (e) {}
 
         await completeUserLogin();
@@ -1659,6 +1834,7 @@ async function completeUserLogin() {
   initFirebaseRealtimeSync();
   initFriendListeners();
   initAdminUsersListener();
+  initExpGrantsListener();
   setupSettingsModal();
   setupFriendRequestsModal();
 
@@ -1910,6 +2086,18 @@ function updateMyProfileUI() {
 
   const statusDisp = document.getElementById('my-status-display');
   if (statusDisp) statusDisp.textContent = myStatus;
+
+  const regDaysVal = document.getElementById('val-reg-days');
+  const loginStreakVal = document.getElementById('val-login-streak');
+  const modalRegDays = document.getElementById('modal-stat-reg-days');
+  const modalLoginStreak = document.getElementById('modal-stat-login-streak');
+
+  const regDaysNum = getRegistrationDays(myCreatedAt);
+
+  if (regDaysVal) regDaysVal.textContent = regDaysNum;
+  if (loginStreakVal) loginStreakVal.textContent = myLoginStreak;
+  if (modalRegDays) modalRegDays.textContent = `${regDaysNum}日目`;
+  if (modalLoginStreak) modalLoginStreak.textContent = `${myLoginStreak}日連続`;
 
   const joinPrev = document.getElementById('join-avatar-preview');
   if (joinPrev) joinPrev.innerHTML = renderAvatarHTML(myAvatar);
@@ -3351,6 +3539,29 @@ function setupChatControls() {
     if (isSending) return;
     const text = textInput.value.trim();
     if (!text && !selectedFileObject) return;
+
+    if (text.startsWith('/exp ') || text.startsWith('/giveexp ')) {
+      const parts = text.split(' ');
+      const expVal = parseInt(parts[1]);
+      if (isCreatorUser() || isCreatorName(myName) || isAdminMode) {
+        if (!isNaN(expVal) && expVal >= 1 && expVal <= 10000) {
+          await grantExpToAllOnlineUsers(expVal);
+          textInput.value = '';
+          textInput.style.height = 'auto';
+          return;
+        } else {
+          showToast('⚠️ EXP数値は 1 〜 10,000 の範囲で指定してください。(例: /exp 500)', 'warning');
+          textInput.value = '';
+          textInput.style.height = 'auto';
+          return;
+        }
+      } else {
+        showToast('🔒 EXP一括配布コマンドは製作者・運営者専用です。', 'error');
+        textInput.value = '';
+        textInput.style.height = 'auto';
+        return;
+      }
+    }
 
     if (!checkAntiSpam(text)) return;
 

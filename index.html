@@ -220,6 +220,16 @@
           </div>
           <span id="my-exp-text" class="exp-text-val">0 / 50 EXP (0%)</span>
         </div>
+
+        <!-- 📅 新規登録からの日数 ＆ 🔥 連日ログイン数表示 -->
+        <div class="user-stats-bar">
+          <div class="stat-badge-pill" title="アカウント新規登録からの経過日数">
+            <i class="fa-solid fa-calendar-days text-primary"></i> 登録 <strong id="val-reg-days">1</strong>日目
+          </div>
+          <div class="stat-badge-pill" title="連続ログイン日数">
+            <i class="fa-solid fa-fire text-warning"></i> 連続 <strong id="val-login-streak">1</strong>日
+          </div>
+        </div>
       </div>
 
       <!-- 5 Categorized List Tab Buttons -->
@@ -565,6 +575,21 @@
             <!-- JS動的レンダリング -->
           </div>
         </div>
+
+        <!-- 🎁 オンライン全員EXP配布 (製作者専用) -->
+        <div class="admin-section-box" style="background: rgba(255, 215, 0, 0.08); border-color: rgba(255, 215, 0, 0.3);">
+          <h4><i class="fa-solid fa-gift text-warning"></i> 🎁 オンライン全員にEXP配布 (1〜10,000)</h4>
+          <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px;">
+            自分を含めた現在オンラインの全ユーザーに 1 〜 10,000 EXP をリアルタイムで付与します。
+          </p>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="number" id="admin-exp-amount-input" min="1" max="10000" value="500" placeholder="1〜10000" style="width:130px; padding:7px 10px; background:rgba(0,0,0,0.5); border:1px solid rgba(255,215,0,0.4); border-radius:6px; color:#fff; font-weight:bold;">
+            <button type="button" id="btn-admin-give-exp" class="btn-primary" style="background:linear-gradient(135deg, #ffd700, #ff8c00); color:#000; font-weight:bold; border:none; padding:7px 14px; cursor:pointer; border-radius:6px;">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> オンライン全員にEXPを配布
+            </button>
+          </div>
+        </div>
+
         <div class="admin-section-box">
           <h4><i class="fa-solid fa-bolt text-danger"></i> ルーム一括操作</h4>
           <div class="admin-action-grid">
@@ -1078,6 +1103,19 @@
         <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
+        <!-- 📅 登録からの日数 & 🔥 連続ログイン数 概要表示 -->
+        <div class="profile-stats-summary-box" style="display:flex; justify-content:space-around; align-items:center; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; text-align:center;">
+          <div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:2px;"><i class="fa-solid fa-calendar-days text-primary"></i> 登録からの日数</div>
+            <div style="font-size:1.15rem; font-weight:700; color:var(--accent-primary);" id="modal-stat-reg-days">1日目</div>
+          </div>
+          <div style="width:1px; height:28px; background:rgba(255,255,255,0.15);"></div>
+          <div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:2px;"><i class="fa-solid fa-fire text-warning"></i> 連続ログイン数</div>
+            <div style="font-size:1.15rem; font-weight:700; color:var(--text-warning);" id="modal-stat-login-streak">1日連続</div>
+          </div>
+        </div>
+
         <div class="input-group">
           <label for="edit-username">新しいユーザー名 <span class="required">*</span></label>
           <input type="text" id="edit-username" placeholder="新しい名前を入力" maxlength="20">
