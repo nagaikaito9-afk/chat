@@ -205,6 +205,9 @@
             <div class="profile-trip" id="my-trip-display">◆------</div>
           </div>
           <div class="profile-card-actions">
+            <button id="btn-download-my-avatar" class="btn-icon" title="自分のアイコンをダウンロード" onclick="window.downloadUserAvatar(myAvatar, myName)">
+              <i class="fa-solid fa-download text-primary"></i>
+            </button>
             <button id="btn-open-edit-profile" class="btn-icon" title="プロフィール変更">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
@@ -1198,6 +1201,9 @@
               <div class="custom-preview-wrapper" style="margin-top:10px; display:flex; align-items:center; gap:10px;">
                 <span class="preview-lbl" style="font-size:0.85rem; color:var(--text-secondary);">現在のアイコン:</span>
                 <div id="edit-avatar-preview" class="avatar-preview-box">🤖</div>
+                <button type="button" class="btn-secondary btn-sm" onclick="window.downloadUserAvatar(myAvatar, myName)" title="現在のアイコンを保存">
+                  <i class="fa-solid fa-download"></i> 保存
+                </button>
               </div>
             </div>
           </div>
@@ -1482,6 +1488,9 @@
           </div>
         </div>
         <div class="fc-header-actions">
+          <button id="fc-btn-download-avatar" class="btn-secondary btn-sm" title="フレンドのアイコンをダウンロード">
+            <i class="fa-solid fa-download"></i> アイコン保存
+          </button>
           <button id="fc-btn-jump-room" class="btn-secondary btn-sm hidden" title="相手のいる部屋に移動">
             <i class="fa-solid fa-right-to-bracket"></i> 部屋へ移動
           </button>
@@ -1571,6 +1580,46 @@
       </div>
       <div class="modal-footer">
         <button class="btn-primary modal-close">完了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👤 ユーザー詳細 & アイコンダウンロード モーダル -->
+  <div id="user-card-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel animate-scale-up" style="max-width: 440px; text-align: center;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-id-card text-primary"></i> ユーザープロフィール & アイコン</h3>
+        <button class="btn-icon modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 20px 16px;">
+        <div class="user-card-avatar-wrapper" style="position: relative;">
+          <div id="uc-avatar-display" class="user-card-avatar-large">🤖</div>
+        </div>
+
+        <div class="user-card-info-box" style="width: 100%;">
+          <h3 id="uc-username-display" style="font-size: 1.3rem; margin-bottom: 4px; color: var(--text-primary);">ユーザー名</h3>
+          <div id="uc-badges-display" style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;"></div>
+          <div id="uc-status-text" class="user-item-status" style="font-size: 0.9rem; color: var(--accent-primary); font-weight: 500;">💬 雑談歓迎</div>
+          <div id="uc-trip-text" style="font-size: 0.78rem; opacity: 0.7; margin-top: 4px; font-family: monospace; color: var(--text-secondary);">◆------</div>
+        </div>
+
+        <div class="user-card-download-box" style="width: 100%; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: var(--radius-md); padding: 14px; text-align: center;">
+          <div style="font-size: 0.85rem; font-weight: bold; color: var(--accent-primary); margin-bottom: 10px;">
+            <i class="fa-solid fa-circle-down"></i> アイコンダウンロード
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+            <button type="button" id="btn-uc-download-avatar" class="btn-primary btn-block" style="padding: 10px 16px; font-weight: bold;">
+              <i class="fa-solid fa-download"></i> アイコンを保存 (PNG/GIF/動画)
+            </button>
+          </div>
+        </div>
+
+        <div id="uc-actions-row" style="display: flex; gap: 8px; width: 100%; justify-content: center;">
+          <!-- 内緒話・フレンド申請等 -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary modal-close">閉じる</button>
       </div>
     </div>
   </div>

@@ -2080,8 +2080,10 @@ function updateMyProfileUI() {
 
   const avatarDisp = document.getElementById('my-avatar');
   if (avatarDisp) {
-    avatarDisp.className = 'avatar-md ' + getUserAvatarGlowClass(myUserId, myName, myLevel);
+    avatarDisp.className = 'avatar-circle avatar-clickable ' + getUserAvatarGlowClass(myUserId, myName, myLevel);
     avatarDisp.innerHTML = renderAvatarHTML(myAvatar);
+    avatarDisp.title = 'クリックでプロフィール表示・アイコン保存';
+    avatarDisp.onclick = () => window.openUserProfileModal(myUserId, myName, myAvatar, myStatus, myLevel, myTrip);
   }
 
   const statusDisp = document.getElementById('my-status-display');
@@ -2593,8 +2595,8 @@ function renderSingleMessage(msgId, msg) {
 
     const metaHtml = `
       <div class="msg-meta">
-        <span class="msg-avatar-icon ${avatarGlowClass}">${renderAvatarHTML(msg.avatar || '🤖')}</span>
-        <span class="${senderClass}">${starBadge}${whisperHeader} ${escapeHtml(msg.name)}${roleBadgesHtml} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
+        <span class="msg-avatar-icon avatar-clickable ${avatarGlowClass}" onclick="window.openUserProfileModal('${msg.userId}', '${escapeHtml(msg.name)}', '${escapeHtml(msg.avatar || '🤖')}', '', ${msg.level || 1}, '${escapeHtml(msg.trip || '')}')" title="クリックでプロフィール表示・アイコン保存">${renderAvatarHTML(msg.avatar || '🤖')}</span>
+        <span class="${senderClass}">${starBadge}${whisperHeader} <span style="cursor:pointer;" onclick="window.openUserProfileModal('${msg.userId}', '${escapeHtml(msg.name)}', '${escapeHtml(msg.avatar || '🤖')}', '', ${msg.level || 1}, '${escapeHtml(msg.trip || '')}')">${escapeHtml(msg.name)}</span>${roleBadgesHtml} <span class="trip-badge">${escapeHtml(msg.trip)}</span></span>
         <span class="msg-time">${formatTime(msg.timestamp)}${readCountTag} ${msg.edited ? '<span style="font-size:0.7rem; opacity:0.6;">(編集済み)</span>' : ''}</span>
       </div>
     `;
@@ -5985,6 +5987,163 @@ window.downloadFile = (fileUrl, fileName) => {
   }
 };
 
+// 📥 ユーザーアイコン（絵文字・画像・動画）ダウンロードヘルパー
+window.downloadUserAvatar = (avatarStr, userName = 'user') => {
+  if (!avatarStr) avatarStr = '🤖';
+  const cleanName = (userName || 'user').replace(/[^a-zA-Z0-9_\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, '_');
+  const filename = `${cleanName}_icon`;
+
+  // 1. 動画アイコンの場合 (.mp4, .webm, data:video/など)
+  if (isVideoAvatar(avatarStr)) {
+    window.downloadFile(avatarStr, `${filename}.mp4`);
+    return;
+  }
+
+  // 2. 画像・GIFアイコンの場合 (data:image/ または http/https URL)
+  if (typeof avatarStr === 'string' && (avatarStr.startsWith('data:image/') || avatarStr.startsWith('http://') || avatarStr.startsWith('https://'))) {
+    if (avatarStr.includes('.gif') || avatarStr.startsWith('data:image/gif')) {
+      window.downloadFile(avatarStr, `${filename}.gif`);
+    } else {
+      window.downloadFile(avatarStr, `${filename}.png`);
+    }
+    return;
+  }
+
+  // 3. 絵文字アイコンの場合 (512x512 Canvasにサイバーネオン背景＋高画質描画してPNG出力)
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // サイバーダーク背景グラデーション
+    const grad = ctx.createLinearGradient(0, 0, 512, 512);
+    grad.addColorStop(0, '#0f172a');
+    grad.addColorStop(0.5, '#1e293b');
+    grad.addColorStop(1, '#020617');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(256, 256, 240, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 発光ネオンリング
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = '#00f0ff';
+    ctx.shadowColor = '#00f0ff';
+    ctx.shadowBlur = 24;
+    ctx.stroke();
+
+    // 絵文字文字描画
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.5)';
+    ctx.shadowBlur = 16;
+    ctx.font = '240px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(avatarStr, 256, 268);
+
+    const pngDataUrl = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = pngDataUrl;
+    a.download = `${filename}.png`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) document.body.removeChild(a);
+    }, 150);
+
+    showToast(`📥 「${userName}」のアイコンをダウンロードしました！`, 'success');
+  } catch (err) {
+    console.error("Download emoji avatar error:", err);
+    showToast('アイコンの保存に失敗しました', 'error');
+  }
+};
+
+// 👤 ユーザー詳細 & アイコンビューア表示モーダル
+window.openUserProfileModal = (userId, name, avatar, status, level, trip) => {
+  const modal = document.getElementById('user-card-modal');
+  if (!modal) return;
+
+  const liveUser = (typeof activeUsersMap !== 'undefined' ? activeUsersMap.get(userId) : null) || 
+                   (typeof globalOnlineUsersMap !== 'undefined' ? globalOnlineUsersMap.get(userId) : null);
+
+  const targetAvatar = avatar || (liveUser ? liveUser.avatar : '🤖');
+  const targetName = name || (liveUser ? liveUser.name : 'ユーザー');
+  const targetStatus = status || (liveUser ? liveUser.status : '💬 雑談歓迎');
+  const targetTrip = trip || (liveUser ? liveUser.trip : '◆------');
+  const targetLevel = level || (liveUser ? liveUser.level : 1);
+
+  const avatarDisplay = document.getElementById('uc-avatar-display');
+  const nameDisplay = document.getElementById('uc-username-display');
+  const badgesDisplay = document.getElementById('uc-badges-display');
+  const statusDisplay = document.getElementById('uc-status-text');
+  const tripDisplay = document.getElementById('uc-trip-text');
+  const downloadBtn = document.getElementById('btn-uc-download-avatar');
+  const actionsRow = document.getElementById('uc-actions-row');
+
+  if (avatarDisplay) {
+    const glow = getUserAvatarGlowClass(userId, targetName, targetLevel);
+    avatarDisplay.className = `user-card-avatar-large ${glow}`;
+    avatarDisplay.innerHTML = renderAvatarHTML(targetAvatar);
+    avatarDisplay.onclick = () => window.downloadUserAvatar(targetAvatar, targetName);
+  }
+
+  if (nameDisplay) nameDisplay.textContent = targetName;
+  if (badgesDisplay) badgesDisplay.innerHTML = getUserRoleBadges(userId, targetName, targetLevel);
+  if (statusDisplay) statusDisplay.textContent = targetStatus;
+  if (tripDisplay) tripDisplay.textContent = targetTrip;
+
+  if (downloadBtn) {
+    downloadBtn.onclick = () => {
+      window.downloadUserAvatar(targetAvatar, targetName);
+    };
+  }
+
+  if (actionsRow) {
+    let btnsHtml = '';
+    if (userId !== myUserId) {
+      btnsHtml += `
+        <button type="button" class="btn-primary btn-sm" onclick="window.startWhisper('${userId}', '${escapeHtml(targetName)}'); document.getElementById('user-card-modal').classList.add('hidden');">
+          <i class="fa-solid fa-lock"></i> 内緒話
+        </button>
+      `;
+      if (!friendsMap.has(userId)) {
+        btnsHtml += `
+          <button type="button" class="btn-secondary btn-sm" onclick="window.sendFriendRequest('${userId}', '${escapeHtml(targetName)}');">
+            <i class="fa-solid fa-user-plus text-primary"></i> フレンド申請
+          </button>
+        `;
+      } else {
+        btnsHtml += `
+          <button type="button" class="btn-primary btn-sm" onclick="window.openFriendChat('${userId}', '${escapeHtml(targetName)}', '${escapeHtml(targetAvatar)}'); document.getElementById('user-card-modal').classList.add('hidden');">
+            <i class="fa-solid fa-comments"></i> チャット
+          </button>
+        `;
+      }
+    } else {
+      btnsHtml += `
+        <button type="button" class="btn-secondary btn-sm" onclick="document.getElementById('user-card-modal').classList.add('hidden'); document.getElementById('btn-open-edit-profile').click();">
+          <i class="fa-solid fa-pen-to-square"></i> プロフィール編集
+        </button>
+      `;
+    }
+    actionsRow.innerHTML = btnsHtml;
+  }
+
+  modal.classList.remove('hidden');
+};
+
+function setupUserCardModal() {
+  const modal = document.getElementById('user-card-modal');
+  if (!modal) return;
+  modal.querySelectorAll('.modal-close').forEach(b => {
+    b.addEventListener('click', () => modal.classList.add('hidden'));
+  });
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+}
+
 function initGlobalFriendDmListener() {
   if (!myUserId) return;
   const dmNotifRef = ref(db, `user_dms/${myUserId}/latest`);
@@ -6319,6 +6478,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupChatMessageSearch();
   setupTranslationControls();
   setupDragAndDropFileUpload();
+  setupUserCardModal();
   renderUnifiedSidebarUserList();
 });
 
@@ -6524,23 +6684,29 @@ function renderUnifiedSidebarUserList() {
     if (u.isOnline) badges += '<span style="font-size:0.7rem; color:var(--success-color);">🟢 オンライン</span>';
 
     let actionBtns = '';
+    const dlBtnHtml = `<button class="btn-icon btn-sm" onclick="event.stopPropagation(); window.downloadUserAvatar('${escapeHtml(u.avatar || '🤖')}', '${escapeHtml(u.name)}')" title="アイコンをダウンロード"><i class="fa-solid fa-download text-primary"></i></button>`;
+
     if (activeSidebarTab === 'ignored') {
-      actionBtns = `<button class="btn-secondary btn-sm" onclick="window.unignoreUser('${u.userId}')" title="無視解除"><i class="fa-solid fa-user-check"></i> 解除</button>`;
+      actionBtns = `${dlBtnHtml}<button class="btn-secondary btn-sm" onclick="window.unignoreUser('${u.userId}')" title="無視解除"><i class="fa-solid fa-user-check"></i> 解除</button>`;
     } else if (activeSidebarTab === 'friends' || isFriend) {
       actionBtns = `
+        ${dlBtnHtml}
         <button class="btn-icon btn-sm" onclick="window.startWhisper('${u.userId}', '${escapeHtml(u.name)}')" title="内緒話"><i class="fa-solid fa-lock text-primary"></i></button>
         ${!isSelf ? `<button class="btn-icon danger btn-sm" onclick="window.removeFriend('${u.userId}', '${escapeHtml(u.name)}')" title="フレンド削除"><i class="fa-solid fa-user-minus"></i></button>` : ''}
       `;
     } else if (!isSelf) {
       actionBtns = `
+        ${dlBtnHtml}
         <button class="btn-icon btn-sm" onclick="window.startWhisper('${u.userId}', '${escapeHtml(u.name)}')" title="内緒話"><i class="fa-solid fa-lock text-primary"></i></button>
         <button class="btn-icon btn-sm" onclick="window.sendFriendRequest('${u.userId}', '${escapeHtml(u.name)}')" title="フレンド申請"><i class="fa-solid fa-user-plus text-warning"></i></button>
       `;
+    } else {
+      actionBtns = dlBtnHtml;
     }
 
     li.innerHTML = `
-      <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
-        <div class="avatar-sm">${renderAvatarHTML(u.avatar || '🤖')}</div>
+      <div style="display:flex; align-items:center; gap:8px; overflow:hidden; cursor:pointer;" onclick="window.openUserProfileModal('${u.userId}', '${escapeHtml(u.name)}', '${escapeHtml(u.avatar || '🤖')}', '${escapeHtml(u.status || '')}', ${u.level || 1}, '${escapeHtml(u.trip || '')}')">
+        <div class="avatar-sm avatar-clickable">${renderAvatarHTML(u.avatar || '🤖')}</div>
         <div style="overflow:hidden;">
           <div style="font-weight:600; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
             ${escapeHtml(u.name)} ${isSelf ? '<span style="font-size:0.7rem; color:var(--accent-primary);">(あなた)</span>' : ''}
