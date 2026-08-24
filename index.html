@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="css/components/paint-studio.css">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="ultra-lightweight">
   <!-- 背景グローエフェクト -->
   <div class="bg-glow bg-glow-1"></div>
   <div class="bg-glow bg-glow-2"></div>
@@ -319,8 +319,13 @@
           </button>
 
 
-          <!-- ⚙️ 設定ボタン (効果音の音量・文字の大きさ) -->
-          <button id="btn-open-settings" onclick="window.openSettingsModal()" class="btn-icon" title="⚙️ 設定 (音量・文字サイズ)">
+          <!-- ⚡ 超超超軽量モード切り替えボタン -->
+          <button id="btn-toggle-ultra-light" class="btn-icon active-light" title="⚡ 超超超軽量モード ON/OFF (爆速・省電力)">
+            <i class="fa-solid fa-bolt text-warning"></i>
+          </button>
+
+          <!-- ⚙️ 設定ボタン (効果音の音量・文字サイズ) -->
+          <button id="btn-open-settings" onclick="window.openSettingsModal()" class="btn-icon" title="⚙️ 設定 (音量・文字サイズ・軽量化)">
             <i class="fa-solid fa-gear"></i>
           </button>
 
@@ -1575,6 +1580,20 @@
             <button type="button" class="btn-secondary btn-sm btn-font-opt" data-size="small">小</button>
             <button type="button" class="btn-secondary btn-sm btn-font-opt active" data-size="medium">中 (標準)</button>
             <button type="button" class="btn-secondary btn-sm btn-font-opt" data-size="large">大</button>
+          </div>
+        </div>
+
+        <div class="input-group" style="margin-top:16px;">
+          <label><i class="fa-solid fa-bolt text-warning"></i> 動作スピード (サクサク軽量化)</label>
+          <div style="margin-top:8px; display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.05); padding:12px 14px; border-radius:var(--radius-sm); border:1px solid var(--glass-border);">
+            <div>
+              <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">⚡ 超超超軽量モード (推奨)</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">ぼかし・背景アニメ・影を完全OFFにして重さゼロに！</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settings-ultra-light-toggle" checked>
+              <span class="slider round"></span>
+            </label>
           </div>
         </div>
       </div>

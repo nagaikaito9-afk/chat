@@ -20,6 +20,7 @@ export const state = {
 
   deviceMode: localStorage.getItem('cyberchat_device_mode') || 'pc',
   currentTheme: localStorage.getItem('cyberchat_theme') || 'cyber',
+  ultraLightweight: localStorage.getItem('cyberchat_ultra_lightweight') !== 'false',
   isAdminMode: localStorage.getItem('cyberchat_is_admin') === 'true',
   ADMIN_PASSWORD: "Unei-Senyou-Password-hatosabure371-hatosabure371-ta-da-no-cat-like-unei",
   trustedUsersSet: new Set(),

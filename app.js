@@ -4626,11 +4626,58 @@ window.openSettingsModal = () => {
   if (modal) modal.classList.remove('hidden');
 };
 
+function applyUltraLightweightMode(enable) {
+  state.ultraLightweight = enable;
+  localStorage.setItem('cyberchat_ultra_lightweight', enable ? 'true' : 'false');
+
+  if (enable) {
+    document.body.classList.add('ultra-lightweight');
+  } else {
+    document.body.classList.remove('ultra-lightweight');
+  }
+
+  const btnHeader = document.getElementById('btn-toggle-ultra-light');
+  if (btnHeader) {
+    btnHeader.classList.toggle('active-light', enable);
+    btnHeader.title = enable ? '⚡ 超超超軽量モード: ON (爆速化中)' : '⚡ 超超超軽量モード: OFF';
+  }
+
+  const settingsToggle = document.getElementById('settings-ultra-light-toggle');
+  if (settingsToggle) {
+    settingsToggle.checked = enable;
+  }
+}
+
+window.toggleUltraLightweightMode = (forcedState) => {
+  const newState = forcedState !== undefined ? forcedState : !state.ultraLightweight;
+  applyUltraLightweightMode(newState);
+  if (newState) {
+    showToast('⚡ 超超超軽量モードをONにしました！（ぼかし・アニメ完全停止で爆速動作）', 'success');
+  } else {
+    showToast('✨ リッチデザインモードに戻しました', 'info');
+  }
+};
+
 function setupSettingsModal() {
   const btnOpen = document.getElementById('btn-open-settings');
   const modal = document.getElementById('settings-modal');
   const volumeInput = document.getElementById('settings-volume-input');
   const volumeValText = document.getElementById('settings-volume-val');
+
+  const btnUltraLight = document.getElementById('btn-toggle-ultra-light');
+  if (btnUltraLight) {
+    btnUltraLight.addEventListener('click', () => window.toggleUltraLightweightMode());
+  }
+
+  const settingsUltraToggle = document.getElementById('settings-ultra-light-toggle');
+  if (settingsUltraToggle) {
+    settingsUltraToggle.checked = state.ultraLightweight;
+    settingsUltraToggle.addEventListener('change', (e) => {
+      window.toggleUltraLightweightMode(e.target.checked);
+    });
+  }
+
+  applyUltraLightweightMode(state.ultraLightweight);
 
   if (btnOpen && modal) {
     btnOpen.addEventListener('click', () => window.openSettingsModal());
